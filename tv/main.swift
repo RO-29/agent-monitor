@@ -15,12 +15,17 @@ import WebKit
 
 let kURL = ProcessInfo.processInfo.environment["AGENT_TV_URL"] ?? "http://127.0.0.1:7777/tv"
 
-// Borderless windows refuse key/main status by default, which would stop the
-// web view from receiving clicks & keyboard. Override so the widget is fully
-// interactive.
-final class KeyableWindow: NSWindow {
+// A non-activating floating NSPanel. Two reasons it's a panel, not a window:
+//  1. Borderless windows refuse key status by default, which would stop the web
+//     view from receiving clicks & keyboard — canBecomeKey fixes that.
+//  2. A regular app's *main window* gets bound by macOS to the Space it opened
+//     on, so .canJoinAllSpaces is ignored (it only shows on its origin desktop).
+//     A panel is an auxiliary window that never becomes main, so it honors
+//     .canJoinAllSpaces and spans every Space — while the app keeps its Dock
+//     icon + ⌘Tab entry (.regular policy).
+final class KeyableWindow: NSPanel {
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
 
 // A grab strip: any click-drag on it moves the window. We drive the drag
@@ -37,15 +42,16 @@ final class Passthrough: NSView {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
-    var window: NSWindow!
+    var window: KeyableWindow!
     var web: WKWebView!
     var retryTimer: Timer?
     var statusItem: NSStatusItem!
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        // Regular app → shows a Dock icon + appears in ⌘Tab, so it's always
-        // launchable/toggleable even when the menu-bar status item is hidden
-        // behind the notch on modern MacBooks. (Also keeps the status item.)
+        // Regular app → Dock icon + ⌘Tab entry, so it's always launchable even
+        // when the menu-bar status item hides behind the notch. All-Spaces
+        // coverage is preserved by making the window a non-activating panel
+        // (see KeyableWindow) rather than by dropping to accessory policy.
         NSApp.setActivationPolicy(.regular)
 
         // ── window: borderless, floating, on all Spaces ──
@@ -55,13 +61,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         window = KeyableWindow(
             contentRect: NSRect(origin: origin, size: size),
-            styleMask: [.borderless, .resizable, .fullSizeContentView],
+            // .nonactivatingPanel keeps the panel auxiliary (never main) so it
+            // isn't pinned to one Space and doesn't steal focus from the app you
+            // click away to — the key to spanning all Spaces under .regular.
+            styleMask: [.borderless, .resizable, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.level = .floating                                   // always on top
+        window.isFloatingPanel = true            // auxiliary panel semantics
+        window.hidesOnDeactivate = false         // stay put when app deactivates
+        window.becomesKeyOnlyIfNeeded = false    // any click makes it key so WKWebView gets clicks/keys
+        window.level = .floating                 // always on top
         // Show on every Space and over fullscreen apps. (No .stationary — that
         // pins it to the desktop like a widget and stops it floating over other
         // Spaces' windows, which is why it only showed on an empty desktop.)
+        // As a non-activating panel this is honored under .regular policy.
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.isMovableByWindowBackground = true                  // drag anywhere
         window.isOpaque = false
@@ -141,6 +154,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         installStatusItem()   // menu-bar icon — the always-available way to bring it back
         installMenu()         // ⌘Q / ⌘R / ⌘W even as an accessory app
+
+        // Keep the widget on whichever Space you switch to. .canJoinAllSpaces is
+        // sometimes ignored for a .regular app's window (it stays on its origin
+        // desktop); re-asserting the behavior + ordering front on each Space
+        // change forces it onto the new active Space, so it's present on all.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(reassertAllSpaces),
+            name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+    }
+
+    @objc func reassertAllSpaces() {
+        guard window != nil, window.isVisible else { return }
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.orderFrontRegardless()   // pull onto the current Space without stealing focus
     }
 
     // Menu-bar presence so a dockless widget can always be re-shown after it's
