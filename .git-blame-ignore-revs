@@ -1,0 +1,6 @@
+# Commits that only reformat. Skip them in blame:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub honours this file automatically.
+
+# chore: gofmt — whole-tree gofmt pass, no behaviour change
+d6be3bd64ac0c2b268bbed918c1d50b00ad1d087

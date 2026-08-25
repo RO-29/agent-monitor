@@ -1,0 +1,33 @@
+# compiled binary
+/agent-monitor
+
+# AgentTV widget build artifact (built via tv/build.sh)
+/AgentTV.app
+
+# Xcode per-user state (not part of the shared project)
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
+
+# runtime logs
+/agent-monitor.log
+/agent-monitor.out.log
+/agent-monitor.err.log
+
+# embedded data dir written at runtime
+.agent-monitor/
+
+# IDE / editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# planning + per-machine settings (not part of the published source)
+.claude/
+.planning/
+
+# local dev handoff / notes (not published)
+/HANDOFF.md
+
+# e2e test harness build output
+/.e2e-bin/

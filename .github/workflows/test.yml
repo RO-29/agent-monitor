@@ -1,0 +1,62 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the in-flight run pointless.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS is where agent-monitor actually runs; Linux is the cheap
+        # canary for accidental darwin-isms in path handling — the install
+        # path resolution this suite covers is exactly the kind of code that
+        # silently assumes one platform's layout.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # Track the go directive rather than pinning a version here, so the
+          # two can't drift apart.
+          go-version-file: go.mod
+          cache: true
+
+      # Runs on one OS only: gofmt output is platform-independent, so checking
+      # it twice would just double the failure noise on a formatting slip.
+      - name: gofmt
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needs to run on these files:"
+            echo "$unformatted"
+            echo "---"
+            gofmt -d .
+            exit 1
+          fi
+          echo "all files are gofmt-clean"
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      # No -short: the e2e tests build the binary and drive `install` against a
+      # synthetic HOME, which is the coverage that matters most on a machine
+      # whose paths differ from the author's.
+      - name: test
+        run: go test ./... -race
