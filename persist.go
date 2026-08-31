@@ -20,10 +20,10 @@ type SessionDB struct {
 	db *sql.DB
 }
 
-func sessionDBPath() string { return filepath.Join(homeDir(), ".agent-monitor", "sessions.db") }
+func sessionDBPath() string { return filepath.Join(stateDir(), "sessions.db") }
 
 func OpenSessionDB() (*SessionDB, error) {
-	dir := filepath.Join(homeDir(), ".agent-monitor")
+	dir := stateDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (d *SessionDB) importSnapshotIfEmpty() {
 	if d.Count() > 0 {
 		return
 	}
-	dir := filepath.Join(homeDir(), ".agent-monitor")
+	dir := stateDir()
 	entries, _ := filepath.Glob(filepath.Join(dir, "sessions-snapshot-*.json"))
 	if len(entries) == 0 {
 		return

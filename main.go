@@ -19,7 +19,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//go:embed web/*
+// The React + Vite app is built into web/dist (npm run build in web/) and
+// embedded here, so `go build` still produces one self-contained binary.
+//
+//go:embed web/dist
 var webFS embed.FS
 
 var store *Store
@@ -178,14 +181,21 @@ func runServer() {
 	// Durable session history — mirror the volatile store to SQLite every 2
 	// minutes (and on shutdown) so history outlives restarts + the decay GC.
 	var flushSessions func()
+	loadSettings()
 	if db, err := OpenSessionDB(); err != nil {
 		log.Printf("sessions.db: disabled (%v)", err)
+		initTraceTables(nil)
 	} else {
 		flushSessions = StartSessionPersistence(store, db, 2*time.Minute)
+		initTraceTables(db)
 		defer db.Close()
 	}
+	// Trace summaries (segments, spans, cost, context) are computed off the
+	// request path and cached in SQLite; list views read the cache only.
+	startSummaryWorkers(store)
 
 	mux := http.NewServeMux()
+	registerTraceRoutes(mux)
 	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"sessions": store.All()})
 	})
@@ -197,7 +207,13 @@ func runServer() {
 			panes[reg.AgentID] = reg.PaneID
 		}
 		sessions := store.All()
-		chains, chainOf := computeChains(sessions, panes)
+		// Chains are now derived from threads (explicit continuations only);
+		// the response shape is unchanged for the iOS app and older clients.
+		threads, _ := computeThreads(sessions, panes)
+		chains, chainOf := chainsFromThreads(threads, sessions)
+		if chains == nil {
+			chains = []Chain{}
+		}
 		parentOf, childrenOf := matchSpawns(sessions)
 		writeJSON(w, map[string]any{
 			"chains": chains, "chainOf": chainOf,
@@ -873,7 +889,7 @@ func runServer() {
 
 	mux.HandleFunc("/ws", handleWS)
 
-	staticFS, err := fs.Sub(webFS, "web")
+	staticFS, err := fs.Sub(webFS, "web/dist")
 	if err != nil {
 		log.Fatalf("embed sub: %v", err)
 	}
@@ -881,30 +897,27 @@ func runServer() {
 	if err != nil {
 		log.Fatalf("embed read index.html: %v", err)
 	}
-	// /tv — compact "peek-a-boo" glance board of live sessions. Served on a
-	// clean path so the AgentTV floating widget (a WKWebView) can point at it.
-	tvBytes, err := fs.ReadFile(staticFS, "tv.html")
-	if err != nil {
-		log.Fatalf("embed read tv.html: %v", err)
-	}
-	mux.HandleFunc("/tv", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store, max-age=0")
-		w.Write(tvBytes)
-	})
 	fileServer := http.FileServer(http.FS(staticFS))
+	// Single-page app: hashed assets come from web/dist; every other path
+	// (/, /tv, /thread/…, /session/…) gets the shell so client routing works.
+	// The AgentTV widget still points at /tv.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve index.html directly — http.FileServer redirects /index.html to ./
-		// when canonicalising URLs, which loops if we rewrite "/" to "/index.html".
-		if r.URL.Path == "/" {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			// no-store on the SPA shell so a daemon rebuild is picked up on
-			// the next page load instead of being held by the browser cache.
-			w.Header().Set("Cache-Control", "no-store, max-age=0")
-			w.Write(indexBytes)
-			return
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p != "" && p != "index.html" {
+			if f, err := staticFS.Open(p); err == nil {
+				f.Close()
+				if strings.HasPrefix(p, "assets/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				}
+				fileServer.ServeHTTP(w, r)
+				return
+			}
 		}
-		fileServer.ServeHTTP(w, r)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// no-store on the SPA shell so a daemon rebuild is picked up on the
+		// next page load instead of being held by the browser cache.
+		w.Header().Set("Cache-Control", "no-store, max-age=0")
+		w.Write(indexBytes)
 	})
 
 	// Always bind 127.0.0.1 so local clients (the MCP permission server and
@@ -914,14 +927,21 @@ func runServer() {
 	// IP (e.g. 100.64.x.y) to expose ONLY over the tailnet, or 0.0.0.0 for all
 	// interfaces. It no longer replaces the loopback listener.
 	binds := []string{"127.0.0.1"}
+	remoteExposed := false
 	if v := os.Getenv("AGENT_MONITOR_BIND"); v != "" && v != "127.0.0.1" && v != "localhost" {
 		binds = append(binds, v)
+		remoteExposed = true
 		log.Printf("⚠ exposed beyond localhost on %s:%d — anyone who can reach it controls every registered tmux pane.", v, port)
 		log.Printf("  Reachable URLs:")
 		for _, u := range reachableURLs(port) {
 			log.Printf("    %s", u)
 		}
 	}
+
+	// Password-gate non-loopback traffic. Loopback (local agents, hooks, MCP,
+	// CLI) is always exempt, so this only affects LAN/Tailscale/public access.
+	initAuth(remoteExposed)
+	handler := authMiddleware(mux)
 	// Flush session history to SQLite on Ctrl-C / SIGTERM so an intentional
 	// restart keeps the latest state instead of waiting on the 2-min ticker.
 	if flushSessions != nil {
@@ -940,7 +960,7 @@ func runServer() {
 	for _, b := range binds {
 		addr := fmt.Sprintf("%s:%d", b, port)
 		log.Printf("agent-monitor listening on http://%s", addr)
-		go func(a string) { errCh <- http.ListenAndServe(a, mux) }(addr)
+		go func(a string) { errCh <- http.ListenAndServe(a, handler) }(addr)
 	}
 	log.Fatal(<-errCh)
 }
@@ -1005,12 +1025,19 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		default:
 		}
 	})
+	unsubTrace := traceBus.subscribe(func(e TraceEvent) {
+		select {
+		case out <- e:
+		default:
+		}
+	})
 	go func() {
 		defer func() {
 			unsubSess()
 			unsubPerm()
 			unsubPane()
 			unsubTalk()
+			unsubTrace()
 			close(out)
 			c.Close()
 		}()

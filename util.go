@@ -63,3 +63,13 @@ func decodePathFromDashEncoded(dir string, hasLeadingDash bool) string {
 	}
 	return path
 }
+
+// stateDir is where the daemon keeps its own files (sessions.db, panes.json,
+// talks.log, settings.json, password). AGENT_MONITOR_HOME overrides it so a
+// second daemon (dev build, tests) never touches the live instance's state.
+func stateDir() string {
+	if v := os.Getenv("AGENT_MONITOR_HOME"); v != "" {
+		return v
+	}
+	return homeDir() + "/.agent-monitor"
+}

@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @State private var serverURL = Config.serverURL
+    @State private var password = Config.password
     @State private var healthMsg: String?
     @State private var checking = false
 
@@ -15,13 +16,20 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .font(.callout.monospaced())
+                    SecureField("Password", text: $password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.callout.monospaced())
                     Button("Save & Reconnect") {
                         Config.serverURL = serverURL.trimmingCharacters(in: .whitespaces)
+                        Config.password = password.trimmingCharacters(in: .whitespaces)
                         store.connect()
                     }
                     Button("Reset to Tailscale default") {
                         serverURL = Config.defaultServer
                         Config.serverURL = Config.defaultServer
+                        password = Config.defaultPassword
+                        Config.password = Config.defaultPassword
                         store.connect()
                     }
                     .foregroundStyle(.secondary)
@@ -56,7 +64,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Agent Monitor mirrors the web dashboard over your tailnet. Bind the daemon to your Tailscale IP so only your devices can reach it.")
+                    Text("Agent Monitor mirrors the web dashboard over your tailnet. Bind the daemon to your Tailscale IP and set a password so only your devices can reach it. The password must match ~/.agent-monitor/password (or $AGENT_MONITOR_PASSWORD) on the daemon.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

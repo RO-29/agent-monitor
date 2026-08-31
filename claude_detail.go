@@ -25,6 +25,7 @@ type claudeAggregate struct {
 	Mode           string
 	LastMessage      string
 	LastActivityMs   int64
+	FirstActivityMs  int64 // first timestamp in the transcript → Session.StartedAt when seeding
 	Spawns           []SpawnRef
 	StartedWithClear bool // transcript began with a /clear (a continuation)
 }
@@ -61,6 +62,9 @@ func scanClaudeJSONL(path string, detailOut *SessionDetail, maxMessages int) (cl
 		}
 		kind, _ := j["type"].(string)
 		ts := parseTimestamp(j["timestamp"])
+		if ts > 0 && (agg.FirstActivityMs == 0 || ts < agg.FirstActivityMs) {
+			agg.FirstActivityMs = ts
+		}
 
 		switch kind {
 		case "ai-title":
@@ -361,6 +365,7 @@ func claudeLooksLikeMeta(text string) bool {
 		"<local-command-stdout>", "<local-command-caveat>", "<user-prompt-submit-hook>",
 		"<system-reminder>", "caveat:", "the messages below were generated",
 		"a session-scoped stop hook", "goal set:",
+		"<task-notification>", "[request interrupted", "<bash-input>", "<bash-stdout>", "<bash-stderr>",
 	} {
 		if strings.HasPrefix(lower, p) {
 			return true

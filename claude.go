@@ -248,6 +248,9 @@ func seedClaudeFromTranscript(s *Store, path, sessionID, cwd string, state State
 		EventKind: "seed", EventText: "seeded from " + filepathBase(path),
 		TranscriptPath: path, HasTranscript: true,
 		LastActivityAtOverride: fileModMs,
+		// Anchor startedAt to the transcript's first record, not the seed time —
+		// thread linking (/clear within 30 min) depends on real start times.
+		StartedAtOverride: agg.FirstActivityMs,
 	}
 	if agg.Title != "" {
 		in.Title, in.HasTitle = agg.Title, true

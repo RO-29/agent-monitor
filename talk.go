@@ -59,7 +59,7 @@ type TalkEvent struct {
 }
 
 func NewTalkStore() *TalkStore {
-	dir := filepath.Join(homeDir(), ".agent-monitor")
+	dir := stateDir()
 	_ = os.MkdirAll(dir, 0o755)
 	return &TalkStore{
 		pending:   map[string]*Talk{},

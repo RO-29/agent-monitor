@@ -36,7 +36,11 @@ final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
             emitState(.disconnected("bad URL"))
             return
         }
-        let t = session.webSocketTask(with: url)
+        var req = URLRequest(url: url)
+        if let h = Config.authHeader {
+            req.setValue(h, forHTTPHeaderField: "Authorization")
+        }
+        let t = session.webSocketTask(with: req)
         task = t
         t.resume()
         receive()

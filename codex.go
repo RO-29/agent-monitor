@@ -108,6 +108,9 @@ func codexHandleLine(s *Store, fp, line string) {
 		if sessionID == "" {
 			return
 		}
+		// Record parent_thread_id links (continuations + subagent spawns) so
+		// threads and traces can use them before any trace is built.
+		codexRecordLinks(sessionID, fp, payload, parseTimestamp(j["timestamp"]))
 		codexMu.Lock()
 		codexSessionMeta[fp] = struct{ SessionID, Cwd string }{sessionID, cwd}
 		codexMu.Unlock()
@@ -122,6 +125,11 @@ func codexHandleLine(s *Store, fp, line string) {
 			state = ClassifyAge(ageMs)
 			startedAt = st.ModTime().UnixMilli()
 		}
+		// session_meta carries the real start time; the file mtime is the END.
+		metaTs := parseTimestamp(j["timestamp"])
+		if metaTs == 0 {
+			metaTs = parseTimestamp(payload["timestamp"])
+		}
 		in := UpsertInput{
 			Tool: ToolCodex, SessionID: sessionID,
 			Cwd: cwd, HasCwd: true,
@@ -132,6 +140,9 @@ func codexHandleLine(s *Store, fp, line string) {
 		if startedAt > 0 {
 			in.StartedAtOverride = startedAt
 			in.LastActivityAtOverride = startedAt
+		}
+		if metaTs > 0 {
+			in.StartedAtOverride = metaTs
 		}
 		// Pull aggregates (token totals, tool histogram, files, first/last
 		// message, title-fallback) from the rollout the same way we do for

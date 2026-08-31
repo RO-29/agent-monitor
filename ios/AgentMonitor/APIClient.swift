@@ -26,8 +26,19 @@ struct APIClient {
 
     // MARK: GET helpers
 
+    /// Attaches the configured password as a Bearer token. Applied to every
+    /// request so remote (tailnet/LAN) access to a password-protected daemon
+    /// works; harmless when the daemon has no password set.
+    static func authorize(_ req: inout URLRequest) {
+        if let h = Config.authHeader {
+            req.setValue(h, forHTTPHeaderField: "Authorization")
+        }
+    }
+
     private func get<T: Decodable>(_ path: String, as: T.Type) async throws -> T {
-        let (data, resp) = try await session.data(from: try url(path))
+        var req = URLRequest(url: try url(path))
+        Self.authorize(&req)
+        let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
         return try JSONDecoder().decode(T.self, from: data)
     }
@@ -36,6 +47,7 @@ struct APIClient {
     private func post(_ path: String, body: [String: Any]? = nil) async throws -> Data {
         var req = URLRequest(url: try url(path))
         req.httpMethod = "POST"
+        Self.authorize(&req)
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)

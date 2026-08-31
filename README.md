@@ -83,7 +83,9 @@ keys, cancel) and route messages between agents.
 ## Quick start
 
 ```bash
-# 1. build
+# 1. build (web/dist is committed, so `go build` alone works from a clone;
+#    run ./build.sh after changing anything under web/ — it runs `npm run build`
+#    and then `go build`, embedding the fresh dist into the binary)
 go build -o agent-monitor .
 
 # 2. wire it into Claude Code + Codex (idempotent; backs up edited files)
@@ -450,6 +452,55 @@ Mostly internal, but useful if you're scripting:
 | GET     | `/api/talk/{id}/await-reply`         | sender long-poll (reply flow)             |
 | POST    | `/api/permission/request`            | MCP server uses this             |
 | POST    | `/api/permission/{id}/respond`       | UI uses this                     |
+| GET     | `/api/threads`                       | `?tool=&state=live\|attention&project=` → threads (explicit continuations) |
+| GET     | `/api/thread/{id}`                   | thread + member sessions + cached trace summaries |
+| GET     | `/api/thread/{id}/story`             | every member's segments + chapters |
+| GET     | `/api/thread/{id}/learnings`         | ledger: memory · correction · summary · output |
+| GET     | `/api/trace/{id}/full`               | segments + spans (+ `?seg=&from=&to=&minDur=`) |
+| GET     | `/api/trace/{id}/segments`           | segments + cost / context meta  |
+| GET     | `/api/trace/{id}/spans`              | spans in a window                |
+| GET     | `/api/trace/{id}/span/{spanId}`      | args, result, parents, same-command history |
+| GET     | `/api/trace/{id}/chapter/{seg}`      | deterministic + enriched chapter |
+| POST    | `/api/trace/{id}/enrich/{seg}`       | run the LLM chapter pass (`?force=1`) |
+| POST    | `/api/trace/{id}/promote`            | `{text, type}` → memory file     |
+| GET     | `/api/summaries`                     | per-session trace summary (segments, cost, context) |
+| GET     | `/api/context/live`                  | context used vs window per live session |
+| GET/POST| `/api/settings`                      | `{enrichEnabled, enrichModel, dailyCapUsd}` |
+
+The WebSocket also carries `{kind:"segment"}` (a new boundary appeared) and
+`{kind:"chapter"}` (an enriched chapter landed).
+
+---
+
+## Trace: segments, spans, chapters, threads
+
+Every transcript is parsed into a **trace** (`trace.go`, `trace_claude.go`,
+`trace_codex.go`), cached in memory per file size + mtime, with a cheap summary
+persisted in SQLite (`trace_summaries`) so list views never parse a transcript:
+
+- **Segment** — the part of a session between two boundaries: `start`,
+  `compact`, `clear`, `resume`. Claude Code boundaries come from
+  `system/compact_boundary` (+ `compactMetadata`: pre/post/dropped tokens,
+  duration), the `isCompactSummary` message that follows it, and the
+  `SessionStart:clear|compact|resume` hook records. Codex boundaries come from
+  `compacted` / `context_compacted`.
+- **Span** — one row on the waterfall: a user prompt, a turn (closed by
+  `turn_duration`), a tool call (paired `tool_use` → `tool_result`, `is_error`),
+  or a subagent run (children parsed from `<session>/subagents/agent-*.jsonl`,
+  joined by `toolUseId`; Codex children by `parent_thread_id`).
+- **Chapter** — one card per segment: the point, intent changes, outcome,
+  learnings, open items, outputs. Deterministic first (from the compaction
+  summary sections, prompts, memory writes, `pr-link`, `frame-link`, handoff
+  docs, commits); optional LLM enrichment (`claude -p`, Haiku by default)
+  behind `/api/settings.enrichEnabled` with a daily USD cap, stored in
+  SQLite (`chapters`).
+- **Thread** — sessions linked ONLY by an explicit continuation
+  (`threads.go`): `/clear` in the same cwd within 30 min (or the same tmux
+  pane), Codex `parent_thread_id`, or a shared `*HANDOFF|PLAN|RESUME|PROMPT*.md`
+  in the first prompt. `/api/chains` keeps its old shape, derived from threads.
+
+`AGENT_MONITOR_HOME` moves the state directory (default `~/.agent-monitor`), so
+a second daemon (dev build on another port) never touches the live one's files.
 
 ---
 
@@ -515,12 +566,24 @@ agent-monitor/
 ├── install_hooks.go      # patches ~/.claude/settings.json
 ├── tail.go               # tiny line-by-line file tailer
 ├── detail.go             # session-detail dispatcher
-├── util.go               # path helpers
+├── trace.go              # trace model: segments, spans, chapters, learnings (+ cache)
+├── trace_claude.go       # Claude Code transcript → trace (boundaries, turns, tools, subagents)
+├── trace_codex.go        # Codex rollout → trace (compacted, turn_context, token_count, child threads)
+├── threads.go            # explicit-continuation thread linking (/clear, resume, handoff)
+├── enrich.go             # settings, SQLite summary cache, WS trace bus, `claude -p` enrichment
+├── api_trace.go          # /api/threads, /api/thread/*, /api/trace/*, /api/settings, /api/context/live
+├── util.go               # path helpers, stateDir()
 ├── wrapper.go            # `agent-monitor run / send / list / read / type / keys / id / name / resolve`
+├── build.sh              # npm run build (web/) + go build
 ├── bin/
 │   └── claude-hook.sh    # SessionStart hook script
-└── web/
-    └── index.html        # single-page web app (vanilla JS, no build step)
+└── web/                  # React + Vite + TypeScript app; dist/ is embedded via go:embed
+    ├── src/api/          # types.ts (JSON shapes), client.ts (fetch wrappers)
+    ├── src/lib/          # ws.ts (live store), format.ts, icons.tsx
+    ├── src/app/          # Shell (rail, topbar, toasts, notifications, help)
+    ├── src/pages/        # threads · session (transcript, pane) · trace · story · learnings · tv
+    ├── src/components/   # pane bridge, attention panel, help overlay
+    └── dist/             # built output (committed)
 ```
 
 ---

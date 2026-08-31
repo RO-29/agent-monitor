@@ -64,7 +64,7 @@ type PaneEvent struct {
 }
 
 func NewPaneRegistry() *PaneRegistry {
-	dir := filepath.Join(homeDir(), ".agent-monitor")
+	dir := stateDir()
 	_ = os.MkdirAll(dir, 0o755)
 	pr := &PaneRegistry{
 		byAgentID: map[string]*PaneRegistration{},
