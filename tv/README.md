@@ -19,7 +19,8 @@ a daemon rebuild, not a recompile.
 
 The daemon must be running (`./agent-monitor`) — the widget retries until it's up.
 
-- **Dockless**: no Dock icon or app-switcher entry (`LSUIElement`).
+- **Dock + ⌘Tab**: a regular app entry, so it stays launchable even when
+  the menu-bar icon hides behind the notch.
 - **Always on top / all Spaces**: floats over fullscreen apps too.
 - **Drag** it anywhere by its background; resize from any edge.
 - **Click a tile** → opens that session's full trace view in your browser.

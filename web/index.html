@@ -52,6 +52,7 @@
 
     --rail-w: 240px;
     --list-w: 380px;
+    --resizer-w: 7px;
     --r-sm: 6px;
     --r-md: 10px;
     --r-lg: 14px;
@@ -123,9 +124,11 @@
   /* ───── layout ───── */
   .app {
     display: grid;
-    grid-template-columns: var(--rail-w) var(--list-w) 1fr;
+    grid-template-columns: var(--rail-w) var(--list-w) var(--resizer-w) 1fr;
     height: 100vh;
   }
+  /* Collapse widths are set inside the >=1101px block below, where the rail
+     is a real grid column and the divider is on screen. */
   .rail { background: var(--bg-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
   .list { background: var(--bg-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
   /* The detail COLUMN is the single scroll surface: the pane bridge, the
@@ -141,6 +144,15 @@
 
   /* ───── rail ───── */
   .brand { padding: 18px 20px 16px; display: flex; align-items: center; gap: 11px; border-bottom: 1px solid var(--border); }
+  .brand .ttl { flex: 1 1 auto; min-width: 0; }
+  .rail-toggle {
+    flex: 0 0 auto; width: 22px; height: 22px; padding: 0;
+    display: grid; place-items: center;
+    background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
+    color: var(--muted); cursor: pointer; transition: all 100ms ease;
+  }
+  .rail-toggle:hover { background: var(--bg-2); border-color: var(--border); color: var(--text); }
+  .rail-toggle svg { display: block; }
   .brand .logo {
     width: 30px; height: 30px; border-radius: 9px;
     background: linear-gradient(135deg, #7dd3fc 0%, #c084fc 100%);
@@ -152,6 +164,8 @@
   .brand .ttl .ver { display: block; color: var(--muted); font-size: 10px; font-weight: 400; margin-top: 1px; letter-spacing: 0.4px; }
 
   .rail-scroll { overflow-y: auto; flex: 1 1 0; min-height: 0; padding: 16px 0; }
+  /* Only the collapsed rail needs these — the expanded rail reads by label. */
+  .nav-glyph-collapsed { display: none; }
   .sec-title {
     font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
     color: var(--muted); font-weight: 600;
@@ -1176,6 +1190,9 @@
       grid-template-columns: 1fr 2fr;
       grid-template-rows: auto 1fr;
     }
+    /* Below this width the list/detail split is fixed: the rail is a slide-in
+       overlay and there is not enough room for a useful drag range. */
+    .col-resizer { display: none; }
     .rail {
       position: fixed; top: 0; bottom: 0; left: 0; width: 260px;
       transform: translateX(-100%); transition: transform 180ms ease;
@@ -1201,6 +1218,7 @@
       grid-template-columns: none;
       grid-template-rows: none;
     }
+    .col-resizer { display: none !important; }
     .mobile-topbar {
       display: flex !important;
       flex: 0 0 auto;
@@ -1578,16 +1596,24 @@
   }
   .detail-back:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-3); }
   .detail-back svg { flex-shrink: 0; }
+  /* The expand/restore button is icon-only, so it needs even padding rather
+     than the label-shaped padding above. */
+  #detail-expand { padding: 6px; }
   @media (min-width: 601px) {
     body.focus-detail .rail,
-    body.focus-detail .list { display: none; }
+    body.focus-detail .list,
+    body.focus-detail .col-resizer { display: none; }
     body.focus-detail .detail { grid-column: 1 / -1; }
-    body.focus-detail .focus-bar {
-      display: block; position: sticky; top: 0; z-index: 20;
+    /* The control strip appears as soon as a session is open — in the default
+       side-by-side layout as well as in full width — so Close and Expand are
+       always in the same place. */
+    body.has-selection .focus-bar {
+      display: flex; align-items: center; gap: 8px;
+      position: sticky; top: 0; z-index: 20;
       background: var(--bg-0); border-bottom: 1px solid var(--border);
     }
-    /* Facet bar sticks just below the back bar so both stay visible. */
-    body.focus-detail .trace-bar { top: 51px; }
+    /* Facet bar sticks just below the control strip so both stay visible. */
+    body.has-selection .trace-bar { top: 51px; }
     /* Give the wide detail a comfortable reading measure instead of letting
        lines run edge-to-edge on a 27" display. */
     body.focus-detail .focus-bar,
@@ -1595,6 +1621,75 @@
     body.focus-detail #pane-bridge-mount,
     body.focus-detail .detail-head { max-width: 1400px; margin-left: auto; margin-right: auto; width: 100%; }
   }
+
+  /* ── collapsed rail: icon-only strip ──
+     Every row keeps a clickable glyph, so filtering still works without the
+     labels. Titles on each row supply the name on hover. Only above 1100px —
+     below that the rail is already a slide-in overlay, where collapsing it
+     would mean hiding it twice. */
+  @media (min-width: 1101px) {
+    /* The rail shrinks to an icon-only strip. Width lives in a variable so the
+       grid track follows without a second rule. */
+    body.rail-collapsed { --rail-w: 60px; }
+    /* Collapsing the list zeroes its track. The divider stays put, so the
+       toggle that brings the list back is still on screen. */
+    body.list-collapsed { --list-w: 0px; }
+    body.list-collapsed .list { display: none; }
+    body.rail-collapsed .brand { flex-direction: column; gap: 10px; padding: 14px 0 12px; }
+    body.rail-collapsed .brand .ttl { display: none; }
+    body.rail-collapsed .sec-title { display: none; }
+    body.rail-collapsed .sec { margin-bottom: 14px; }
+    body.rail-collapsed .rail-scroll { padding: 12px 0; }
+    body.rail-collapsed .nav-item {
+      justify-content: center; gap: 0;
+      /* 2px more on the right balances the active row's left border. */
+      padding: 9px 2px 9px 0;
+    }
+    /* With the labels and counts gone, the glyph has to carry the active
+       state, so let it take the row's accent colour. */
+    body.rail-collapsed .nav-item.active .nav-glyph { color: var(--accent); }
+    body.rail-collapsed .nav-item .lbl,
+    body.rail-collapsed .nav-item .num { display: none; }
+    body.rail-collapsed .nav-glyph-collapsed { display: inline; }
+    body.rail-collapsed .rail-foot { padding: 10px 8px; }
+    body.rail-collapsed .ctrl-row { grid-template-columns: 1fr 1fr; gap: 5px; }
+    body.rail-collapsed .ctrl-btn { padding: 7px 0; }
+    body.rail-collapsed .cb-lbl { display: none; }
+    body.rail-collapsed .conn-pill { padding: 4px; }
+    body.rail-collapsed .conn-text { display: none; }
+    body.rail-collapsed .tmux-warn { display: none !important; }
+  }
+
+  /* ── list / detail divider ──
+     A thin hit area with a wider invisible grab margin, so it is easy to catch
+     with a mouse without drawing a fat line. */
+  .col-resizer {
+    position: relative; background: var(--border);
+    cursor: col-resize; user-select: none;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 120ms ease;
+  }
+  .col-resizer::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px;
+  }
+  .col-resizer:hover, .col-resizer.dragging { background: var(--accent-strong); }
+  body.list-collapsed .col-resizer { cursor: default; }
+  body.list-collapsed .col-resizer::before { display: none; }
+  .col-resizer-btn {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 18px; height: 26px; padding: 0; z-index: 5;
+    display: grid; place-items: center;
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r-sm); color: var(--muted);
+    cursor: pointer; transition: all 100ms ease;
+  }
+  .col-resizer-btn:hover { background: var(--bg-3); border-color: var(--accent); color: var(--accent); }
+  .col-resizer-btn svg { display: block; }
+  /* Nothing should react to the pointer mid-drag except the divider — an
+     iframe-free page still lets the web view swallow moves over the <pre>. */
+  body.col-dragging { cursor: col-resize; }
+  body.col-dragging * { pointer-events: none !important; user-select: none !important; }
+  body.col-dragging .col-resizer { pointer-events: auto !important; }
 
   @media (max-width: 600px) {
     .kpi { min-width: 33%; }
@@ -1611,50 +1706,51 @@
     <div class="brand">
       <div class="logo">A</div>
       <div class="ttl">agent-monitor<span class="ver">v0.3 · go</span></div>
+      <button class="rail-toggle" id="rail-toggle" aria-label="Collapse tools rail" title="Collapse tools rail"></button>
     </div>
     <div class="rail-scroll">
       <div class="sec">
         <div class="sec-title">Tools</div>
-        <div class="nav-item active" data-filter-tool="all">
+        <div class="nav-item active" data-filter-tool="all" title="All sessions">
           <span class="dot"></span><span class="lbl">All sessions</span><span class="num" id="n-all">0</span>
         </div>
-        <div class="nav-item tool-claude" data-filter-tool="claude">
+        <div class="nav-item tool-claude" data-filter-tool="claude" title="Claude Code">
           <span class="nav-glyph">✻</span><span class="lbl">Claude Code</span><span class="num" id="n-claude">0</span>
         </div>
-        <div class="nav-item tool-codex" data-filter-tool="codex">
+        <div class="nav-item tool-codex" data-filter-tool="codex" title="Codex">
           <span class="nav-glyph">⬢</span><span class="lbl">Codex</span><span class="num" id="n-codex">0</span>
         </div>
-        <div class="nav-item tool-opencode" data-filter-tool="opencode">
+        <div class="nav-item tool-opencode" data-filter-tool="opencode" title="opencode">
           <span class="nav-glyph">◆</span><span class="lbl">opencode</span><span class="num" id="n-opencode">0</span>
         </div>
-        <div class="nav-item tool-cursor" data-filter-tool="cursor">
+        <div class="nav-item tool-cursor" data-filter-tool="cursor" title="Cursor IDE">
           <span class="nav-glyph">▣</span><span class="lbl">Cursor IDE</span><span class="num" id="n-cursor">0</span>
         </div>
-        <div class="nav-item tool-cursor-agent" data-filter-tool="cursor-agent">
+        <div class="nav-item tool-cursor-agent" data-filter-tool="cursor-agent" title="cursor-agent CLI">
           <span class="nav-glyph">▶</span><span class="lbl">cursor-agent CLI</span><span class="num" id="n-cursor-agent">0</span>
         </div>
       </div>
       <div class="sec">
         <div class="sec-title">View</div>
-        <div class="nav-item active" data-filter-state="active">
-          <span class="lbl">Live &amp; idle</span><span class="num" id="n-active">0</span>
+        <div class="nav-item active" data-filter-state="active" title="Live &amp; idle">
+          <span class="nav-glyph nav-glyph-collapsed">◉</span><span class="lbl">Live &amp; idle</span><span class="num" id="n-active">0</span>
         </div>
-        <div class="nav-item" data-filter-state="attention">
-          <span class="lbl">Needs attention</span><span class="num" id="n-attention">0</span>
+        <div class="nav-item" data-filter-state="attention" title="Needs attention">
+          <span class="nav-glyph nav-glyph-collapsed">!</span><span class="lbl">Needs attention</span><span class="num" id="n-attention">0</span>
         </div>
-        <div class="nav-item" data-filter-state="all">
-          <span class="lbl">All history</span><span class="num" id="n-history">0</span>
+        <div class="nav-item" data-filter-state="all" title="All history">
+          <span class="nav-glyph nav-glyph-collapsed">◴</span><span class="lbl">All history</span><span class="num" id="n-history">0</span>
         </div>
       </div>
     </div>
     <div class="rail-foot">
       <div class="ctrl-row">
-        <button class="ctrl-btn" id="btn-notify">Notify</button>
-        <button class="ctrl-btn active" id="btn-sound">🔊 Sound</button>
-        <button class="ctrl-btn" id="btn-theme" title="Toggle light/dark">
+        <button class="ctrl-btn" id="btn-notify" title="Desktop notifications"><span class="cb-ic">🔔</span><span class="cb-lbl">Notify</span></button>
+        <button class="ctrl-btn active" id="btn-sound" title="Alert sound"><span class="cb-ic">🔊</span><span class="cb-lbl">Sound</span></button>
+        <button class="ctrl-btn ctrl-btn-icon" id="btn-theme" title="Toggle light/dark">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
         </button>
-        <button class="ctrl-btn" id="btn-help" title="Setup &amp; permission flow">?</button>
+        <button class="ctrl-btn ctrl-btn-icon" id="btn-help" title="Setup &amp; permission flow">?</button>
       </div>
       <div><span class="conn-pill" id="conn"><span class="led"></span><span class="conn-text">connecting…</span></span></div>
       <div><span class="tmux-warn" id="tmux-warn" hidden></span></div>
@@ -1684,15 +1780,25 @@
     <div class="list-scroll" id="list"></div>
   </section>
 
+  <!-- ─────── LIST / DETAIL DIVIDER ───────
+       Drag to resize the sessions list, double-click to reset, or use the
+       button to collapse it entirely. The button stays on the divider (not
+       inside the list) so it is still reachable once the list is hidden. -->
+  <div class="col-resizer" id="list-resizer" role="separator" aria-orientation="vertical"
+       aria-label="Resize sessions list" title="Drag to resize · double-click to reset">
+    <button class="col-resizer-btn" id="list-toggle" aria-label="Collapse sessions list" title="Collapse sessions list"></button>
+  </div>
+
   <!-- ─────── DETAIL ─────── -->
   <section class="detail">
     <!-- Persistent focus-mode back bar. Lives ABOVE the pane-bridge mount so
          it's always visible in full-width mode — even when a big live-pane
          viewer would otherwise push an in-header button off-screen. -->
     <div class="focus-bar" id="focus-bar">
-      <button class="detail-back" id="detail-back" title="Back to sessions (Esc)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>All sessions
+      <button class="detail-back" id="detail-back" title="Close session (Esc)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span id="detail-back-lbl">Close</span>
       </button>
+      <button class="detail-back" id="detail-expand" title="Expand to full width"></button>
     </div>
     <!-- Persistent pane-bridge mount. Lives outside #detail-inner so the
          renderDetail innerHTML rewrite never touches it — the live viewer's
@@ -2058,13 +2164,13 @@ const select = (id) => {
   state.selectedId = id;
   state.expandedItems.clear();
   try { if (id) location.hash = "s=" + encodeURIComponent(id); } catch {}
-  // Desktop/tablet: open the session full-width (rail + list collapse). Phones
-  // already swap to a single detail page via data-mobile-view below.
-  if (id && !window.matchMedia("(max-width: 600px)").matches) {
-    document.body.classList.add("focus-detail");
-  } else if (!id) {
-    document.body.classList.remove("focus-detail");
-  }
+  // Desktop/tablet: the session opens in the detail column beside the list, so
+  // the list stays visible and switching sessions is one click. Full width is
+  // opt-in via the Expand button. Phones still swap to a single detail page
+  // via data-mobile-view below.
+  document.body.classList.toggle("has-selection", !!id);
+  if (!id) document.body.classList.remove("focus-detail");
+  syncFocusControls();
   renderList();
   renderDetail();
   mountPaneBridge(id);
@@ -3474,10 +3580,34 @@ const connectWs = () => {
 };
 
 // ─── interactions ───
-// exitFocus returns from the full-width detail to the sessions list. Keeps
-// the selection so the row stays highlighted and re-opening is one click.
+const expandIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>`;
+const shrinkIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10h6V4M10 14H4v6M20 4l-7 7M4 20l7-7"/></svg>`;
+
+// Keeps the Close/Expand pair describing what they actually do right now: in
+// full width Close steps back to the list, in split view it clears the pane.
+const syncFocusControls = () => {
+  const full = document.body.classList.contains("focus-detail");
+  const expand = $("#detail-expand");
+  if (expand) {
+    expand.innerHTML = full ? shrinkIcon : expandIcon;
+    expand.title = full ? "Back to side-by-side" : "Expand to full width";
+  }
+  const lbl = $("#detail-back-lbl");
+  if (lbl) lbl.textContent = full ? "All sessions" : "Close";
+};
+
+// collapseFocus leaves full width but keeps the session open, dropping back to
+// the list-plus-detail layout.
+const collapseFocus = () => {
+  document.body.classList.remove("focus-detail");
+  syncFocusControls();
+};
+
+// exitFocus closes the session entirely and returns to the sessions list.
 const exitFocus = () => {
   document.body.classList.remove("focus-detail");
+  document.body.classList.remove("has-selection");
+  syncFocusControls();
   // Clear the selected session + its #s= identifier from the URL so a reload
   // (or shared link) lands on the list, not back in the session.
   state.selectedId = null;
@@ -3490,8 +3620,13 @@ const exitFocus = () => {
 };
 
 document.addEventListener("click", (e) => {
-  // ── Focus-mode back button ──
+  // ── Detail control strip ──
   if (e.target.closest("#detail-back")) { exitFocus(); return; }
+  if (e.target.closest("#detail-expand")) {
+    if (document.body.classList.contains("focus-detail")) collapseFocus();
+    else { document.body.classList.add("focus-detail"); syncFocusControls(); }
+    return;
+  }
   // ── Trace-view controls ──
   const facet = e.target.closest("[data-facet]");
   if (facet) {
@@ -3827,6 +3962,125 @@ const jumpToTs = (ts) => {
   setTimeout(() => best.classList.remove("flash"), 1500);
 };
 
+// ═══════════ LAYOUT CONTROLS ═══════════
+// Rail collapse, sessions-list width, and sessions-list collapse. All three
+// persist to localStorage so the layout you set is the layout you get back.
+// Every value is validated on read — a hand-edited or stale key must not be
+// able to wedge the layout into an unusable state.
+
+const RAIL_KEY = "agent-monitor-rail-collapsed";
+const LIST_W_KEY = "agent-monitor-list-w";
+const LIST_COLLAPSED_KEY = "agent-monitor-list-collapsed";
+
+// The drag range. --list-w in the stylesheet is the starting value; these
+// bound it so the list can never be dragged to unusable or absurd widths.
+const LIST_W_MIN = 260;
+const LIST_W_MAX = 720;
+const LIST_W_DEFAULT = 380;
+
+const chevronLeft = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+const chevronRight = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`;
+
+const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const writeStored = (key, val) => { try { localStorage.setItem(key, val); } catch (e) { console.warn("cannot persist " + key, e); } };
+
+// ── rail ──
+const applyRailCollapsed = (collapsed) => {
+  document.body.classList.toggle("rail-collapsed", collapsed);
+  const btn = $("#rail-toggle");
+  if (btn) {
+    btn.innerHTML = collapsed ? chevronRight : chevronLeft;
+    btn.title = collapsed ? "Expand tools rail" : "Collapse tools rail";
+    btn.setAttribute("aria-label", btn.title);
+  }
+};
+applyRailCollapsed(readStored(RAIL_KEY) === "1");
+$("#rail-toggle")?.addEventListener("click", () => {
+  const next = !document.body.classList.contains("rail-collapsed");
+  applyRailCollapsed(next);
+  writeStored(RAIL_KEY, next ? "1" : "0");
+});
+
+// ── sessions list width ──
+const clampListW = (px) => Math.min(LIST_W_MAX, Math.max(LIST_W_MIN, Math.round(px)));
+const applyListW = (px) => {
+  document.documentElement.style.setProperty("--list-w", clampListW(px) + "px");
+};
+const storedListW = Number(readStored(LIST_W_KEY));
+if (Number.isFinite(storedListW) && storedListW > 0) applyListW(storedListW);
+
+// ── sessions list collapse ──
+const applyListCollapsed = (collapsed) => {
+  document.body.classList.toggle("list-collapsed", collapsed);
+  const btn = $("#list-toggle");
+  if (btn) {
+    btn.innerHTML = collapsed ? chevronRight : chevronLeft;
+    btn.title = collapsed ? "Show sessions list" : "Collapse sessions list";
+    btn.setAttribute("aria-label", btn.title);
+  }
+};
+applyListCollapsed(readStored(LIST_COLLAPSED_KEY) === "1");
+$("#list-toggle")?.addEventListener("click", (e) => {
+  e.stopPropagation();   // don't let the divider read this as the start of a drag
+  const next = !document.body.classList.contains("list-collapsed");
+  applyListCollapsed(next);
+  writeStored(LIST_COLLAPSED_KEY, next ? "1" : "0");
+});
+
+// ── drag the divider ──
+// Pointer events (not mouse) so a trackpad, a mouse, and a touch display all
+// take the same path, and so pointer capture keeps the drag alive when the
+// cursor outruns the 7px divider.
+const resizer = $("#list-resizer");
+if (resizer) {
+  let dragging = false;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const railW = document.querySelector(".rail")?.getBoundingClientRect().width || 0;
+    applyListW(e.clientX - railW);
+  };
+
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove("dragging");
+    document.body.classList.remove("col-dragging");
+    try { resizer.releasePointerCapture(e.pointerId); } catch {}
+    const w = getComputedStyle(document.documentElement).getPropertyValue("--list-w").trim();
+    const px = parseFloat(w);
+    if (Number.isFinite(px)) writeStored(LIST_W_KEY, String(Math.round(px)));
+  };
+
+  resizer.addEventListener("pointerdown", (e) => {
+    // Only the primary button, and never while the list is collapsed — there
+    // is nothing to resize then, and the toggle owns that state.
+    if (e.button !== 0) return;
+    if (document.body.classList.contains("list-collapsed")) return;
+    if (e.target.closest("#list-toggle")) return;
+    dragging = true;
+    resizer.classList.add("dragging");
+    document.body.classList.add("col-dragging");
+    try { resizer.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+  });
+  resizer.addEventListener("pointermove", onMove);
+  resizer.addEventListener("pointerup", endDrag);
+  resizer.addEventListener("pointercancel", endDrag);
+
+  // Double-click the divider to go back to the default width.
+  resizer.addEventListener("dblclick", (e) => {
+    if (e.target.closest("#list-toggle")) return;
+    applyListW(LIST_W_DEFAULT);
+    writeStored(LIST_W_KEY, String(LIST_W_DEFAULT));
+  });
+}
+
+// Give the detail control strip its initial icons and labels. The strip is
+// hidden until a session is open, but the button contents are set once here
+// rather than on every select.
+syncFocusControls();
+
 // Mobile topbar: hamburger toggles the slide-in rail; back button returns
 // from the detail "page" to the list. Both are no-ops on desktop because
 // the topbar is display:none.
@@ -3854,7 +4108,7 @@ $("#btn-notify").addEventListener("click", async () => {
   if (state.notifyEnabled) {
     state.notifyEnabled = false;
     localStorage.setItem("agent-monitor-notify", "0");
-    $("#btn-notify").textContent = "Notify";
+    setCtrlLabel($("#btn-notify"), "🔔", "Notify");
     $("#btn-notify").classList.remove("active");
     showToast("Notifications muted", "Click Notify again to re-enable.");
     return;
@@ -3875,7 +4129,7 @@ $("#btn-notify").addEventListener("click", async () => {
   if (r !== "granted") return;
   state.notifyEnabled = true;
   localStorage.setItem("agent-monitor-notify", "1");
-  $("#btn-notify").textContent = "✓ On";
+  setCtrlLabel($("#btn-notify"), "✅", "On");
   $("#btn-notify").classList.add("active");
   // Always show an in-page toast so the user sees feedback even if the OS
   // silently swallows the OS-level notification (Focus mode, DND, browser
@@ -3949,7 +4203,7 @@ const showToast = (title, body) => {
 $("#btn-sound").addEventListener("click", () => {
   state.soundEnabled = !state.soundEnabled;
   $("#btn-sound").classList.toggle("active", state.soundEnabled);
-  $("#btn-sound").textContent = state.soundEnabled ? "🔊 Sound" : "🔇 Muted";
+  setCtrlLabel($("#btn-sound"), state.soundEnabled ? "🔊" : "🔇", state.soundEnabled ? "Sound" : "Muted");
   if (state.soundEnabled) playBeep();
 });
 
@@ -3963,13 +4217,27 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   const overlay = $("#help-overlay");
   if (overlay && overlay.classList.contains("open")) { overlay.classList.remove("open"); return; }
-  // Esc backs out of the full-width detail — but not while typing in a field
-  // (the pane-bridge / search inputs handle their own Esc semantics).
+  // Esc steps back one level — but not while typing in a field (the
+  // pane-bridge / search inputs handle their own Esc semantics).
   const tag = (document.activeElement && document.activeElement.tagName) || "";
-  if (document.body.classList.contains("focus-detail") && tag !== "TEXTAREA" && tag !== "INPUT") {
-    exitFocus();
+  if (tag === "TEXTAREA" || tag === "INPUT") return;
+  if (document.body.classList.contains("focus-detail")) {
+    collapseFocus();          // full width -> side-by-side
+  } else if (document.body.classList.contains("has-selection")) {
+    exitFocus();              // side-by-side -> no session open
   }
 });
+
+// The rail-foot buttons carry an icon and a label in separate spans, so the
+// collapsed rail can hide the words and keep the glyph. Writing textContent
+// would flatten both away, hence this helper.
+const setCtrlLabel = (el, icon, label) => {
+  if (!el) return;
+  const ic = el.querySelector(".cb-ic");
+  const lb = el.querySelector(".cb-lbl");
+  if (ic) ic.textContent = icon;
+  if (lb) lb.textContent = label;
+};
 
 // Theme handling — persisted to localStorage. Default to system preference.
 const THEME_KEY = "agent-monitor-theme";
@@ -4042,7 +4310,7 @@ const savedSound = localStorage.getItem(SOUND_KEY);
 if (savedSound !== null) {
   state.soundEnabled = savedSound === "1";
   $("#btn-sound").classList.toggle("active", state.soundEnabled);
-  $("#btn-sound").textContent = state.soundEnabled ? "🔊 Sound" : "🔇 Muted";
+  setCtrlLabel($("#btn-sound"), state.soundEnabled ? "🔊" : "🔇", state.soundEnabled ? "Sound" : "Muted");
 }
 $("#btn-sound").addEventListener("click", () => {
   localStorage.setItem(SOUND_KEY, state.soundEnabled ? "1" : "0");
@@ -4054,7 +4322,7 @@ $("#btn-sound").addEventListener("click", () => {
 if ("Notification" in window && Notification.permission === "granted") {
   const muted = localStorage.getItem("agent-monitor-notify") === "0";
   state.notifyEnabled = !muted;
-  $("#btn-notify").textContent = state.notifyEnabled ? "✓ On" : "Notify";
+  setCtrlLabel($("#btn-notify"), state.notifyEnabled ? "✅" : "🔔", state.notifyEnabled ? "On" : "Notify");
   $("#btn-notify").classList.toggle("active", state.notifyEnabled);
 }
 
