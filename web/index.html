@@ -408,6 +408,27 @@
   }
   .detail-head .head-row .pill { font-size: 11px; padding: 4px 10px; }
 
+  /* Session id — copyable so a run can be resumed from the CLI. */
+  .sid-row {
+    margin-top: 12px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .sid-row .sid-k {
+    color: var(--muted-2); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .sid-copy {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+    padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-2); color: var(--text-2);
+    font-family: inherit; font-size: 11px;
+  }
+  .sid-copy:hover { border-color: var(--accent); color: var(--text); }
+  .sid-copy .sid-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sid-copy .sid-ic { color: var(--muted); flex-shrink: 0; }
+  .sid-copy.copied { border-color: var(--green); color: var(--green); }
+  .sid-copy.copied .sid-ic { color: var(--green); }
+
   /* No longer its own scroller — the .detail column scrolls (see above). */
   .detail-body { overflow: visible; padding: 24px 28px 80px; flex: 1 1 0; min-height: 0; }
   .detail::-webkit-scrollbar { width: 10px; }
@@ -1632,9 +1653,14 @@
        grid track follows without a second rule. */
     body.rail-collapsed { --rail-w: 60px; }
     /* Collapsing the list zeroes its track. The divider stays put, so the
-       toggle that brings the list back is still on screen. */
+       toggle that brings the list back is still on screen.
+       The list keeps `display` — `none` would drop it out of the grid and
+       shift the divider and the detail one track to the left, leaving the
+       open session squeezed into the 7px divider track. visibility:hidden
+       keeps the (now zero-width) track occupied, so the detail still lands
+       on the 1fr track and fills the freed space. */
     body.list-collapsed { --list-w: 0px; }
-    body.list-collapsed .list { display: none; }
+    body.list-collapsed .list { visibility: hidden; border-right: none; }
     body.rail-collapsed .brand { flex-direction: column; gap: 10px; padding: 14px 0 12px; }
     body.rail-collapsed .brand .ttl { display: none; }
     body.rail-collapsed .sec-title { display: none; }
@@ -1969,6 +1995,34 @@ const projectName = (cwd) => {
 };
 const escape = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const chevSvg = () => `<svg class="chev-sec" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+const copySvg = () => `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+// CLI command that resumes a session for the tools that support it. Empty
+// string means "no known command" — the raw id is still copyable.
+const resumeCmd = (sess) => {
+  const id = sess.sessionId || "";
+  if (!id) return "";
+  if (sess.tool === "claude") return `claude --resume ${id}`;
+  if (sess.tool === "codex") return `codex resume ${id}`;
+  return "";
+};
+// Clipboard write with a legacy fallback — the async API needs a secure
+// context, which is not guaranteed when the UI is opened from a file URL.
+const copyToClipboard = async (text) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch (e) { console.warn("clipboard API write failed, using fallback", e); }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.top = "-1000px"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (e) { console.warn("clipboard fallback write failed", e); return false; }
+};
 const toolLetter = (t) => ({ claude:"C", codex:"O", opencode:"K", cursor:"S", "cursor-agent":"A"}[t] || t[0].toUpperCase());
 const toolName = (t) => ({ claude:"Claude Code", codex:"Codex", opencode:"opencode", cursor:"Cursor IDE", "cursor-agent":"cursor-agent"}[t] || t);
 // Official brand logos (single-path SVGs, 0 0 24 24) so each tool is instantly
@@ -2739,6 +2793,20 @@ const renderDetail = () => {
       </div>`;
   })();
 
+  // Session id — full value plus the tool's resume command, both copyable.
+  const sidRowHtml = (() => {
+    const sid = sess.sessionId || "";
+    if (!sid) return "";
+    const cmd = resumeCmd(sess);
+    const btn = (val, title) => `<span class="sid-copy" data-copy="${escape(val)}" title="${escape(title)}"><span class="sid-ic">${copySvg()}</span><span class="sid-v">${escape(val)}</span></span>`;
+    return `
+      <div class="sid-row">
+        <span class="sid-k">session-id</span>
+        ${btn(sid, "Copy session id")}
+        ${cmd ? btn(cmd, "Copy resume command") : ""}
+      </div>`;
+  })();
+
   root.innerHTML = `
     <div class="detail-head">
       <div class="crumbs">
@@ -2750,6 +2818,7 @@ const renderDetail = () => {
       </div>
       <h1 class="${titleClass}">${escape(title)}</h1>
       <div class="head-row">${chips.join("")}</div>
+      ${sidRowHtml}
       ${chainNavHtml}
       ${spawnBarHtml}
     </div>
@@ -3652,6 +3721,19 @@ document.addEventListener("click", (e) => {
   const bin = e.target.closest(".ribbon .bin[data-jump-ts]");
   if (bin) {
     jumpToTs(+bin.dataset.jumpTs);
+    return;
+  }
+  // ── copy-to-clipboard chips (session id, resume command) ──
+  const copyBtn = e.target.closest("[data-copy]");
+  if (copyBtn) {
+    const label = copyBtn.querySelector(".sid-v");
+    const original = label ? label.textContent : "";
+    copyToClipboard(copyBtn.dataset.copy || "").then(ok => {
+      if (!label) return;
+      label.textContent = ok ? "copied" : "copy failed";
+      copyBtn.classList.toggle("copied", ok);
+      setTimeout(() => { label.textContent = original; copyBtn.classList.remove("copied"); }, 1200);
+    });
     return;
   }
   // ── session-chain controls ──
