@@ -4,6 +4,9 @@
 # AgentTV widget build artifact (built via tv/build.sh)
 /AgentTV.app
 
+# AgentMonitor dashboard app build artifact (built via mac/build.sh)
+/AgentMonitor.app
+
 # Xcode per-user state (not part of the shared project)
 ios/**/xcuserdata/
 ios/**/*.xcuserstate

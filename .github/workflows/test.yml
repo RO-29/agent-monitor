@@ -52,6 +52,14 @@ jobs:
       - name: build
         run: go build ./...
 
+      # The two macOS app shells (tv/ and mac/) are Swift, outside the Go
+      # toolchain's reach. Typecheck them so a broken shell can't land silently.
+      - name: typecheck swift app shells
+        if: matrix.os == 'macos-latest'
+        run: |
+          swiftc -typecheck tv/main.swift
+          swiftc -typecheck mac/main.swift mac/hotkey.swift mac/daemon.swift
+
       - name: vet
         run: go vet ./...
 

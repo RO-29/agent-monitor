@@ -480,6 +480,44 @@ endpoints all consult the registry directly, never the session store.
 
 ---
 
+## Desktop apps
+
+Two optional native macOS shells around the same daemon. Both are thin
+WKWebView wrappers — the UI lives in `web/`, so changing a page needs a daemon
+rebuild, not a recompile. Neither installs a LaunchAgent; run them by hand.
+
+| | `AgentMonitor.app` | `AgentTV.app` |
+|---|---|---|
+| Page | `/` — the full dashboard | `/tv` — compact glance board |
+| Window | standard, resizable, position remembered | small, borderless, always on top, all Spaces |
+| Toggle | **⌥⌘A from any app**, menu-bar icon, Dock, ⌘Tab | menu-bar icon |
+| For | working in | watching out of the corner of your eye |
+| Daemon | bundled — the app starts it | needs one running |
+| Build | `./mac/build.sh --run` | `./tv/build.sh --run` |
+| Docs | [mac/README.md](mac/README.md) | [tv/README.md](tv/README.md) |
+
+`AgentMonitor.app` exists because a browser tab is hard to find among thirty
+others. ⌥⌘A brings the dashboard forward from anywhere and puts it away again.
+The shortcut uses Carbon's `RegisterEventHotKey`, so macOS never asks for
+Accessibility or Input Monitoring permission. Change it with
+`AGENT_MONITOR_HOTKEY="ctrl+opt+cmd+a"`, or point either app at a remote daemon
+with `AGENT_MONITOR_APP_URL` / `AGENT_TV_URL`.
+
+`AgentMonitor.app` also ships the daemon inside its bundle: on launch it adopts
+a daemon that is already listening, or starts its own and stops it on quit. So
+opening the app is the whole workflow — no terminal. It starts the daemon on
+loopback only and ignores `AGENT_MONITOR_BIND`; use `AGENT_MONITOR_APP_BIND` to
+expose it deliberately, or start the daemon by hand and let the app adopt it.
+The remaining one-time step, `agent-monitor install`, is an app menu item that
+asks before it edits any config.
+
+Caveat: desktop notifications do not fire inside these shells. WKWebView does
+not implement the Web Notification API the dashboard uses, so it degrades to
+silence. Sound alerts still work; use a browser tab if you need system
+notifications.
+
+---
+
 ## Mobile
 
 The web UI collapses to single-pane navigation on phones (≤ 600 px). The
@@ -519,8 +557,17 @@ agent-monitor/
 ├── wrapper.go            # `agent-monitor run / send / list / read / type / keys / id / name / resolve`
 ├── bin/
 │   └── claude-hook.sh    # SessionStart hook script
-└── web/
-    └── index.html        # single-page web app (vanilla JS, no build step)
+├── web/
+│   ├── index.html        # single-page web app (vanilla JS, no build step)
+│   └── tv.html           # compact glance board served at /tv
+├── mac/                  # AgentMonitor.app — dashboard as a Mac app (Swift)
+│   ├── main.swift        # window, menu bar, navigation policy
+│   ├── hotkey.swift      # Carbon global hotkey (no TCC permission needed)
+│   └── build.sh          # swiftc + bundle + ad-hoc codesign
+├── tv/                   # AgentTV.app — always-on-top glance widget (Swift)
+│   ├── main.swift
+│   └── build.sh
+└── ios/                  # SwiftUI iPhone client (Xcode project)
 ```
 
 ---
