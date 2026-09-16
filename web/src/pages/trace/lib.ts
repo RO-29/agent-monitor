@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
-import type { BoundaryKind, Chapter, Segment, Span, SpanFamily, TraceFull } from "../../api/types";
+import type { BoundaryKind, Chapter, Segment, Span, SpanFamily, TokenUsage, TraceFull } from "../../api/types";
 import { fmtClock, fmtDate } from "../../lib/format";
 import { onLiveEvent } from "../../lib/ws";
 
@@ -14,20 +14,9 @@ export const BOUNDARY: Record<BoundaryKind, { glyph: string; cls: string; label:
 
 export const FAM_ORDER: SpanFamily[] = ["bash", "agent", "mcp", "edit", "read", "web", "other", "model"];
 
-export interface TimeWindow {
-  from: number;
-  to: number;
-}
-
 export const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/** x position (0..1) of a timestamp inside a window */
-export const frac = (ts: number, w: TimeWindow) => (w.to > w.from ? (ts - w.from) / (w.to - w.from) : 0);
 
-export function segmentWindow(seg: Segment, lastTs: number): TimeWindow {
-  const to = seg.toTs > seg.fromTs ? seg.toTs : Math.max(lastTs, seg.fromTs + 60_000);
-  return { from: seg.fromTs, to };
-}
 
 // ── span index ────────────────────────────────────────────────────────────
 export interface SpanIndex {
@@ -86,16 +75,7 @@ export function indexSpans(spans: Span[]): SpanIndex {
   return { byId, children, roots, turns: roots.filter((s) => s.kind === "turn"), synthetic };
 }
 
-/** Axis tick label: clock only inside a day, date · clock for multi-day windows. */
-export function tickLabel(t: number, w: TimeWindow): string {
-  return w.to - w.from > 20 * 3_600_000 ? fmtDate(t) : fmtClock(t);
-}
 
-export function famCounts(spans: Span[]): Record<string, number> {
-  const c: Record<string, number> = {};
-  for (const s of spans) if (s.kind === "tool" || s.kind === "agent") c[s.name] = (c[s.name] || 0) + 1;
-  return c;
-}
 
 /** All descendants of a span (flattened), used for collapsed-turn counts. */
 export function descendants(idx: SpanIndex, id: string, out: Span[] = []): Span[] {
@@ -129,19 +109,6 @@ export function breakdown(spans: Span[]): Breakdown {
   return { total, byFam };
 }
 
-// ── critical path: longest child at every level ───────────────────────────
-export function criticalPath(idx: SpanIndex, segSpans: Span[]): Set<string> {
-  const set = new Set<string>();
-  const turns = segSpans.filter((s) => s.kind === "turn");
-  if (!turns.length) return set;
-  let cur: Span | undefined = turns.reduce((a, b) => (b.dur > a.dur ? b : a));
-  while (cur) {
-    set.add(cur.id);
-    const kids: Span[] = idx.children.get(cur.id) || [];
-    cur = kids.length ? kids.reduce((a: Span, b: Span) => (b.dur > a.dur ? b : a)) : undefined;
-  }
-  return set;
-}
 
 // ── chapter helpers ───────────────────────────────────────────────────────
 export function chapterCounts(ch?: Chapter) {
@@ -222,32 +189,128 @@ export function useTrace(sessionId: string): TraceState {
   return { trace, loading, error, loadMs, reload: load };
 }
 
-/** Width of an element, tracked with ResizeObserver. Callback ref so a node
- *  mounted after the first render (behind a loading state) is still observed. */
-export function useWidth<T extends HTMLElement>(): [(el: T | null) => void, number] {
-  const [node, setNode] = useState<T | null>(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    if (!node) return;
-    const ro = new ResizeObserver(() => setW(node.clientWidth));
-    ro.observe(node);
-    setW(node.clientWidth);
-    return () => ro.disconnect();
-  }, [node]);
-  return [setNode, w];
-}
 
 export function outputHref(o: { kind: string; ref: string }): string | undefined {
   return o.kind === "pr" || o.kind === "artifact" ? o.ref : undefined;
 }
 
-/** Tick positions for a time axis: ~7 ticks at a round interval. */
-export function axisTicks(w: TimeWindow): number[] {
-  const span = w.to - w.from;
-  if (span <= 0) return [];
-  const steps = [1000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 21_600_000, 43_200_000, 86_400_000];
-  const step = steps.find((s) => span / s <= 8) || 86_400_000 * Math.ceil(span / 86_400_000 / 8);
+
+// ── turn groups: the narrative unit ───────────────────────────────────────
+// A session is a flat sequence of prompt → work. 84% of spans sit at depth 1,
+// so there is no call tree worth drawing; there are turns, and what each ran.
+export interface TurnGroup {
+  id: string;
+  prompt?: Span; // the user span that started it
+  turns: Span[];
+  calls: Span[]; // every tool/agent call under those turns, in time order
+  fromTs: number;
+  toTs: number;
+  dur: number; // summed turn duration, not wall-clock
+  errors: number;
+  tokens: TokenUsage;
+  gapBefore: number; // idle ms since the previous group
+}
+
+export function buildGroups(idx: SpanIndex, segNo: number): TurnGroup[] {
+  const out: TurnGroup[] = [];
+  let cur: TurnGroup | null = null;
+  const start = (prompt?: Span, turn?: Span): TurnGroup => {
+    const g: TurnGroup = {
+      id: (prompt || turn)!.id,
+      prompt,
+      turns: [],
+      calls: [],
+      fromTs: (prompt || turn)!.ts,
+      toTs: (prompt || turn)!.ts,
+      dur: 0,
+      errors: 0,
+      tokens: { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 },
+      gapBefore: 0,
+    };
+    out.push(g);
+    return g;
+  };
+  for (const r of idx.roots) {
+    if (r.seg !== segNo) continue;
+    if (r.kind === "user") {
+      cur = start(r);
+    } else if (r.kind === "turn") {
+      if (!cur || cur.turns.length) cur = start(undefined, r);
+      cur.turns.push(r);
+      cur.dur += r.dur;
+      cur.toTs = Math.max(cur.toTs, r.ts + r.dur);
+      if (r.tokens) {
+        cur.tokens.input += r.tokens.input;
+        cur.tokens.output += r.tokens.output;
+        cur.tokens.cacheRead += r.tokens.cacheRead;
+        cur.tokens.cacheCreate += r.tokens.cacheCreate;
+      }
+      for (const c of descendants(idx, r.id)) {
+        if (c.kind !== "tool" && c.kind !== "agent") continue;
+        cur.calls.push(c);
+        if (c.err) cur.errors++;
+        cur.toTs = Math.max(cur.toTs, c.ts + c.dur);
+      }
+    }
+  }
+  for (const g of out) g.calls.sort((a, b) => a.ts - b.ts);
+  for (let i = 1; i < out.length; i++) out[i].gapBefore = Math.max(out[i].fromTs - out[i - 1].toTs, 0);
+  return out.filter((g) => g.prompt || g.turns.length);
+}
+
+/** Relative weight of a turn, for splitting a segment's cost across its turns.
+ *  Never shown as money on its own: pricing cache reads at list rate reads as
+ *  hundreds of dollars on a session that actually cost ten. */
+export function costWeight(model: string, t?: TokenUsage): number {
+  if (!t) return 0;
+  const m = (model || "").toLowerCase();
+  let r = [3, 15, 0.3, 3.75];
+  if (m.includes("haiku")) r = [1, 5, 0.1, 1.25];
+  else if (m.includes("opus") || m.includes("fable") || m.includes("mythos")) r = [15, 75, 1.5, 18.75];
+  else if (m.includes("gpt") || m.includes("codex")) r = [1.25, 10, 0.125, 0];
+  return (t.input * r[0] + t.output * r[1] + t.cacheRead * r[2] + t.cacheCreate * r[3]) / 1e6;
+}
+
+/** Ribbon: one gradient instead of one node per call, so a 700-call turn stays cheap. */
+export function ribbonGradient(calls: Span[]): string {
+  const total = calls.reduce((a, c) => a + Math.max(c.dur, 1), 0) || 1;
+  const stops: string[] = [];
+  let at = 0;
+  // A hairline between calls: without it 115 Bash runs draw as one flat block.
+  const gap = calls.length > 1 && calls.length <= 400 ? Math.min(0.35, 40 / calls.length) : 0;
+  for (const c of calls) {
+    const w = (Math.max(c.dur, 1) / total) * 100;
+    const end = at + w;
+    stops.push(`var(--fam-${c.fam}) ${at.toFixed(3)}% ${Math.max(at, end - gap).toFixed(3)}%`);
+    if (gap) stops.push(`var(--bg-0) ${Math.max(at, end - gap).toFixed(3)}% ${end.toFixed(3)}%`);
+    at = end;
+  }
+  return stops.length ? `linear-gradient(90deg, ${stops.join(", ")})` : "none";
+}
+
+/** Where each error sits along the ribbon, as a percentage. */
+export function errorMarks(calls: Span[]): number[] {
+  const total = calls.reduce((a, c) => a + Math.max(c.dur, 1), 0) || 1;
   const out: number[] = [];
-  for (let t = Math.ceil(w.from / step) * step; t <= w.to; t += step) out.push(t);
+  let at = 0;
+  for (const c of calls) {
+    const w = (Math.max(c.dur, 1) / total) * 100;
+    if (c.err) out.push(at + w / 2);
+    at += w;
+  }
   return out;
+}
+
+/** mcp__clickstack-staging__clickstack_sql reads as clickstack_sql: the server
+ *  and transport prefix repeats on every row. */
+export const shortTool = (n: string) => (n.startsWith("mcp__") ? n.split("__").slice(-1)[0] : n);
+
+export function famSummary(calls: Span[], max = 4): string {
+  const c: Record<string, number> = {};
+  for (const s of calls) c[s.name] = (c[s.name] || 0) + 1;
+  return Object.entries(c)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([n, k]) => `${n} ${k}`)
+    .join(" · ");
 }

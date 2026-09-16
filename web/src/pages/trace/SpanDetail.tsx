@@ -21,16 +21,6 @@ interface Props {
 
 type Tab = "overview" | "args" | "result" | "chapter";
 
-function estimateTurnCost(model: string, t?: Span["tokens"]): number {
-  if (!t) return 0;
-  const m = model.toLowerCase();
-  let r = [3, 15, 0.3, 3.75];
-  if (m.includes("haiku")) r = [1, 5, 0.1, 1.25];
-  else if (m.includes("opus") || m.includes("fable") || m.includes("mythos")) r = [15, 75, 1.5, 18.75];
-  else if (m.includes("gpt") || m.includes("codex")) r = [1.25, 10, 0.125, 0];
-  return (t.input * r[0] + t.output * r[1] + t.cacheRead * r[2] + t.cacheCreate * r[3]) / 1e6;
-}
-
 export default function SpanDetail({ sessionId, span, segment, idx, model, onSelect, onEnrich, enriching, enrichError }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [det, setDet] = useState<SpanDetailT | null>(null);
@@ -87,7 +77,7 @@ export default function SpanDetail({ sessionId, span, segment, idx, model, onSel
           </div>
           <div className="tr-dbody">
             <ChapterCard segment={segment} onEnrich={onEnrich} enriching={enriching} enrichError={enrichError} compact />
-            <div className="tr-dempty" style={{ paddingLeft: 0 }}>Select a span in the flame graph or the tree to inspect it.</div>
+            <div className="tr-dempty" style={{ paddingLeft: 0 }}>Open a turn and pick a call to inspect it.</div>
           </div>
         </>
       ) : (
@@ -141,7 +131,6 @@ export default function SpanDetail({ sessionId, span, segment, idx, model, onSel
                 {kv("span id", span.id)}
                 {span.child && kv("child session", <Link to={`/session/${encodeURIComponent(span.child)}`}>{span.child.slice(0, 22)}…</Link>)}
                 {turn?.tokens && kv("turn tokens", `in ${fmtTok(turn.tokens.input)} · out ${fmtTok(turn.tokens.output)} · cache ${fmtTok(turn.tokens.cacheRead + turn.tokens.cacheCreate)}`)}
-                {turn?.tokens && kv("turn cost", fmtUsd(estimateTurnCost(turn.model || model, turn.tokens), true))}
                 {span.kind === "user" && span.text && (
                   <>
                     <div className="k" style={{ margin: "12px 0 6px" }}>prompt</div>
