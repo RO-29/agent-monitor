@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { DetailMsg, DetailTool, Session, SessionDetail } from "../../api/types";
 import { fmtBytes, fmtTime, isLive, modelShort } from "../../lib/format";
 import { Icon } from "../../lib/icons";
+import { Markdown, plainText } from "../../lib/markdown";
 
 // Ported from the legacy grouped transcript: turns = prose message + the tool
 // calls issued before the next message; flat one-row-per-event mode once any
@@ -229,9 +230,16 @@ export default function Transcript({ session }: { session: Session }) {
             {turn.tools.length > 0 && <span className="num muted">{turn.tools.length} tool{turn.tools.length === 1 ? "" : "s"}</span>}
           </div>
           {turn.text.trim() && (
-            <div className={`turn-text ${long && !open ? "clamp" : ""}`} onClick={() => long && toggle(turn.key)} title={long && !open ? "click to expand" : undefined}>
-              {turn.text}
-            </div>
+            <>
+              <div className={`turn-text ${long && !open ? "clamp" : ""}`} onClick={() => long && toggle(turn.key)}>
+                <Markdown text={turn.text} />
+              </div>
+              {long && (
+                <div className="clamp-hint" onClick={() => toggle(turn.key)}>
+                  {open ? "show less" : "show the whole message"}
+                </div>
+              )}
+            </>
           )}
           {shown.length > 0 && <div style={{ marginTop: 6 }}>{shown.map((t) => evRow(t))}</div>}
           {turn.tools.length > RUN_CAP && !runOpen && (
@@ -269,7 +277,11 @@ export default function Transcript({ session }: { session: Session }) {
             <div key={`m:${r.m!.ts}`} className="evrow" onClick={() => toggle(`msg:${r.m!.ts}`)}>
               <span className="tm">{fmtTime(r.m!.ts)}</span>
               <span className="nm" style={{ color: r.m!.role === "user" ? "var(--blue)" : "var(--magenta)" }}>{r.m!.role === "user" ? "you" : "asst"}</span>
-              <span className="prev" style={{ fontFamily: "var(--font-sans)", color: "var(--text-2)" }}>{expanded.has(`msg:${r.m!.ts}`) ? r.m!.text : r.m!.text.split("\n")[0]}</span>
+              {expanded.has(`msg:${r.m!.ts}`) ? (
+                <Markdown text={r.m!.text} className="prev open" />
+              ) : (
+                <span className="prev" style={{ fontFamily: "var(--font-sans)", color: "var(--text-2)" }}>{plainText(r.m!.text.split("\n")[0])}</span>
+              )}
             </div>
           ),
         )}

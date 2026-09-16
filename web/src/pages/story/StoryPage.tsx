@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { Segment, ThreadStoryResponse } from "../../api/types";
 import { fmtDate, fmtDur, fmtTok, fmtUsd, shortCwd, stateColorVar, stateLabel, titleFor } from "../../lib/format";
 import { Icon, ToolLogo } from "../../lib/icons";
+import { Markdown } from "../../lib/markdown";
 import { OutputChips, SourceBadge } from "../trace/ChapterBand";
 import { BOUNDARY } from "../trace/lib";
 import "../trace/trace.css";
@@ -145,7 +146,7 @@ export default function StoryPage() {
                 <div className="st-cols">
                   <div>
                     <div className="k">The point</div>
-                    <p>{ch?.point || "—"}</p>
+                    {ch?.point ? <Markdown text={ch.point} /> : <p>—</p>}
                     {ch?.outcome && (
                       <>
                         <div className="k" style={{ marginTop: 10 }}>Outcome</div>

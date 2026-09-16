@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { FeedLearning, LearningSource } from "../../api/types";
 import { fmtAgo, projectName } from "../../lib/format";
 import { Icon, ToolLogo } from "../../lib/icons";
+import { Markdown } from "../../lib/markdown";
 import { useSearch } from "../../app/search";
 import { copyText } from "../trace/lib";
 import "../trace/trace.css";
@@ -152,7 +153,7 @@ export default function LearningsFeed() {
                     {l.heuristic && <span className="tr-src heur">heuristic</span>}
                   </span>
                   <div className="txt">
-                    <span>{l.text}</span>
+                    <Markdown text={l.text} inlineOnly />
                     <span className="ev" title={l.evidence}>{l.evidence}</span>
                   </div>
                   <Link className="txt" to={`/thread/${encodeURIComponent(l.threadId)}/learnings`} style={{ color: "inherit", minWidth: 0 }}>

@@ -1,6 +1,7 @@
 import type { Learning, Output, Segment } from "../../api/types";
 import { fmtAgo, fmtClock } from "../../lib/format";
 import { Icon } from "../../lib/icons";
+import { Markdown } from "../../lib/markdown";
 import { outputHref } from "./lib";
 
 interface CardProps {
@@ -63,11 +64,11 @@ export default function ChapterCard({ segment, onEnrich, enriching, enrichError,
     <div className="tr-card" style={{ gridTemplateColumns: cols, padding: compact ? "8px 0 4px" : undefined, borderTop: compact ? 0 : undefined }}>
       <div>
         <div className="k">The point</div>
-        <p>{ch.point || "—"}</p>
+        {ch.point ? <Markdown text={ch.point} /> : <p>—</p>}
         {ch.outcome && (
           <>
             <div className="k" style={{ marginTop: 10 }}>Outcome so far</div>
-            <p style={{ color: "var(--text-2)", fontSize: 12 }}>{ch.outcome}</p>
+            <Markdown text={ch.outcome} className="dim" />
           </>
         )}
       </div>
@@ -92,7 +93,7 @@ export default function ChapterCard({ segment, onEnrich, enriching, enrichError,
               <div key={l.id} className="tr-lrn">
                 <SourceBadge l={l} />
                 <span style={{ flex: 1 }}>
-                  {l.text} <span className="num muted" style={{ fontSize: 10.5 }}>· {fmtClock(l.ts)}</span>
+                  <Markdown text={l.text} inlineOnly /> <span className="num muted" style={{ fontSize: 10.5 }}>· {fmtClock(l.ts)}</span>
                 </span>
               </div>
             ))}
@@ -105,7 +106,7 @@ export default function ChapterCard({ segment, onEnrich, enriching, enrichError,
             {ch.open.map((o, i) => (
               <div key={i} className="tr-lrn">
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yellow)", marginTop: 6, flex: "none" }} />
-                <span>{o}</span>
+                <span><Markdown text={o} inlineOnly /></span>
               </div>
             ))}
           </div>

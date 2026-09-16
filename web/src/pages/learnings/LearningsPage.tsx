@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { Learning, LearningSource, ThreadLearningsResponse } from "../../api/types";
 import { fmtDate, shortCwd } from "../../lib/format";
 import { Icon } from "../../lib/icons";
+import { Markdown } from "../../lib/markdown";
 import { copyText } from "../trace/lib";
 import "../trace/trace.css";
 import "./learnings.css";
@@ -149,7 +150,7 @@ export default function LearningsPage() {
                 {l.heuristic && <span className="tr-src heur">heuristic</span>}
               </span>
               <div className="txt">
-                <span>{l.text}</span>
+                <Markdown text={l.text} inlineOnly />
                 <span className="ev" title={l.evidence}>{l.evidence}</span>
               </div>
               <span className="num t2" style={{ fontSize: 11.5 }}>segment {l.seg + 1}</span>
