@@ -5,12 +5,12 @@ import type { DetailMsg, DetailTool, Session, SessionDetail } from "../../api/ty
 import { fmtBytes, fmtTime, isLive, modelShort } from "../../lib/format";
 import { Icon } from "../../lib/icons";
 import { Markdown, plainText } from "../../lib/markdown";
+import { useVirtual } from "../../lib/virtual";
 
 // Ported from the legacy grouped transcript: turns = prose message + the tool
 // calls issued before the next message; flat one-row-per-event mode once any
 // facet, tool filter, or query narrows the view.
 const RUN_CAP = 7;
-const CAP = 600;
 const STUB_RE = /^\s*→\s*[\w.\-]+\s*$/;
 const ERR_RE = /(^|\n)\s*(error[:\s]|traceback \(most recent|fatal:|command failed|no such file|permission denied|exit code [1-9]|npm err!|error!|cannot find|is not recognized|segmentation fault|panic:)/i;
 type Facet = "all" | "prose" | "tools" | "errors" | "user";
@@ -140,6 +140,11 @@ export default function Transcript({ session }: { session: Session }) {
   }, [session.id, session.messageCount]);
 
   const S = useMemo(() => (detail ? buildTurns(detail) : null), [detail]);
+
+  // A scroll offset means nothing once the list is reordered or refiltered.
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = 0;
+  }, [order, facet, toolF, qq]);
   const ord = order === "auto" ? (isLive(session.state) ? "desc" : "asc") : order;
   const flatMode = facet !== "all" || toolF !== "all" || qq.trim() !== "";
   const setFacet = (f: Facet) => {
@@ -162,6 +167,39 @@ export default function Transcript({ session }: { session: Session }) {
       else n.add(k);
       return n;
     });
+
+  const turns = useMemo(() => (ord === "desc" ? [...(S?.turns || [])].reverse() : S?.turns || []), [S, ord]);
+  const flatRows = useMemo(() => {
+    if (!flatMode || !S) return [];
+    const wantMsg = facet === "all" || facet === "prose" || facet === "user";
+    const wantTool = facet === "all" || facet === "tools" || facet === "errors";
+    let rows: { ts: number; m?: DetailMsg; t?: DetailTool }[] = [];
+    if (wantMsg && toolF === "all")
+      S.msgs.forEach((m) => {
+        if (facet === "prose" && m.role !== "assistant") return;
+        if (facet === "user" && m.role !== "user") return;
+        rows.push({ ts: m.ts, m });
+      });
+    if (wantTool)
+      S.tools.forEach((t) => {
+        if (facet === "errors" && !isErrTool(t)) return;
+        if (toolF !== "all" && t.name !== toolF) return;
+        rows.push({ ts: t.ts, t });
+      });
+    const needle = qq.trim().toLowerCase();
+    if (needle) rows = rows.filter((r) => (r.m ? r.m.text : `${r.t!.name} ${r.t!.args} ${r.t!.result}`).toLowerCase().includes(needle));
+    rows.sort((a, b) => a.ts - b.ts);
+    if (ord === "desc") rows.reverse();
+    return rows;
+  }, [flatMode, facet, toolF, qq, ord, S]);
+
+  // Only the rows near the viewport are mounted: a long session is ~800 turns
+  // and ~2,000 tool rows, which is 3 MB of DOM if it all renders at once.
+  const keys = useMemo(
+    () => (flatMode ? flatRows.map((r, i) => (r.t ? `t:${r.t.id}` : `m:${r.m!.ts}:${i}`)) : turns.map((t) => t.key)),
+    [flatMode, flatRows, turns],
+  );
+  const v = useVirtual(keys, scroller, flatMode ? 28 : 150);
 
   if (err) return <div className="empty">transcript unavailable: {err}</div>;
   if (!S) return <div className="empty">loading transcript…</div>;
@@ -200,10 +238,10 @@ export default function Transcript({ session }: { session: Session }) {
     );
   };
 
+
   let body;
   if (!flatMode) {
-    const turns = ord === "desc" ? [...S.turns].reverse() : S.turns;
-    body = turns.map((turn) => {
+    const render = (turn: Turn) => {
       const long = turn.text.length > 320 || turn.text.split("\n").length > 6;
       const open = expanded.has(turn.key);
       const runOpen = runs.has(turn.key);
@@ -249,43 +287,46 @@ export default function Transcript({ session }: { session: Session }) {
           )}
         </div>
       );
-    });
-    if (!turns.length) body = <div className="empty">No activity recorded for this session.</div>;
+    };
+    body = turns.length ? (
+      <>
+        <div style={{ height: v.padTop }} />
+        {turns.slice(v.start, v.end).map((turn) => (
+          <div key={turn.key} ref={v.rowRef(turn.key)}>
+            {render(turn)}
+          </div>
+        ))}
+        <div style={{ height: v.padBottom }} />
+      </>
+    ) : (
+      <div className="empty">No activity recorded for this session.</div>
+    );
   } else {
-    const wantMsg = facet === "all" || facet === "prose" || facet === "user";
-    const wantTool = facet === "all" || facet === "tools" || facet === "errors";
-    let rows: { ts: number; m?: DetailMsg; t?: DetailTool }[] = [];
-    if (wantMsg && toolF === "all") S.msgs.forEach((m) => {
-      if (facet === "prose" && m.role !== "assistant") return;
-      if (facet === "user" && m.role !== "user") return;
-      rows.push({ ts: m.ts, m });
-    });
-    if (wantTool) S.tools.forEach((t) => {
-      if (facet === "errors" && !isErrTool(t)) return;
-      if (toolF !== "all" && t.name !== toolF) return;
-      rows.push({ ts: t.ts, t });
-    });
-    const needle = qq.trim().toLowerCase();
-    if (needle) rows = rows.filter((r) => (r.m ? r.m.text : `${r.t!.name} ${r.t!.args} ${r.t!.result}`).toLowerCase().includes(needle));
-    rows.sort((a, b) => a.ts - b.ts);
-    if (ord === "desc") rows.reverse();
-    const total = rows.length;
+    const total = flatRows.length;
     body = (
       <div style={{ padding: "6px 10px" }}>
-        {rows.slice(0, CAP).map((r) =>
-          r.t ? evRow(r.t, true) : (
-            <div key={`m:${r.m!.ts}`} className="evrow" onClick={() => toggle(`msg:${r.m!.ts}`)}>
-              <span className="tm">{fmtTime(r.m!.ts)}</span>
-              <span className="nm" style={{ color: r.m!.role === "user" ? "var(--blue)" : "var(--magenta)" }}>{r.m!.role === "user" ? "you" : "asst"}</span>
-              {expanded.has(`msg:${r.m!.ts}`) ? (
-                <Markdown text={r.m!.text} className="prev open" />
+        <div style={{ height: v.padTop }} />
+        {flatRows.slice(v.start, v.end).map((r, i) => {
+          const k = keys[v.start + i];
+          return (
+            <div key={k} ref={v.rowRef(k)}>
+              {r.t ? (
+                evRow(r.t, true)
               ) : (
-                <span className="prev" style={{ fontFamily: "var(--font-sans)", color: "var(--text-2)" }}>{plainText(r.m!.text.split("\n")[0])}</span>
+                <div className="evrow" onClick={() => toggle(`msg:${r.m!.ts}`)}>
+                  <span className="tm">{fmtTime(r.m!.ts)}</span>
+                  <span className="nm" style={{ color: r.m!.role === "user" ? "var(--blue)" : "var(--magenta)" }}>{r.m!.role === "user" ? "you" : "asst"}</span>
+                  {expanded.has(`msg:${r.m!.ts}`) ? (
+                    <Markdown text={r.m!.text} className="prev open" />
+                  ) : (
+                    <span className="prev" style={{ fontFamily: "var(--font-sans)", color: "var(--text-2)" }}>{plainText(r.m!.text.split("\n")[0])}</span>
+                  )}
+                </div>
               )}
             </div>
-          ),
-        )}
-        {total > CAP && <div className="empty">Showing first {CAP} of {total}. Narrow it with search.</div>}
+          );
+        })}
+        <div style={{ height: v.padBottom }} />
         {total === 0 && <div className="empty">No matches. Try another facet or search.</div>}
       </div>
     );
