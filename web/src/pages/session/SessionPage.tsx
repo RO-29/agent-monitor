@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
-import type { Thread, TraceMeta } from "../../api/types";
-import { fmtAgo, fmtTok, fmtUsd, modelShort, shortCwd, titleFor } from "../../lib/format";
+import type { Session, Thread, TraceMeta } from "../../api/types";
+import { fmtAgo, fmtTok, fmtUsd, modelShort, resumeCommand, shortCwd, titleFor } from "../../lib/format";
 import { Icon, ToolLogo } from "../../lib/icons";
 import { useLive } from "../../lib/ws";
 import { StatePill } from "../../app/ui";
 import PaneBridge from "../../components/bridge/PaneBridge";
+import { copyText } from "../trace/lib";
+import { showToast } from "../../app/toast";
 import TracePanel from "../trace/TracePanel";
 import Transcript from "./Transcript";
 
@@ -86,6 +88,7 @@ export default function SessionPage() {
           <span className="chip num" style={{ fontSize: 11 }}>{sess.messageCount.toLocaleString()} turns</span>
           {errCount !== null && <span className="chip num" style={{ fontSize: 11, color: errCount ? "var(--red)" : undefined }}>{errCount} errors</span>}
           <span className="mono muted" style={{ fontSize: 11 }}>{shortCwd(sess.cwd)} · {fmtAgo(sess.lastActivityAt)}</span>
+          <ResumeChip session={sess} />
           <div style={{ flex: 1 }} />
           <button className="btn" onClick={() => nav(`/thread/${encodeURIComponent(threadId)}`)}>
             <Icon name="book" size={13} /> story
@@ -120,5 +123,34 @@ export default function SessionPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Session id plus the command that reopens it. Click copies the command
+ *  (`cd <cwd> && claude --resume <uuid>`); the id alone is a second click. */
+function ResumeChip({ session }: { session: Session }) {
+  const cmd = resumeCommand(session);
+  return (
+    <span className="resume-chip" title={cmd || `session id ${session.sessionId}`}>
+      <Icon name="terminal" size={11} color="var(--muted)" />
+      <code>{session.sessionId}</code>
+      <button
+        onClick={() => {
+          copyText(cmd || session.sessionId);
+          showToast(cmd ? "Resume command copied" : "Session id copied", cmd || session.sessionId);
+        }}
+      >
+        <Icon name="copy" size={11} /> {cmd ? "copy resume" : "copy id"}
+      </button>
+      <button
+        onClick={() => {
+          copyText(session.sessionId);
+          showToast("Session id copied", session.sessionId);
+        }}
+        title="copy the bare id"
+      >
+        id
+      </button>
+    </span>
   );
 }

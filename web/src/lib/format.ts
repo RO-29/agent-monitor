@@ -38,7 +38,8 @@ export function firstRealLine(text?: string): string {
 export const titleFor = (s: Session) => s.title || firstRealLine(s.firstMessage) || projectName(s.cwd);
 
 export const isLive = (st: SessionState) => st === "running" || st === "idle" || st === "awaiting-input" || st === "awaiting-permission";
-export const isAttention = (st: SessionState) => st === "awaiting-permission";
+// Needs attention = the agent cannot proceed without the user.
+export const isAttention = (st: SessionState) => st === "awaiting-permission" || st === "awaiting-input";
 export const stateRank = (st: SessionState) =>
   ({ "awaiting-permission": 0, "awaiting-input": 1, running: 2, idle: 3, completed: 4, abandoned: 5 } as Record<string, number>)[st] ?? 9;
 export const stateLabel = (st: SessionState) => st.replace("awaiting-", "");
@@ -95,3 +96,13 @@ export function fmtBytes(n?: number): string {
 }
 export const fmtUsd = (n?: number, est = false) => (n == null ? "—" : (est ? "≈" : "") + "$" + (n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(2)));
 export const pct = (a: number, b: number) => (b > 0 ? Math.min(100, (a / b) * 100) : 0);
+
+/** Shell command that reopens a session in its own working directory.
+ *  Only Claude Code and Codex expose a documented resume flag; for the rest the
+ *  id alone is the useful thing to copy. */
+export function resumeCommand(s: { tool: Tool; sessionId: string; cwd: string }): string | null {
+  const cd = s.cwd ? `cd ${s.cwd} && ` : "";
+  if (s.tool === "claude") return `${cd}claude --resume ${s.sessionId}`;
+  if (s.tool === "codex") return `${cd}codex resume ${s.sessionId}`;
+  return null;
+}

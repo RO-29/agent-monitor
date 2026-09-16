@@ -142,7 +142,7 @@ function PanePicker({ session, onRegistered }: { session: Session; onRegistered:
           {error && <div className="muted">{error}</div>}
           {!error && panes === null && <div className="muted">loading tmux panes…</div>}
           {auto && <div className="muted">→ auto-registering {auto} (only pane with a matching cwd)…</div>}
-          {!error && panes && panes.length === 0 && <div className="muted">no tmux panes found — start a tmux session first</div>}
+          {!error && panes && panes.length === 0 && <div className="muted">no tmux panes found. Start a tmux session first</div>}
           {panes?.map((p) => {
             const a = paneAffinity(p, session.cwd);
             return (
@@ -186,7 +186,7 @@ function LiveBridge({ session, status, onForget }: { session: Session; status: P
       const el = pre.current;
       if (!el) return;
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
-      el.innerHTML = content.trim() ? ansiToHtml(content) : '<span class="a-d">pane buffer is empty — send a prompt or wait for the CLI to render</span>';
+      el.innerHTML = content.trim() ? ansiToHtml(content) : '<span class="a-d">pane buffer is empty. Send a prompt, or wait for the CLI to render</span>';
       if (autoScroll || nearBottom) el.scrollTop = el.scrollHeight;
     };
     const loop = async () => {
@@ -321,7 +321,7 @@ function LiveBridge({ session, status, onForget }: { session: Session; status: P
               onClick={async () => {
                 try {
                   const r = await api.talkRequest(id, talkTo, talkMsg);
-                  showToast("Talk proposed", `→ ${r.toAgent} (id ${r.id}) — they decide`);
+                  showToast("Talk proposed", `→ ${r.toAgent} (id ${r.id}). They decide`);
                   setTalkMsg("");
                   setTalkOpen(false);
                 } catch (e) {

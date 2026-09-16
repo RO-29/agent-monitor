@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Segment } from "../../api/types";
-import { famLabel, fmtDate, fmtDur, fmtDuration, fmtTime, fmtUsd } from "../../lib/format";
+import { famLabel, fmtDate, fmtDur, fmtDuration, fmtUsd } from "../../lib/format";
 import { Icon } from "../../lib/icons";
-import { ChapterBand } from "./ChapterBand";
+import ChapterCard from "./ChapterBand";
 import FlameGraph from "./FlameGraph";
 import SpanDetail from "./SpanDetail";
 import SpanTree from "./SpanTree";
@@ -19,9 +19,9 @@ export interface TracePanelProps {
   spanId?: string;
 }
 
-// Session trace: summary strip · chapter band · toolbar · minimap · flame
-// graph · span tree · span detail. The URL carries ?seg= and ?span= so a
-// permalink reopens the same view.
+// Session trace: one context row, one control row, then the data. Segment
+// stats, the tool-family split and the chapter live in the first row; view
+// filters and zoom sit behind two popovers. The URL carries ?seg= and ?span=.
 export default function TracePanel({ sessionId, segment, spanId }: TracePanelProps) {
   const { trace, loading, error, loadMs, reload } = useTrace(sessionId);
   const [params, setParams] = useSearchParams();
@@ -42,6 +42,8 @@ export default function TracePanel({ sessionId, segment, spanId }: TracePanelPro
   const [crit, setCrit] = useState(false);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [chapterOpen, setChapterOpen] = useState(false);
+  const [menu, setMenu] = useState<"" | "filters" | "fit" | "seg">("");
   const [enriching, setEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
 
@@ -159,121 +161,98 @@ export default function TracePanel({ sessionId, segment, spanId }: TracePanelPro
   const segDur = (seg.toTs || trace.lastTs) - seg.fromTs;
   const totalSpan = Math.max(trace.lastTs - trace.firstTs, 1);
   const segErrors = seg.errors;
+  const chapCount = (seg.chapter?.learnings?.length || 0) + (seg.chapter?.open?.length || 0) + (seg.chapter?.intentChanges?.length || 0);
   const filterState = { turns: showTurns, tools: showTools, agents: showAgents, minDur, errorsOnly, query };
   const selSpan = selected ? idx.byId.get(selected) || null : null;
 
+  const famTitle = bd.byFam.map((b) => `${famLabel(b.fam)} ${b.pct.toFixed(0)}% · ${fmtDur(b.ms)}`).join("\n");
+  const filtersOn = [!showTurns, !showTools, !showAgents, minDur, errorsOnly, crit].filter(Boolean).length;
+  const segMeta = BOUNDARY[seg.boundary.kind] || BOUNDARY.start;
+
   return (
     <div className="tr-root">
-      {/* segment strip */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border)", flex: "none" }}>
-        <span className="k" style={{ flex: "none" }}>segments</span>
-        <div className="tr-segstrip">
-          {trace.segments.map((s, i) => {
-            const w = Math.max((s.toTs || trace.lastTs) - s.fromTs, 60_000);
-            const meta = BOUNDARY[s.boundary.kind] || BOUNDARY.start;
-            return (
-              <div
-                key={s.id}
-                className={`tr-seg ${i === segIndex ? "cur" : i < segIndex ? "prev" : ""}`}
-                style={{ flex: `${w} 1 0` }}
-                onClick={() => setSeg(i)}
-                title={`segment ${i + 1} · ${meta.label} · ${fmtDate(s.fromTs)} · ${fmtDur(w)}`}
-              >
-                <span className={`tr-bd sm ${meta.cls}`}>{meta.glyph}</span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.boundary.kind === "compact" ? `compact ${i}` : s.boundary.kind === "start" ? "start" : s.boundary.kind}
-                  {s.boundary.droppedTokens ? ` · −${(s.boundary.droppedTokens / 1000).toFixed(0)}k` : ""}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <span className="num muted" style={{ fontSize: 11, flex: "none" }}>
-          {trace.segments.filter((s) => s.boundary.kind === "compact").length} compacts · {trace.segments.filter((s) => s.boundary.kind === "clear").length} clear ·{" "}
-          {fmtTokShort(trace.segments.reduce((a, s) => a + (s.boundary.droppedTokens || 0), 0))} tokens dropped
+      {/* row 1: what you are looking at */}
+      <div className="tr-bar">
+        <button className="tr-ico" disabled={segIndex === 0} onClick={() => setSeg(segIndex - 1)} title="previous segment">
+          <Icon name="chevl" size={13} />
+        </button>
+        <Pop open={menu === "seg"} onOpen={(o) => setMenu(o ? "seg" : "")} label={
+          <>
+            <span className={`tr-bd sm ${segMeta.cls}`}>{segMeta.glyph}</span>
+            seg <b>{segIndex + 1}</b>/{segCount}
+            <span className="tr-dim">{seg.boundary.kind === "compact" ? `compact · ${seg.boundary.trigger || "auto"}` : segMeta.label}</span>
+          </>
+        }>
+          <div className="tr-menu seg">
+            {trace.segments.map((sg, i) => {
+              const m = BOUNDARY[sg.boundary.kind] || BOUNDARY.start;
+              return (
+                <button key={sg.id} className={i === segIndex ? "on" : ""} onClick={() => { setSeg(i); setMenu(""); }}>
+                  <span className={`tr-bd sm ${m.cls}`}>{m.glyph}</span>
+                  <span className="num">{i + 1}</span>
+                  <span className="ell">{sg.boundary.kind === "compact" ? "compact" : m.label}</span>
+                  <span className="tr-dim num">{fmtDur((sg.toTs || trace.lastTs) - sg.fromTs)}</span>
+                  {sg.boundary.droppedTokens ? <span className="tr-dim num">−{Math.round(sg.boundary.droppedTokens / 1000)}k</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </Pop>
+        <button className="tr-ico" disabled={segIndex >= segCount - 1} onClick={() => setSeg(segIndex + 1)} title="next segment">
+          <Icon name="chev" size={13} />
+        </button>
+
+        <span className="tr-stats" title={`starts ${fmtDate(seg.fromTs)}`}>
+          <b>{fmtDur(segDur)}</b>
+          <i className="opt" />
+          <span className="opt">{seg.spans.toLocaleString()} spans</span>
+          <i />
+          <span className={segErrors ? "bad" : ""}>{segErrors} err</span>
+          <i className="opt" />
+          <span className="opt">{fmtUsd(seg.usdEst, trace.costEstimated)}</span>
         </span>
-      </div>
 
-      {/* summary strip */}
-      <div className="tr-summary">
-        <div className="tr-kpis">
-          {[
-            ["trace · segment " + (segIndex + 1), fmtDur(segDur), "var(--text)"],
-            ["start", fmtTime(seg.fromTs), "var(--text)"],
-            ["spans", String(seg.spans), "var(--text)"],
-            ["errors", String(segErrors), segErrors ? "var(--red)" : "var(--text)"],
-            ["cost", fmtUsd(seg.usdEst, trace.costEstimated), "var(--text)"],
-          ].map(([k, v, c]) => (
-            <div key={k}>
-              <div className="k">{k}</div>
-              <div className="v" style={{ color: c }}>{v}</div>
-            </div>
+        <span className="tr-fam" title={famTitle || "no tool time in this segment"}>
+          {bd.byFam.map((b) => (
+            <span key={b.fam} style={{ width: `${b.pct}%`, background: `var(--fam-${b.fam})` }} />
           ))}
-        </div>
-        <div className="tr-exec">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="k">execution time by tool family</span>
-            <span className={`tr-chip sm ${crit ? "on" : ""}`} onClick={() => setCrit(!crit)}>
-              <Icon name="pulse" size={10} /> critical path
-            </span>
-          </div>
-          <div className="tr-exec-bar">
-            {bd.byFam.map((b) => (
-              <div key={b.fam} style={{ width: `${b.pct}%`, background: `var(--fam-${b.fam})` }} title={`${famLabel(b.fam)} ${fmtDur(b.ms)}`} />
-            ))}
-          </div>
-          <div className="tr-legend">
-            {bd.byFam.map((b) => (
-              <span key={b.fam}>
-                <i style={{ background: `var(--fam-${b.fam})` }} /> {famLabel(b.fam)} <span className="num muted">{b.pct.toFixed(0)}%</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        </span>
+
+        <span className="point" title={seg.chapter?.point || ""}>{seg.chapter?.point || "no chapter for this segment yet"}</span>
+
+        <button className={`tr-chip ${chapterOpen ? "on" : ""}`} onClick={() => setChapterOpen(!chapterOpen)}>
+          chapter
+          {chapCount > 0 && <span className="num">{chapCount}</span>}
+          <Icon name={chapterOpen ? "chevd" : "chev"} size={10} />
+        </button>
       </div>
 
-      <ChapterBand segment={seg} onEnrich={runEnrich} enriching={enriching} enrichError={enrichError} loadMs={loadMs} />
+      {chapterOpen && (
+        <div className={`tr-chapter ${seg.boundary.kind}`}>
+          <ChapterCard segment={seg} onEnrich={runEnrich} enriching={enriching} enrichError={enrichError} loadMs={loadMs} />
+        </div>
+      )}
 
-      {/* toolbar */}
-      <div className="tr-toolbar">
-        <span className={`tr-chip ${view === "both" ? "on" : ""}`} onClick={() => setView("both")}>flame + spans</span>
-        <span className={`tr-chip ${view === "spans" ? "on" : ""}`} onClick={() => setView("spans")}>spans only</span>
-        <span className="tr-sep" />
-        <span className={`tr-chip ${showTurns ? "on" : ""}`} onClick={() => setShowTurns(!showTurns)}>turns</span>
-        <span className={`tr-chip ${showTools ? "on" : ""}`} onClick={() => setShowTools(!showTools)}>tools</span>
-        <span className={`tr-chip ${showAgents ? "on" : ""}`} onClick={() => setShowAgents(!showAgents)}>subagents</span>
-        <span className={`tr-chip ${minDur ? "on" : ""}`} onClick={() => setMinDur(!minDur)}>min dur ≥ 1s</span>
-        <span className={`tr-chip err ${errorsOnly ? "on" : ""}`} onClick={() => setErrorsOnly(!errorsOnly)}>errors only</span>
-        <span className="tr-sep" />
-        <span className="tr-chip" onClick={fitSegment}><Icon name="zoom" size={11} /> fit segment</span>
-        <span className="tr-chip" onClick={fitSession}>fit session</span>
-        <div style={{ flex: 1 }} />
-        <label className="tr-filter">
-          <Icon name="search" size={12} />
-          <input placeholder="filter spans · resource, tool, text" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </label>
-      </div>
-
-      {/* minimap */}
-      <div className="tr-minimap">
-        <div className="lab k" style={{ whiteSpace: "nowrap" }}>session · {fmtDuration(totalSpan)}</div>
+      {/* row 2: how you are looking at it */}
+      <div className="tr-bar2">
         <div
           className="track"
+          title={`session · ${fmtDuration(totalSpan)} · ${fmtDate(trace.firstTs)} → ${fmtDate(trace.lastTs)}`}
           onClick={(e) => {
             const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
             const t = trace.firstTs + ((e.clientX - r.left) / r.width) * totalSpan;
-            const i = trace.segments.findIndex((s, k) => t >= s.fromTs && (k === trace.segments.length - 1 || t < trace.segments[k + 1].fromTs));
+            const i = trace.segments.findIndex((s2, k) => t >= s2.fromTs && (k === trace.segments.length - 1 || t < trace.segments[k + 1].fromTs));
             if (i >= 0 && i !== segIndex) setSeg(i);
           }}
         >
-          {trace.segments.map((s, i) => (
+          {trace.segments.map((s2, i) => (
             <div
-              key={s.id}
+              key={s2.id}
               className="mseg"
               style={{
-                left: `${((s.fromTs - trace.firstTs) / totalSpan) * 100}%`,
-                width: `${(((s.toTs || trace.lastTs) - s.fromTs) / totalSpan) * 100}%`,
-                background: s.boundary.kind === "compact" ? `rgba(251,146,60,${i % 2 ? 0.14 : 0.2})` : s.boundary.kind === "clear" ? "rgba(96,165,250,.18)" : "rgba(74,222,128,.14)",
+                left: `${((s2.fromTs - trace.firstTs) / totalSpan) * 100}%`,
+                width: `${(((s2.toTs || trace.lastTs) - s2.fromTs) / totalSpan) * 100}%`,
+                background: s2.boundary.kind === "compact" ? `rgba(251,146,60,${i % 2 ? 0.14 : 0.22})` : s2.boundary.kind === "clear" ? "rgba(96,165,250,.2)" : "rgba(74,222,128,.16)",
               }}
             />
           ))}
@@ -298,9 +277,35 @@ export default function TracePanel({ sessionId, segment, spanId }: TracePanelPro
             }}
             onClick={(e) => e.stopPropagation()}
           />
-          <span className="mlab" style={{ left: 6 }}>{fmtDate(trace.firstTs)}</span>
-          <span className="mlab" style={{ right: 6 }}>{fmtDate(trace.lastTs)}</span>
         </div>
+
+        <label className="tr-filter">
+          <Icon name="search" size={12} />
+          <input placeholder="filter spans" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+
+        <Pop open={menu === "filters"} onOpen={(o) => setMenu(o ? "filters" : "")} label={<>filters{filtersOn > 0 && <span className="num">{filtersOn}</span>}<Icon name="chevd" size={10} /></>} on={filtersOn > 0}>
+          <div className="tr-menu">
+            <div className="k">rows</div>
+            <button className={showTurns ? "on" : ""} onClick={() => setShowTurns(!showTurns)}><Tick on={showTurns} /> turns</button>
+            <button className={showTools ? "on" : ""} onClick={() => setShowTools(!showTools)}><Tick on={showTools} /> tools</button>
+            <button className={showAgents ? "on" : ""} onClick={() => setShowAgents(!showAgents)}><Tick on={showAgents} /> subagents</button>
+            <div className="k">only</div>
+            <button className={minDur ? "on" : ""} onClick={() => setMinDur(!minDur)}><Tick on={minDur} /> slower than 1s</button>
+            <button className={errorsOnly ? "on" : ""} onClick={() => setErrorsOnly(!errorsOnly)}><Tick on={errorsOnly} /> errors</button>
+            <button className={crit ? "on" : ""} onClick={() => setCrit(!crit)}><Tick on={crit} /> critical path</button>
+            <div className="k">layout</div>
+            <button className={view === "both" ? "on" : ""} onClick={() => setView("both")}><Tick on={view === "both"} /> flame graph + spans</button>
+            <button className={view === "spans" ? "on" : ""} onClick={() => setView("spans")}><Tick on={view === "spans"} /> spans only</button>
+          </div>
+        </Pop>
+
+        <Pop open={menu === "fit"} onOpen={(o) => setMenu(o ? "fit" : "")} label={<><Icon name="zoom" size={11} /> fit<Icon name="chevd" size={10} /></>}>
+          <div className="tr-menu">
+            <button onClick={() => { fitSegment(); setMenu(""); }}>this segment</button>
+            <button onClick={() => { fitSession(); setMenu(""); }}>whole session · {fmtDuration(totalSpan)}</button>
+          </div>
+        </Pop>
       </div>
 
       <div className="tr-main">
@@ -325,7 +330,7 @@ export default function TracePanel({ sessionId, segment, spanId }: TracePanelPro
               />
             </div>
           )}
-          <SpanTree idx={idx} spans={segSpans} win={win} selected={selected} expanded={expanded} onToggle={toggle} onSelect={select} crit={critSet} filter={filterState} onWheel={onWheel} />
+          <SpanTree idx={idx} spans={segSpans} win={win} selected={selected} expanded={expanded} onToggle={toggle} onSelect={select} crit={critSet} filter={filterState} onWheel={onWheel} ticks={view !== "both"} />
         </div>
         <SpanDetail sessionId={sessionId} span={selSpan} segment={seg} idx={idx} model={trace.model} onSelect={select} onEnrich={runEnrich} enriching={enriching} enrichError={enrichError} />
       </div>
@@ -333,8 +338,30 @@ export default function TracePanel({ sessionId, segment, spanId }: TracePanelPro
   );
 }
 
-function fmtTokShort(n: number) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(0) + "k";
-  return String(n);
+/** Small dropdown: a chip that opens a menu and closes on any outside click. */
+function Pop({ open, onOpen, label, on, children }: { open: boolean; onOpen: (o: boolean) => void; label: React.ReactNode; on?: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onOpen(false);
+    window.addEventListener("mousedown", away);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("mousedown", away);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open, onOpen]);
+  return (
+    <span className="tr-pop" ref={ref}>
+      <span className={`tr-chip ${open || on ? "on" : ""}`} onClick={() => onOpen(!open)}>{label}</span>
+      {open && children}
+    </span>
+  );
+}
+
+function Tick({ on }: { on: boolean }) {
+  return <span className={`tr-tick ${on ? "on" : ""}`}>{on ? "✓" : ""}</span>;
 }

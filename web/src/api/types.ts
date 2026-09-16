@@ -284,6 +284,21 @@ export interface ThreadLearningsResponse {
   learnings: Learning[];
   outputs: Output[] | null;
 }
+/** One row of the global ledger: a learning plus where it came from. */
+export interface FeedLearning extends Learning {
+  threadId: string;
+  threadTitle: string;
+  cwd: string;
+  sessionId: string;
+  tool: Tool;
+}
+export interface LearningsFeedResponse {
+  learnings: FeedLearning[];
+  total: number;
+  threadsScanned: number;
+  truncated: boolean;
+  counts: Record<string, number>;
+}
 export interface ContextRow {
   sessionId: string;
   used: number;

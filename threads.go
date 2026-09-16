@@ -182,7 +182,9 @@ func computeThreads(sessions []*Session, panes map[string]string) ([]Thread, map
 			t.Tokens.CacheRead += m.Tokens.CacheRead
 			t.Tokens.CacheCreate += m.Tokens.CacheCreate
 			t.Turns += m.MessageCount
-			if m.State == StateAwaitingPermission {
+			// "needs attention" = the agent cannot proceed without the user.
+			// The web rail and the attention panel use the same rule.
+			if m.State == StateAwaitingPermission || m.State == StateAwaitingInput {
 				t.Attention = true
 			}
 		}

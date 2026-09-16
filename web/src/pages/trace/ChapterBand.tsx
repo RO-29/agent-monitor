@@ -1,8 +1,7 @@
-import { useState } from "react";
 import type { Learning, Output, Segment } from "../../api/types";
-import { fmtAgo, fmtClock, fmtTok } from "../../lib/format";
+import { fmtAgo, fmtClock } from "../../lib/format";
 import { Icon } from "../../lib/icons";
-import { BOUNDARY, chapterCounts, outputHref } from "./lib";
+import { outputHref } from "./lib";
 
 interface CardProps {
   segment: Segment;
@@ -132,53 +131,6 @@ export default function ChapterCard({ segment, onEnrich, enriching, enrichError,
           {enriching ? <span className="tr-spin" /> : <Icon name="spark" size={11} />} {enriching ? "running…" : ch.source === "enriched" ? "re-run enrichment" : "run enrichment"}
         </button>
       </div>
-    </div>
-  );
-}
-
-interface BandProps extends CardProps {
-  loadMs: number;
-}
-
-/** One-line band under the header; expands into the full card. */
-export function ChapterBand(props: BandProps) {
-  const { segment } = props;
-  const [open, setOpen] = useState(false);
-  const b = segment.boundary;
-  const meta = BOUNDARY[b.kind] || BOUNDARY.start;
-  const c = chapterCounts(segment.chapter);
-  return (
-    <div className={`tr-chapter ${b.kind}`}>
-      <div className="tr-band">
-        <span className={`tr-bd ${meta.cls}`}>{meta.glyph}</span>
-        <span style={{ fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap" }}>
-          {b.kind === "compact" ? `compact · ${b.trigger || "auto"}` : meta.label}
-        </span>
-        {b.kind === "compact" && b.preTokens ? (
-          <span className="num muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
-            {fmtTok(b.preTokens)} → {fmtTok(b.postTokens)} tok
-          </span>
-        ) : null}
-        <span className="tr-sep" />
-        <span className="k">the point</span>
-        <span className="point">{segment.chapter?.point || "—"}</span>
-        <span className="tr-chip sm" style={{ cursor: "default" }}>
-          intent changed <span className="num">{c.intent}</span>
-        </span>
-        <span className="tr-chip sm" style={{ cursor: "default" }}>
-          <span className="tr-src correction">correction</span> {c.corrections}
-        </span>
-        <span className="tr-chip sm" style={{ cursor: "default" }}>
-          learnings <span className="num">{c.learnings}</span>
-        </span>
-        <span className="tr-chip sm warn" style={{ cursor: "default" }}>
-          open <span className="num">{c.open}</span>
-        </span>
-        <span className={`tr-chip sm ${open ? "on" : ""}`} onClick={() => setOpen(!open)}>
-          chapter <Icon name={open ? "chevd" : "chev"} size={10} />
-        </span>
-      </div>
-      {open && <ChapterCard {...props} />}
     </div>
   );
 }

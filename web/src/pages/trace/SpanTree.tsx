@@ -15,6 +15,8 @@ interface Props {
   crit?: Set<string>;
   filter: { turns: boolean; tools: boolean; agents: boolean; minDur: boolean; errorsOnly: boolean; query: string };
   onWheel: (e: React.WheelEvent<HTMLElement>) => void;
+  /** draw the time ruler in the header; off when the flame graph already shows one */
+  ticks?: boolean;
 }
 
 interface Row {
@@ -30,7 +32,7 @@ const ROW_H = 24;
 // Visible rows: depth-0 spans (user prompts, turns) in time order; children of
 // expanded turns/agents follow their parent. Only the rows inside the scroll
 // viewport are mounted (row height is fixed at 24px).
-export default function SpanTree({ idx, spans, win, selected, expanded, onToggle, onSelect, crit, filter, onWheel }: Props) {
+export default function SpanTree({ idx, spans, win, selected, expanded, onToggle, onSelect, crit, filter, onWheel, ticks: showTicks = true }: Props) {
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     // synthetic "continued" turns are not in `spans`, so match on the segment number
@@ -108,7 +110,7 @@ export default function SpanTree({ idx, spans, win, selected, expanded, onToggle
       <div className="tr-tree-head">
         <div className="c-name k">span · resource</div>
         <div className="c-time">
-          {ticks.map((t) => (
+          {showTicks && ticks.map((t) => (
             <span key={t} className="tick" style={{ position: "absolute", left: `${frac(t, win) * 100}%`, top: 7, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", transform: frac(t, win) < 0.02 ? "translateX(4px)" : "translateX(-50%)" }}>
               {tickLabel(t, win)}
             </span>

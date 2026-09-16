@@ -1,14 +1,15 @@
-// Notification policy (ported from the legacy UI):
+// OS notifications only. What needs the user in-page is the AlertBar, which
+// renders the live attention set; duplicating it as toasts is what produced
+// the pile-up. Nothing fires for the backlog present when the page opens:
+// the baseline is the first snapshot that actually carries sessions.
 //   awaiting-permission → notify whenever the message text changes
 //   awaiting-input      → notify once, on the transition into the state
 //   any other state     → reset both memories
-// Permission requests and talks (WS) notify on arrival.
 import { useEffect, useRef } from "react";
 import type { Session, WsEvent } from "../api/types";
-import { projectName, titleFor, toolName } from "../lib/format";
+import { projectName } from "../lib/format";
 import { onLiveEvent, useLive } from "../lib/ws";
 import { KEYS } from "./prefs";
-import { showToast } from "./toast";
 
 function pref(key: string, def: boolean) {
   try {
@@ -66,13 +67,20 @@ export function useNotifications(navigate: (path: string) => void) {
 
   useEffect(() => {
     const fire = (s: Session, msg: string) => {
-      const title = `${toolName(s.tool)} · ${projectName(s.cwd)} needs you`;
       const go = () => navigate(`/session/${encodeURIComponent(s.id)}?tab=pane`);
-      osNotify(title, msg, s.id, go);
-      showToast(title, `${titleFor(s)} — ${msg}`, { kind: "alert", onClick: go });
+      osNotify(`${projectName(s.cwd)} needs you`, msg, s.id, go);
       playBeep();
     };
-    // First snapshot: alert for anything already waiting, then track deltas.
+    // The first snapshot that carries sessions is the baseline, not an event:
+    // everything already waiting when the page opens is shown by the AlertBar.
+    if (!seen.current && live.sessions.size > 0) {
+      live.sessions.forEach((s) => {
+        if (s.state === "awaiting-permission") permMsg.current.set(s.id, s.permissionMessage || s.lastMessage || "needs permission");
+        else if (s.state === "awaiting-input") inputNotified.current.add(s.id);
+      });
+      seen.current = true;
+      return;
+    }
     live.sessions.forEach((s) => {
       if (s.state === "awaiting-permission") {
         const msg = s.permissionMessage || s.lastMessage || "needs permission";
@@ -81,29 +89,27 @@ export function useNotifications(navigate: (path: string) => void) {
           fire(s, msg);
         }
       } else if (s.state === "awaiting-input") {
-        if (seen.current && !inputNotified.current.has(s.id)) {
+        if (!inputNotified.current.has(s.id)) {
           inputNotified.current.add(s.id);
           fire(s, s.lastMessage || "waiting for your reply");
-        } else inputNotified.current.add(s.id);
+        }
       } else {
         permMsg.current.delete(s.id);
         inputNotified.current.delete(s.id);
       }
     });
-    seen.current = true;
   }, [live.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return onLiveEvent((e: WsEvent) => {
       if (e.kind === "perm-add") {
-        const body = JSON.stringify(e.request.input).slice(0, 120);
-        osNotify(`${e.request.toolName} wants permission`, body, `perm-${e.request.id}`, () => navigate("/"));
-        showToast(`${e.request.toolName} wants permission`, body, { kind: "alert", onClick: () => navigate("/") });
+        const i = e.request.input;
+        const one = (i.command || i.file_path || i.url || i.query) as string | undefined;
+        osNotify(`${e.request.toolName} wants permission`, one ? String(one).slice(0, 160) : JSON.stringify(i).slice(0, 120), `perm-${e.request.id}`, () => navigate("/"));
         playBeep();
       } else if (e.kind === "talk-request") {
         const go = () => navigate(`/session/${encodeURIComponent(e.talk.toAgent)}?tab=pane`);
-        osNotify(`Incoming talk from ${e.talk.fromLabel}`, e.talk.message.slice(0, 140), `talk-${e.talk.id}`, go);
-        showToast(`Incoming talk from ${e.talk.fromLabel}`, e.talk.message.slice(0, 140), { kind: "alert", onClick: go });
+        osNotify(`Talk from ${e.talk.fromLabel}`, e.talk.message.slice(0, 140), `talk-${e.talk.id}`, go);
         playBeep();
       }
     });

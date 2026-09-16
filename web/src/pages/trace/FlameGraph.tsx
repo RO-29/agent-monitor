@@ -26,7 +26,7 @@ const ROWS = ["segment", "turns", "tools", "subagents", "depth 2"];
 
 // Rows by depth: 0 = the segment bar, 1 = turns (+ user marks), 2 = tools,
 // 3 = subagent children, 4 = deeper. Bars thinner than 0.5px are skipped unless
-// selected — a 9k-span session must stay smooth.
+// selected: a 9k-span session must stay smooth.
 export default function FlameGraph({ segment, segments, spans, idx, win, width, selected, crit, showTurns, showTools, showAgents, onSelect, onWheel, onAxisDrag }: Props) {
   const W = Math.max(width, 10);
   const x = (ts: number) => frac(ts, win) * W;
@@ -52,7 +52,9 @@ export default function FlameGraph({ segment, segments, spans, idx, win, width, 
     return out;
   }, [spans, win, W, showTurns, showTools, showAgents, selected, span]);
 
-  const ticks = axisTicks(win);
+  // keep ~80px between labels so a narrow window does not overprint them
+  const minGap = 80 / Math.max(W, 1);
+  const ticks = axisTicks(win).filter((t, i, a) => i === 0 || frac(t, win) - frac(a[i - 1], win) >= minGap);
   const boundaries = segments.filter((sg) => sg.boundary.at >= win.from && sg.boundary.at <= win.to);
   const segFrom = clamp(x(segment.fromTs), 0, W);
   const segTo = clamp(x(segment.toTs || win.to), 0, W);

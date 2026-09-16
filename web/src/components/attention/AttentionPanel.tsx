@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
-import type { PermissionRequest } from "../../api/types";
+import type { FeedLearning, PermissionRequest } from "../../api/types";
 import { fmtAgo, shortCwd, titleFor } from "../../lib/format";
 import { Icon, ToolLogo } from "../../lib/icons";
-import { dropPerm, dropTalk, useLive } from "../../lib/ws";
+import { attentionOf, dropPerm, dropTalk, useLive } from "../../lib/ws";
 import { StatePill } from "../../app/ui";
 import { showToast } from "../../app/toast";
 
@@ -53,12 +53,7 @@ function PermCard({ r }: { r: PermissionRequest }) {
 export default function AttentionPanel({ open }: { open?: boolean }) {
   const live = useLive();
   const nav = useNavigate();
-  const perms = [...live.perms.values()].sort((a, b) => a.createdAt - b.createdAt);
-  const waiting = [...live.sessions.values()]
-    .filter((s) => s.state === "awaiting-permission" || s.state === "awaiting-input")
-    .sort((a, b) => (a.state === "awaiting-permission" ? 0 : 1) - (b.state === "awaiting-permission" ? 0 : 1) || b.lastActivityAt - a.lastActivityAt);
-  const talks = [...live.talks.values()].sort((a, b) => a.createdAt - b.createdAt);
-  const total = perms.length + waiting.length + talks.length;
+  const { perms, waiting, talks, total } = attentionOf(live);
   return (
     <aside className={`side ${open ? "open" : ""}`}>
       <div className="sec" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -107,10 +102,39 @@ export default function AttentionPanel({ open }: { open?: boolean }) {
         </div>
       ))}
       {total === 0 && <div className="sec muted" style={{ fontSize: 12 }}>Nothing waits on you. Permission prompts, agents waiting for a reply, and talks appear here.</div>}
-      <div className="sec">
-        <span className="k">recent learnings</span>
-        <div className="muted" style={{ fontSize: 12 }}>learnings appear on each thread's ledger</div>
-      </div>
+      <RecentLearnings />
     </aside>
+  );
+}
+
+/** Newest learnings across every recent thread; the full list lives at /?view=learnings. */
+function RecentLearnings() {
+  const [rows, setRows] = useState<FeedLearning[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = () => api.learningsFeed({ limit: 6, threads: 25 }).then((r) => alive && setRows(r.learnings)).catch(() => alive && setRows([]));
+    tick();
+    const t = window.setInterval(tick, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, []);
+  return (
+    <div className="sec">
+      <div className="row" style={{ gap: 8 }}>
+        <span className="k">recent learnings</span>
+        <div style={{ flex: 1 }} />
+        <Link to="/?view=learnings" className="chip" style={{ height: 18, fontSize: 10.5 }}>all</Link>
+      </div>
+      {rows === null && <div className="muted" style={{ fontSize: 11.5 }}>loading…</div>}
+      {rows?.length === 0 && <div className="muted" style={{ fontSize: 11.5 }}>none yet</div>}
+      {rows?.map((l) => (
+        <Link key={l.id + l.threadId} to={`/thread/${encodeURIComponent(l.threadId)}/learnings`} className="row" style={{ gap: 6, alignItems: "flex-start", color: "inherit" }}>
+          <span className={`tr-src ${l.source}`}>{l.source}</span>
+          <span className="ell" style={{ fontSize: 11.5, lineHeight: 1.35, flex: 1 }} title={l.text}>{l.text}</span>
+        </Link>
+      ))}
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // registerTraceRoutes adds the trace / thread / chapter / learning endpoints
@@ -331,6 +332,96 @@ func registerTraceRoutes(mux *http.ServeMux) {
 		writeJSON(w, map[string]any{"summaries": out})
 	})
 
+	// GET /api/learnings?limit=&source=&project=&threads=
+	// Global ledger across the most recently active threads. `threads` caps how
+	// many transcripts are parsed; the walk also stops at a wall-clock budget so
+	// a cold cache never blocks the page.
+	mux.HandleFunc("/api/learnings", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		limit := qInt(q.Get("limit"), 200)
+		if limit <= 0 || limit > 2000 {
+			limit = 200
+		}
+		maxThreads := qInt(q.Get("threads"), 60)
+		if maxThreads <= 0 || maxThreads > 400 {
+			maxThreads = 60
+		}
+		source := q.Get("source")
+		project := q.Get("project")
+
+		sessions := store.All()
+		threads, _ := computeThreads(sessions, panesBySession())
+		byID := map[string]*Session{}
+		for _, s := range sessions {
+			byID[s.ID] = s
+		}
+		deadline := time.Now().Add(6 * time.Second)
+		var out []FeedLearning
+		scanned, truncated := 0, false
+		for i := range threads {
+			if scanned >= maxThreads || time.Now().After(deadline) {
+				truncated = i < len(threads)
+				break
+			}
+			t := &threads[i]
+			if project != "" && project != "all" && t.Cwd != project {
+				continue
+			}
+			scanned++
+			for _, sid := range t.Sessions {
+				m := byID[sid]
+				if m == nil {
+					continue
+				}
+				tr := buildTrace(m)
+				if tr == nil {
+					continue
+				}
+				add := func(l Learning) {
+					if source != "" && source != "all" && l.Source != source {
+						return
+					}
+					out = append(out, FeedLearning{Learning: l, ThreadID: t.ID, ThreadTitle: t.Title, Cwd: t.Cwd, SessionID: m.ID, Tool: string(m.Tool)})
+				}
+				for _, l := range tr.Learnings {
+					l.Ref = firstNonEmpty(l.Ref, m.ID)
+					add(l)
+				}
+				for _, o := range tr.Outputs {
+					add(Learning{ID: spanID("lrn", o.Ref+o.Label), Source: "output", Text: o.Label, Evidence: o.Kind + " · " + clipString(o.Ref, 120), Ts: o.Ts, Seg: o.Seg, Ref: m.ID})
+				}
+				for si := range tr.Segments {
+					c := loadEnrichedChapter(m.ID, si)
+					if c == nil {
+						continue
+					}
+					for _, l := range c.Learnings {
+						if l.Source == "memory" || l.Source == "output" {
+							continue
+						}
+						l.Ref = m.ID
+						l.Seg = si
+						add(l)
+					}
+				}
+			}
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Ts > out[j].Ts })
+		out = dedupeFeed(out)
+		total := len(out)
+		if len(out) > limit {
+			out = out[:limit]
+		}
+		if out == nil {
+			out = []FeedLearning{}
+		}
+		counts := map[string]int{}
+		for _, l := range out {
+			counts[l.Source]++
+		}
+		writeJSON(w, map[string]any{"learnings": out, "total": total, "threadsScanned": scanned, "truncated": truncated, "counts": counts})
+	})
+
 	// GET|POST /api/settings
 	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -469,4 +560,42 @@ func panesBySession() map[string]string {
 		panes[reg.AgentID] = reg.PaneID
 	}
 	return panes
+}
+
+// FeedLearning is one learning row in the global ledger: the learning plus the
+// thread and session it came from.
+type FeedLearning struct {
+	Learning
+	ThreadID    string `json:"threadId"`
+	ThreadTitle string `json:"threadTitle"`
+	Cwd         string `json:"cwd"`
+	SessionID   string `json:"sessionId"`
+	Tool        string `json:"tool"`
+}
+
+// dedupeFeed drops repeats of the same text within one thread; the same lesson
+// legitimately recurs across different threads.
+func dedupeFeed(in []FeedLearning) []FeedLearning {
+	seen := map[string]bool{}
+	var out []FeedLearning
+	for _, l := range in {
+		k := l.ThreadID + "|" + l.Source + "|" + strings.ToLower(clipString(l.Text, 80))
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, l)
+	}
+	return out
+}
+
+func qInt(s string, d int) int {
+	if s == "" {
+		return d
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return d
+	}
+	return n
 }

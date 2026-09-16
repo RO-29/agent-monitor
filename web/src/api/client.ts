@@ -11,6 +11,7 @@ import type {
   Span,
   SpanDetail,
   Talk,
+  LearningsFeedResponse,
   ThreadLearningsResponse,
   ThreadResponse,
   ThreadStoryResponse,
@@ -67,6 +68,15 @@ export const api = {
   thread: (id: string) => get<ThreadResponse>(`/api/thread/${enc(id)}`),
   threadStory: (id: string) => get<ThreadStoryResponse>(`/api/thread/${enc(id)}/story`),
   threadLearnings: (id: string) => get<ThreadLearningsResponse>(`/api/thread/${enc(id)}/learnings`),
+  learningsFeed: (q: { source?: string; project?: string; limit?: number; threads?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (q.source && q.source !== "all") p.set("source", q.source);
+    if (q.project && q.project !== "all") p.set("project", q.project);
+    if (q.limit) p.set("limit", String(q.limit));
+    if (q.threads) p.set("threads", String(q.threads));
+    const s = p.toString();
+    return get<LearningsFeedResponse>(`/api/learnings${s ? "?" + s : ""}`);
+  },
 
   // trace
   trace: (id: string, q: { seg?: number; from?: number; to?: number; minDur?: number } = {}) => {

@@ -4,6 +4,7 @@ import ThreadsPage from "./pages/threads/ThreadsPage";
 import SessionPage from "./pages/session/SessionPage";
 import StoryPage from "./pages/story/StoryPage";
 import LearningsPage from "./pages/learnings/LearningsPage";
+import LearningsFeed from "./pages/learnings/LearningsFeed";
 import TVPage from "./pages/tv/TVPage";
 
 // Legacy deep links: /#s=<id>&f=<facet>&q=<query>  →  /session/<id>?f=&q=
@@ -31,6 +32,7 @@ export default function App() {
       <Route element={<Shell />}>
         <Route path="/" element={<ThreadsPage />} />
         <Route path="/threads" element={<Navigate to="/" replace />} />
+        <Route path="/learnings" element={<LearningsFeed />} />
         <Route path="/session/:id" element={<SessionPage />} />
         <Route path="/thread/:id" element={<StoryPage />} />
         <Route path="/thread/:id/story" element={<StoryPage />} />

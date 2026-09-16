@@ -105,7 +105,7 @@ export default function ThreadsPage() {
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div className="pagehead" style={{ gap: 8 }}>
           <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-            <h1 style={{ flex: "none" }}>{view === "live" ? "Live sessions" : view === "attention" ? "Needs attention" : view === "projects" ? "Projects" : view === "learnings" ? "Learnings" : "Threads"}</h1>
+            <h1 style={{ flex: "none" }}>{view === "live" ? "Live sessions" : view === "attention" ? "Needs attention" : view === "projects" ? "Projects" : "Threads"}</h1>
             <span className="num muted">{mode === "flat" ? flat.length : threads.length}</span>
             <div style={{ flex: 1 }} />
             <select className="sel" value={tool} onChange={(e) => set("tool", e.target.value)}>
@@ -139,9 +139,8 @@ export default function ThreadsPage() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-          {view === "learnings" && <div className="empty">Pick a thread and open its ledger. Learnings are collected per thread.</div>}
-          {view !== "learnings" && err && <div className="empty">threads unavailable: {err}</div>}
-          {view !== "learnings" && mode === "threads" && !grouped && (
+          {err && <div className="empty">threads unavailable: {err}</div>}
+          {mode === "threads" && !grouped && (
             <>
               <div className="tgrid head k">
                 <span>thread</span>
@@ -153,7 +152,7 @@ export default function ThreadsPage() {
               {data && threads.length === 0 && <div className="empty">No threads match. Clear the filters or switch to flat sessions.</div>}
             </>
           )}
-          {view !== "learnings" && mode === "threads" && grouped && grouped.map(([cwd, ts]) => (
+          {mode === "threads" && grouped && grouped.map(([cwd, ts]) => (
             <div key={cwd}>
               <div className="grouphead row" style={{ gap: 8 }}>
                 <Icon name="folder" size={13} color="var(--muted)" />
@@ -164,7 +163,7 @@ export default function ThreadsPage() {
               {ts.map((t) => <ThreadRow key={t.id} t={t} sessions={live.sessions} onOpen={(p) => nav(p)} />)}
             </div>
           ))}
-          {view !== "learnings" && mode === "flat" && <FlatSessions list={flat} threadOf={data?.threadOf || {}} />}
+          {mode === "flat" && <FlatSessions list={flat} threadOf={data?.threadOf || {}} />}
         </div>
       </div>
       <AttentionPanel open={sideOpen} />

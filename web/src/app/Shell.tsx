@@ -5,7 +5,8 @@ import type { ContextRow, Health } from "../api/types";
 import { fmtTok, isLive, pct } from "../lib/format";
 import { Icon } from "../lib/icons";
 import { ToolLogo } from "../lib/icons";
-import { useLive } from "../lib/ws";
+import { attentionOf, useLive } from "../lib/ws";
+import AlertBar from "../components/attention/AlertBar";
 import HelpOverlay from "../components/help/HelpOverlay";
 import { KEYS, useBoolPref, useTheme } from "./prefs";
 import { useNotifications } from "./notify";
@@ -20,6 +21,7 @@ function Crumbs() {
   const parts: { label: string; to?: string }[] = [];
   const p = loc.pathname;
   if (p === "/") parts.push({ label: "threads" });
+  else if (p === "/learnings") parts.push({ label: "threads", to: "/" }, { label: "learnings" });
   else if (p.startsWith("/session/")) {
     const id = decodeURIComponent(params.id || p.split("/")[2] || "");
     parts.push({ label: "threads", to: "/" }, { label: `session ${id.split(":").pop()?.slice(0, 8)}` });
@@ -131,7 +133,7 @@ export default function Shell() {
 
   const sessions = [...live.sessions.values()];
   const liveN = sessions.filter((s) => isLive(s.state)).length;
-  const attnN = sessions.filter((s) => s.state === "awaiting-permission").length + live.perms.size;
+  const attnN = attentionOf(live).total;
   const toolCount = (t: string) => sessions.filter((s) => s.tool === t && isLive(s.state)).length;
   const projects = new Set(sessions.filter((s) => isLive(s.state)).map((s) => s.cwd)).size;
   const view = new URLSearchParams(loc.search).get("view") || (loc.pathname === "/" ? "threads" : "");
@@ -201,11 +203,11 @@ export default function Shell() {
         <div className="spacer" style={{ flex: 1 }} />
         <div className="searchbox">
           <Icon name="search" size={13} />
-          <input id="topbar-search" ref={bindSearchInput} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search threads, sessions, paths…" onFocus={() => loc.pathname !== "/" && nav("/")} />
+          <input id="topbar-search" ref={bindSearchInput} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search threads, sessions, paths…" onFocus={() => loc.pathname !== "/" && loc.pathname !== "/learnings" && nav("/")} />
           <span className="kbd">/</span>
         </div>
         {tmux >= 12 && (
-          <span className="chip" style={{ color: tmux >= 18 ? "var(--red)" : "var(--yellow)" }} title={`${tmux} tmux panes · ${health?.registeredPanes || 0} agent-driven — consider closing some`}>
+          <span className="chip" style={{ color: tmux >= 18 ? "var(--red)" : "var(--yellow)" }} title={`${tmux} tmux panes · ${health?.registeredPanes || 0} agent-driven. Consider closing some`}>
             <Icon name="layers" size={11} /> {tmux} panes
           </span>
         )}
@@ -227,7 +229,7 @@ export default function Shell() {
           {navItem("Needs attention", "alert", attnN, "/?view=attention", view === "attention")}
           {navItem("Threads", "thread", "", "/", view === "threads" && !toolFilter)}
           {navItem("Projects", "folder", projects, "/?view=projects", view === "projects")}
-          {navItem("Learnings", "book", "", "/?view=learnings", view === "learnings")}
+          {navItem("Learnings", "book", "", "/learnings", loc.pathname === "/learnings")}
           <div className="k">agents</div>
           {agentItem("Claude Code", "claude")}
           {agentItem("Codex", "codex")}
@@ -254,6 +256,7 @@ export default function Shell() {
           <Outlet />
         </main>
       </div>
+      <AlertBar />
       {help && <HelpOverlay onClose={() => setHelp(false)} />}
       <div className="toasts">
         {toasts.map((t) => (

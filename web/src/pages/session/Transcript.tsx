@@ -273,7 +273,7 @@ export default function Transcript({ session }: { session: Session }) {
             </div>
           ),
         )}
-        {total > CAP && <div className="empty">Showing first {CAP} of {total} — narrow with search.</div>}
+        {total > CAP && <div className="empty">Showing first {CAP} of {total}. Narrow it with search.</div>}
         {total === 0 && <div className="empty">No matches. Try another facet or search.</div>}
       </div>
     );

@@ -3,6 +3,7 @@
 // small pub/sub for trace events (segment / chapter) so any view can react.
 import { useSyncExternalStore } from "react";
 import type { PermissionRequest, Session, Talk, WsEvent } from "../api/types";
+import { isAttention } from "./format";
 
 export interface LiveState {
   connected: boolean;
@@ -109,6 +110,25 @@ export function useLive(): LiveState {
 export function onLiveEvent(l: EventListener): () => void {
   eventListeners.add(l);
   return () => eventListeners.delete(l);
+}
+
+/** One definition of "needs attention", shared by the rail count, the threads
+ *  filter and the side panel. A session with a pending MCP request is counted
+ *  once, as the request. */
+export interface AttentionSet {
+  perms: PermissionRequest[];
+  waiting: Session[];
+  talks: Talk[];
+  total: number;
+}
+export function attentionOf(live: LiveState): AttentionSet {
+  const perms = [...live.perms.values()].sort((a, b) => a.createdAt - b.createdAt);
+  const claimed = new Set(perms.map((p) => p.sessionId || ""));
+  const waiting = [...live.sessions.values()]
+    .filter((s) => isAttention(s.state) && !claimed.has(s.sessionId))
+    .sort((a, b) => (a.state === "awaiting-permission" ? 0 : 1) - (b.state === "awaiting-permission" ? 0 : 1) || b.lastActivityAt - a.lastActivityAt);
+  const talks = [...live.talks.values()].sort((a, b) => a.createdAt - b.createdAt);
+  return { perms, waiting, talks, total: perms.length + waiting.length + talks.length };
 }
 
 /** Optimistic local removals (after a successful respond call). */

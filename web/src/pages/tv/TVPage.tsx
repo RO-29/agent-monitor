@@ -237,11 +237,11 @@ function Detail({ s, onClose, onDashboard, say }: { s: Session; onClose: () => v
       const r = await api.focus(s.id);
       if (r.ok) say(`→ ${r.terminal || ""} ${r.sessionName || ""} ${r.paneId || ""}`);
       else {
-        say("No live terminal — opening dashboard");
+        say("No live terminal. Opening dashboard");
         onDashboard();
       }
     } catch {
-      say("No live terminal — opening dashboard");
+      say("No live terminal. Opening dashboard");
       onDashboard();
     }
   };

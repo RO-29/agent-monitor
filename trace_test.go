@@ -269,3 +269,31 @@ func TestParseSummarySections(t *testing.T) {
 		t.Errorf("bold residue: %v", got)
 	}
 }
+
+// A thread needs attention when any member waits on the user — a permission
+// prompt or a plain reply. The web rail and side panel use the same rule.
+func TestThreadAttentionCoversAwaitingInput(t *testing.T) {
+	now := time.Now().UnixMilli()
+	mk := func(id string, st State) *Session {
+		return &Session{ID: "claude:" + id, Tool: ToolClaude, SessionID: id, Cwd: "/p" + id, StartedAt: now - 60_000, LastActivityAt: now, State: st}
+	}
+	cases := []struct {
+		state State
+		want  bool
+	}{
+		{StateAwaitingPermission, true},
+		{StateAwaitingInput, true},
+		{StateRunning, false},
+		{StateIdle, false},
+		{StateCompleted, false},
+	}
+	for _, c := range cases {
+		threads, _ := computeThreads([]*Session{mk(string(c.state), c.state)}, map[string]string{})
+		if len(threads) != 1 {
+			t.Fatalf("state %s: threads = %d, want 1", c.state, len(threads))
+		}
+		if threads[0].Attention != c.want {
+			t.Errorf("state %s: attention = %v, want %v", c.state, threads[0].Attention, c.want)
+		}
+	}
+}
