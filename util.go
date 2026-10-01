@@ -12,6 +12,25 @@ func homeDir() string {
 	return os.Getenv("HOME")
 }
 
+// ensureToolEnv fixes launchd/detached starts: PATH has no tmux, and with no
+// UTF-8 locale tmux prints tabs in -F output as "_", which breaks parsing.
+func ensureToolEnv() {
+	if os.Getenv("LC_ALL") == "" && os.Getenv("LC_CTYPE") == "" && os.Getenv("LANG") == "" {
+		_ = os.Setenv("LC_CTYPE", "UTF-8")
+	}
+	path := os.Getenv("PATH")
+	have := map[string]bool{}
+	for _, d := range strings.Split(path, ":") {
+		have[d] = true
+	}
+	for _, d := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {
+		if !have[d] && pathExists(d) {
+			path += ":" + d
+		}
+	}
+	_ = os.Setenv("PATH", path)
+}
+
 func pathExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil

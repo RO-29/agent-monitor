@@ -259,6 +259,10 @@ func (pr *PaneRegistry) List() []*PaneRegistration {
 // Returns the agent ids it removed so the caller can broadcast pane-forget
 // events. Cheap: ~5ms tmux fork plus an O(N) syscall per registration.
 func (pr *PaneRegistry) GarbageCollect(panes []TmuxPane) []string {
+	// Zero panes means tmux output did not parse; never wipe the registry on it.
+	if len(panes) == 0 {
+		return nil
+	}
 	live := make(map[string]bool, len(panes))
 	for _, p := range panes {
 		live[p.PaneID] = true
