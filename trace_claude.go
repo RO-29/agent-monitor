@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -18,11 +20,75 @@ import (
 //   - attachment hook records named SessionStart:clear|compact|resume
 //   - a first user prompt of <command-name>/clear
 func buildClaudeTrace(sess *Session) *SessionTrace {
+	p := newClaudeTraceParser(sess)
+	p.advance()
+	return p.snapshot(sess)
+}
+
+func newClaudeTraceParser(sess *Session) *claudeTraceParser {
 	tr := &SessionTrace{SessionID: sess.ID, Tool: ToolClaude, io: map[string]SpanIO{}}
-	p := &claudeTraceParser{tr: tr, sess: sess, curTurn: -1, pendingCompact: -1, seenTool: map[string]bool{}, inFile: map[string]bool{}}
-	p.subagentIndex(sess.TranscriptPath, sess.SessionID)
-	p.parseFile(sess.TranscriptPath, "", 0)
-	p.closeTurn(p.lastAct)
+	return &claudeTraceParser{tr: tr, main: sess.TranscriptPath, sessionID: sess.SessionID, curTurn: -1, pendingCompact: -1,
+		seenTool: map[string]bool{}, files: map[string]*claudeFileState{}, subagents: map[string]string{}, metas: map[string]bool{}, unlinked: map[string]agentRef{}}
+}
+
+// advance parses every complete line appended since the last call: the main
+// transcript, newly linked subagents, and subagents that grew. It returns
+// false when a file shrank; the caller must then start a fresh parser.
+func (p *claudeTraceParser) advance() bool {
+	p.subagentIndex()
+	if !p.parseFile(p.main, "", 0) {
+		return false
+	}
+	for id, ref := range p.unlinked {
+		if child, ok := p.subagents[id]; ok {
+			delete(p.unlinked, id)
+			if !p.parseFile(child, ref.spanID, ref.depth) {
+				return false
+			}
+		}
+	}
+	for i := 0; i < len(p.order); i++ {
+		if !p.parseFile(p.order[i], "", 0) {
+			return false
+		}
+	}
+	return true
+}
+
+// snapshot finalises a copy of the raw parse state, so the parser can keep
+// consuming appends while readers hold the returned trace.
+func (p *claudeTraceParser) snapshot(sess *Session) *SessionTrace {
+	raw := p.tr
+	tr := &SessionTrace{SessionID: raw.SessionID, Tool: raw.Tool, Model: raw.Model, FirstTs: raw.FirstTs, LastTs: raw.LastTs,
+		Segments: append([]Segment(nil), raw.Segments...), Spans: make([]Span, len(raw.Spans)),
+		Learnings: append([]Learning(nil), raw.Learnings...), Outputs: append([]Output(nil), raw.Outputs...), io: make(map[string]SpanIO, len(raw.io))}
+	byID := make(map[string]int, len(raw.Spans))
+	for i, sp := range raw.Spans {
+		if sp.Tokens != nil {
+			t := *sp.Tokens
+			sp.Tokens = &t
+		}
+		tr.Spans[i] = sp
+		byID[sp.ID] = i
+	}
+	for k, v := range raw.io {
+		tr.io[k] = v
+	}
+	// A subagent's parent span ends when its file ends if the tool_result is missing.
+	for _, fs := range p.files {
+		if i, ok := byID[fs.parentID]; ok && fs.parentID != "" && tr.Spans[i].Dur == 0 && fs.last > tr.Spans[i].Ts {
+			tr.Spans[i].Dur = fs.last - tr.Spans[i].Ts
+		}
+	}
+	if p.curTurn >= 0 && p.curTurn < len(tr.Spans) {
+		t := &tr.Spans[p.curTurn]
+		if p.lastAct > t.Ts && t.Dur == 0 {
+			t.Dur = p.lastAct - t.Ts
+		}
+		if t.Dur < 0 {
+			t.Dur = 0
+		}
+	}
 	if tr.FirstTs == 0 {
 		tr.FirstTs = sess.StartedAt
 	}
@@ -50,7 +116,10 @@ func buildClaudeTrace(sess *Session) *SessionTrace {
 		tr.CostUSD = estimateCost(tr.Model, sess.Tokens)
 		tr.CostEstimated = true
 	}
-	finalizeTrace(tr, p.aways)
+	// Appended subagent lines land out of file order; time order is chunking-independent.
+	sort.SliceStable(tr.Learnings, func(i, j int) bool { return tr.Learnings[i].Ts < tr.Learnings[j].Ts })
+	sort.SliceStable(tr.Outputs, func(i, j int) bool { return tr.Outputs[i].Ts < tr.Outputs[j].Ts })
+	finalizeTrace(tr, append([]IntentChange(nil), p.aways...))
 	if p.costUSD > 0 {
 		// scale segment estimates so they sum to the exact session cost
 		var sum float64
@@ -66,11 +135,30 @@ func buildClaudeTrace(sess *Session) *SessionTrace {
 	return tr
 }
 
-type claudeTraceParser struct {
-	tr   *SessionTrace
-	sess *Session
+// claudeFileState is the resume point of one JSONL file.
+type claudeFileState struct {
+	off        int64
+	parentID   string
+	depth      int
+	pendingIdx map[string]int // tool_use id → index into tr.Spans
+	last       int64          // newest timestamp seen in the file
+}
 
-	subagents map[string]string // toolUseId → agent-*.jsonl path
+type agentRef struct {
+	spanID string
+	depth  int
+}
+
+type claudeTraceParser struct {
+	tr        *SessionTrace
+	main      string // transcript path
+	sessionID string
+
+	subagents map[string]string           // toolUseId → agent-*.jsonl path
+	metas     map[string]bool             // meta files already read
+	unlinked  map[string]agentRef         // Agent tool_use ids whose transcript has not appeared yet
+	files     map[string]*claudeFileState // every file being followed
+	order     []string                    // subagent files in link order
 
 	curTurn          int // index into tr.Spans, -1 = none
 	turnCount        int
@@ -84,7 +172,6 @@ type claudeTraceParser struct {
 	costUSD          float64
 	aways            []IntentChange
 	seenTool         map[string]bool // tool_use ids already emitted (fork transcripts replay the parent's history)
-	inFile           map[string]bool // subagent files on the current parse stack
 }
 
 func (p *claudeTraceParser) turn() *Span {
@@ -96,11 +183,17 @@ func (p *claudeTraceParser) turn() *Span {
 
 // subagentIndex maps every Agent tool_use id to the child transcript that ran
 // it, from <projectDir>/<sessionId>/subagents/agent-*.meta.json.
-func (p *claudeTraceParser) subagentIndex(transcript, sessionID string) {
-	p.subagents = map[string]string{}
-	dir := filepath.Join(filepath.Dir(transcript), sessionID, "subagents")
+func (p *claudeTraceParser) subagentIndex() {
+	dir := filepath.Join(filepath.Dir(p.main), p.sessionID, "subagents")
 	metas, _ := filepath.Glob(filepath.Join(dir, "agent-*.meta.json"))
 	for _, m := range metas {
+		if p.metas[m] {
+			continue
+		}
+		jsonl := strings.TrimSuffix(m, ".meta.json") + ".jsonl"
+		if !pathExists(jsonl) {
+			continue
+		}
 		raw, err := os.ReadFile(m)
 		if err != nil {
 			continue
@@ -108,13 +201,11 @@ func (p *claudeTraceParser) subagentIndex(transcript, sessionID string) {
 		var meta struct {
 			ToolUseID string `json:"toolUseId"`
 		}
+		p.metas[m] = true
 		if json.Unmarshal(raw, &meta) != nil || meta.ToolUseID == "" {
 			continue
 		}
-		jsonl := strings.TrimSuffix(m, ".meta.json") + ".jsonl"
-		if pathExists(jsonl) {
-			p.subagents[meta.ToolUseID] = jsonl
-		}
+		p.subagents[meta.ToolUseID] = jsonl
 	}
 }
 
@@ -151,29 +242,49 @@ func (p *claudeTraceParser) closeTurn(at int64) {
 	p.curTurn = -1
 }
 
-// parseFile walks one JSONL file. parentID/depth are set when the file is a
-// subagent transcript nested under an Agent span.
-func (p *claudeTraceParser) parseFile(path, parentID string, depth int) {
-	if p.inFile[path] {
-		return // a replayed Agent call inside a fork must not re-enter its own file
+// parseFile consumes the complete lines appended to one JSONL file since its
+// last call. parentID/depth are fixed when a subagent file is first linked.
+// Returns false when the file shrank.
+func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
+	fs := p.files[path]
+	if fs == nil {
+		fs = &claudeFileState{parentID: parentID, depth: depth, pendingIdx: map[string]int{}}
+		p.files[path] = fs
+		if path != p.main {
+			p.order = append(p.order, path)
+		}
 	}
-	p.inFile[path] = true
-	defer delete(p.inFile, path)
+	parentID, depth = fs.parentID, fs.depth
 	f, err := os.Open(path)
 	if err != nil {
-		return
+		return true
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	st, err := f.Stat()
+	if err != nil {
+		return true
+	}
+	if st.Size() < fs.off {
+		return false
+	}
+	if st.Size() == fs.off {
+		return true
+	}
+	if _, err := f.Seek(fs.off, io.SeekStart); err != nil {
+		return true
+	}
+	r := bufio.NewReaderSize(f, 256*1024)
 
 	tr := p.tr
 	isChild := parentID != ""
-	pendingIdx := map[string]int{} // tool_use id → index into tr.Spans
-	var childLast int64
+	pendingIdx := fs.pendingIdx
 
-	for sc.Scan() {
-		line := sc.Bytes()
+	for {
+		line, err := r.ReadBytes('\n')
+		if err != nil {
+			break // a partial last line waits for its newline
+		}
+		fs.off += int64(len(line))
 		var j map[string]any
 		if json.Unmarshal(line, &j) != nil {
 			continue
@@ -188,8 +299,8 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) {
 				tr.LastTs = ts
 			}
 		}
-		if ts > childLast {
-			childLast = ts
+		if ts > fs.last {
+			fs.last = ts
 		}
 
 		switch kind {
@@ -426,7 +537,9 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) {
 				}
 				// Subagent transcript → nested spans.
 				if fam == "agent" && depth < 3 {
-					if child, ok := p.subagents[id]; ok {
+					if child, ok := p.subagents[id]; !ok {
+						p.unlinked[id] = agentRef{spanID: sp.ID, depth: depth + 1}
+					} else if p.files[child] == nil {
 						p.parseFile(child, sp.ID, depth+1)
 					}
 				}
@@ -448,23 +561,16 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) {
 				if !sp.Err && sp.Fam == "bash" && strings.Contains(head, "Exit code") && !strings.Contains(head, "Exit code 0") {
 					sp.Err = true
 				}
-				io := tr.io[sp.ID]
-				io.Result = clipString(res, 20000)
-				tr.io[sp.ID] = io
+				sio := tr.io[sp.ID]
+				sio.Result = clipString(res, 20000)
+				tr.io[sp.ID] = sio
 				if !isChild {
 					p.lastAct = ts
 				}
 			}
 		}
 	}
-	// A subagent's parent span ends when its file ends if the tool_result is missing.
-	if isChild && parentID != "" {
-		for i := range tr.Spans {
-			if tr.Spans[i].ID == parentID && tr.Spans[i].Dur == 0 && childLast > tr.Spans[i].Ts {
-				tr.Spans[i].Dur = childLast - tr.Spans[i].Ts
-			}
-		}
-	}
+	return true
 }
 
 func fmtClock(ms int64) string {

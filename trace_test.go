@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -295,5 +298,97 @@ func TestThreadAttentionCoversAwaitingInput(t *testing.T) {
 		if threads[0].Attention != c.want {
 			t.Errorf("state %s: attention = %v, want %v", c.state, threads[0].Attention, c.want)
 		}
+	}
+}
+
+func traceFingerprint(tr *SessionTrace) []string {
+	var out []string
+	for _, sp := range tr.Spans {
+		out = append(out, fmt.Sprintf("%s|%s|%s|%d|%d|%d|%v|%s", sp.ID, sp.Kind, sp.Parent, sp.Depth, sp.Seg, sp.Dur, sp.Err, sp.Text))
+	}
+	for _, l := range tr.Learnings {
+		out = append(out, "L|"+l.ID+"|"+fmt.Sprint(l.Seg))
+	}
+	for _, o := range tr.Outputs {
+		out = append(out, "O|"+o.Kind+"|"+o.Ref)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func appendFile(t *testing.T, path string, b []byte) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(b); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+}
+
+func incrementalTrace(t *testing.T, sess *Session) *SessionTrace {
+	t.Helper()
+	st, err := os.Stat(sess.TranscriptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return buildClaudeTraceIncremental(sess, st)
+}
+
+func TestClaudeTraceIncrementalMatchesFull(t *testing.T) {
+	_, sess := writeClaudeFixture(t)
+	sess.ID = "claude:incremental-halves"
+	want := buildClaudeTrace(sess)
+
+	full, _ := os.ReadFile(sess.TranscriptPath)
+	agent := filepath.Join(filepath.Dir(sess.TranscriptPath), sess.SessionID, "subagents", "agent-abc.jsonl")
+	meta := strings.TrimSuffix(agent, ".jsonl") + ".meta.json"
+	agentFull, _ := os.ReadFile(agent)
+	metaRaw, _ := os.ReadFile(meta)
+
+	// First half ends mid-line, after the Agent call but before its transcript is linked.
+	cut := strings.Index(string(full), `"turn_duration"`)
+	agentCut := len(agentFull) / 2
+	_ = os.WriteFile(sess.TranscriptPath, full[:cut], 0o644)
+	_ = os.WriteFile(agent, agentFull[:agentCut], 0o644)
+	_ = os.Remove(meta)
+	if tr := incrementalTrace(t, sess); tr == nil || len(tr.Spans) == 0 {
+		t.Fatal("first half produced no spans")
+	}
+
+	appendFile(t, sess.TranscriptPath, full[cut:])
+	appendFile(t, agent, agentFull[agentCut:])
+	_ = os.WriteFile(meta, metaRaw, 0o644)
+	got := incrementalTrace(t, sess)
+
+	if !reflect.DeepEqual(summarizeTrace(got), summarizeTrace(want)) {
+		t.Errorf("summary differs\n got %+v\nwant %+v", summarizeTrace(got), summarizeTrace(want))
+	}
+	if g, w := traceFingerprint(got), traceFingerprint(want); !reflect.DeepEqual(g, w) {
+		t.Errorf("trace differs\n got %v\nwant %v", g, w)
+	}
+	if len(got.io) != len(want.io) {
+		t.Errorf("io entries = %d, want %d", len(got.io), len(want.io))
+	}
+}
+
+func TestClaudeTraceIncrementalTruncation(t *testing.T) {
+	_, sess := writeClaudeFixture(t)
+	sess.ID = "claude:incremental-truncate"
+	if tr := incrementalTrace(t, sess); len(tr.Segments) != 2 {
+		t.Fatalf("segments = %d, want 2", len(tr.Segments))
+	}
+	full, _ := os.ReadFile(sess.TranscriptPath)
+	lines := strings.SplitAfter(string(full), "\n")
+	_ = os.WriteFile(sess.TranscriptPath, []byte(strings.Join(lines[:8], "")), 0o644)
+	got := incrementalTrace(t, sess)
+	want := buildClaudeTrace(sess)
+	if !reflect.DeepEqual(summarizeTrace(got), summarizeTrace(want)) {
+		t.Errorf("after truncation summary = %+v, want %+v", summarizeTrace(got), summarizeTrace(want))
+	}
+	if got.Spans[len(got.Spans)-1].Ts > want.LastTs || len(got.Segments) != 1 {
+		t.Errorf("stale state survived truncation: segments=%d", len(got.Segments))
 	}
 }

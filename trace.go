@@ -163,6 +163,40 @@ var traceCache = struct {
 	m  map[string]*traceCacheEntry
 }{m: map[string]*traceCacheEntry{}}
 
+// claudeParsers keeps each session's parse state so a grown transcript costs
+// only its appended lines.
+type claudeParserEntry struct {
+	mu sync.Mutex
+	fi os.FileInfo
+	p  *claudeTraceParser
+}
+
+var claudeParsers = struct {
+	mu sync.Mutex
+	m  map[string]*claudeParserEntry
+}{m: map[string]*claudeParserEntry{}}
+
+func buildClaudeTraceIncremental(sess *Session, st os.FileInfo) *SessionTrace {
+	claudeParsers.mu.Lock()
+	e := claudeParsers.m[sess.ID]
+	if e == nil {
+		e = &claudeParserEntry{}
+		claudeParsers.m[sess.ID] = e
+	}
+	claudeParsers.mu.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.p == nil || e.p.main != sess.TranscriptPath || !os.SameFile(e.fi, st) || st.Size() < e.p.files[e.p.main].off {
+		e.p = newClaudeTraceParser(sess)
+	}
+	if !e.p.advance() {
+		e.p = newClaudeTraceParser(sess)
+		e.p.advance()
+	}
+	e.fi = st
+	return e.p.snapshot(sess)
+}
+
 // buildTrace returns the trace for a session, reusing the cached copy while
 // the transcript file has not changed. Returns nil when the tool has no parser.
 func buildTrace(sess *Session) *SessionTrace {
@@ -183,7 +217,7 @@ func buildTrace(sess *Session) *SessionTrace {
 	var tr *SessionTrace
 	switch sess.Tool {
 	case ToolClaude:
-		tr = buildClaudeTrace(sess)
+		tr = buildClaudeTraceIncremental(sess, st)
 	case ToolCodex:
 		tr = buildCodexTrace(sess)
 	default:
