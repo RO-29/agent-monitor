@@ -176,6 +176,22 @@ var claudeParsers = struct {
 	m  map[string]*claudeParserEntry
 }{m: map[string]*claudeParserEntry{}}
 
+// claudeChildrenChanged is false while a refresh holds the parser; that
+// refresh picks the growth up itself.
+func claudeChildrenChanged(sess *Session) bool {
+	if sess.Tool != ToolClaude {
+		return false
+	}
+	claudeParsers.mu.Lock()
+	e := claudeParsers.m[sess.ID]
+	claudeParsers.mu.Unlock()
+	if e == nil || !e.mu.TryLock() {
+		return false
+	}
+	defer e.mu.Unlock()
+	return e.p != nil && e.p.childrenChanged()
+}
+
 func buildClaudeTraceIncremental(sess *Session, st os.FileInfo) *SessionTrace {
 	claudeParsers.mu.Lock()
 	e := claudeParsers.m[sess.ID]
@@ -208,11 +224,11 @@ func buildTrace(sess *Session) *SessionTrace {
 		return nil
 	}
 	traceCache.mu.Lock()
-	if e, ok := traceCache.m[sess.ID]; ok && e.size == st.Size() && e.mtime == st.ModTime().UnixMilli() {
-		traceCache.mu.Unlock()
+	e, ok := traceCache.m[sess.ID]
+	traceCache.mu.Unlock()
+	if ok && e.size == st.Size() && e.mtime == st.ModTime().UnixMilli() && !claudeChildrenChanged(sess) {
 		return e.trace
 	}
-	traceCache.mu.Unlock()
 
 	var tr *SessionTrace
 	switch sess.Tool {

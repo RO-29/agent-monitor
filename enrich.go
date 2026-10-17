@@ -144,7 +144,7 @@ func cachedSummary(sess *Session) *TraceSummary {
 	summaryCache.mu.Lock()
 	e := summaryCache.m[sess.ID]
 	summaryCache.mu.Unlock()
-	if e != nil && e.size == st.Size() && e.mtime == st.ModTime().UnixMilli() {
+	if e != nil && e.size == st.Size() && e.mtime == st.ModTime().UnixMilli() && !claudeChildrenChanged(sess) {
 		return e.sum
 	}
 	scheduleSummary(sess)

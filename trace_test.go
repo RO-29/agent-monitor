@@ -392,3 +392,56 @@ func TestClaudeTraceIncrementalTruncation(t *testing.T) {
 		t.Errorf("stale state survived truncation: segments=%d", len(got.Segments))
 	}
 }
+
+func TestBuildTraceSeesSubagentGrowthAlone(t *testing.T) {
+	_, sess := writeClaudeFixture(t)
+	sess.ID = "claude:child-growth"
+	before := buildTrace(sess)
+	agent := filepath.Join(filepath.Dir(sess.TranscriptPath), sess.SessionID, "subagents", "agent-abc.jsonl")
+	b, _ := json.Marshal(map[string]any{"type": "assistant", "timestamp": "2026-08-20T10:00:40Z", "isSidechain": true, "message": map[string]any{
+		"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": "c2", "name": "Read", "input": map[string]any{"file_path": "/x"}}}}})
+	appendFile(t, agent, append(b, '\n'))
+	after := buildTrace(sess)
+	if len(after.Spans) != len(before.Spans)+1 {
+		t.Errorf("spans = %d, want %d: subagent growth hidden by an unchanged main transcript", len(after.Spans), len(before.Spans)+1)
+	}
+	if again := buildTrace(sess); again != after {
+		t.Error("unchanged files rebuilt the trace")
+	}
+}
+
+func TestTailFileSharedPoller(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.jsonl")
+	_ = os.WriteFile(path, []byte("old\n"), 0o644)
+	got := make(chan string, 16)
+	stop := TailFile(path, func(l string) { got <- l })
+	defer stop()
+	next := func() string {
+		select {
+		case l := <-got:
+			return l
+		case <-time.After(3 * time.Second):
+			return "<timeout>"
+		}
+	}
+	appendFile(t, path, []byte("a\nb"))
+	if l := next(); l != "a" {
+		t.Fatalf("first line = %q, want a (existing content skipped)", l)
+	}
+	appendFile(t, path, []byte("c\n"))
+	if l := next(); l != "bc" {
+		t.Fatalf("joined partial = %q, want bc", l)
+	}
+	_ = os.WriteFile(path, []byte("z\n"), 0o644)
+	if l := next(); l != "z" {
+		t.Fatalf("after truncation = %q, want z", l)
+	}
+	stop()
+	appendFile(t, path, []byte("late\n"))
+	if l := next(); l != "<timeout>" {
+		t.Fatalf("closed tail delivered %q", l)
+	}
+	if d := tailInterval(2 * time.Hour); d != 30*time.Second {
+		t.Errorf("quiet interval = %v, want 30s", d)
+	}
+}

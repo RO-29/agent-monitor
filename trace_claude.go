@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // buildClaudeTrace parses one Claude Code transcript (plus its subagent
@@ -142,11 +143,46 @@ type claudeFileState struct {
 	depth      int
 	pendingIdx map[string]int // tool_use id → index into tr.Spans
 	last       int64          // newest timestamp seen in the file
+	seen       int64          // file size at the last parse
+	mod        time.Time      // file mtime at the last parse
 }
 
 type agentRef struct {
 	spanID string
 	depth  int
+	ts     int64
+}
+
+// childStaleAfter stops polling subagent files and unlinked Agent calls that
+// have been quiet this long.
+const childStaleAfter = time.Hour
+
+// childrenChanged reports subagent growth that a quiet main transcript hides.
+func (p *claudeTraceParser) childrenChanged() bool {
+	now := time.Now()
+	for _, path := range p.order {
+		fs := p.files[path]
+		if now.Sub(fs.mod) > childStaleAfter {
+			continue
+		}
+		if st, err := os.Stat(path); err == nil && (st.Size() != fs.seen || !st.ModTime().Equal(fs.mod)) {
+			return true
+		}
+	}
+	for _, ref := range p.unlinked {
+		if now.UnixMilli()-ref.ts > childStaleAfter.Milliseconds() {
+			continue
+		}
+		dir := filepath.Join(filepath.Dir(p.main), p.sessionID, "subagents")
+		metas, _ := filepath.Glob(filepath.Join(dir, "agent-*.meta.json"))
+		for _, m := range metas {
+			if !p.metas[m] {
+				return true
+			}
+		}
+		break
+	}
+	return false
 }
 
 type claudeTraceParser struct {
@@ -267,6 +303,7 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 	if st.Size() < fs.off {
 		return false
 	}
+	fs.seen, fs.mod = st.Size(), st.ModTime()
 	if st.Size() == fs.off {
 		return true
 	}
@@ -538,7 +575,7 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 				// Subagent transcript → nested spans.
 				if fam == "agent" && depth < 3 {
 					if child, ok := p.subagents[id]; !ok {
-						p.unlinked[id] = agentRef{spanID: sp.ID, depth: depth + 1}
+						p.unlinked[id] = agentRef{spanID: sp.ID, depth: depth + 1, ts: ts}
 					} else if p.files[child] == nil {
 						p.parseFile(child, sp.ID, depth+1)
 					}
