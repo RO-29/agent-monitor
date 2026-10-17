@@ -154,11 +154,19 @@ func cachedSummary(sess *Session) *TraceSummary {
 	return nil
 }
 
+// summaryMinInterval caps how often one growing transcript is re-summarised.
+const summaryMinInterval = 30 * time.Second
+
 var summaryQueue = struct {
-	mu      sync.Mutex
-	pending map[string]bool
-	ch      chan *Session
-}{pending: map[string]bool{}, ch: make(chan *Session, 4096)}
+	mu       sync.Mutex
+	pending  map[string]bool
+	last     map[string]time.Time // last enqueue per session
+	trailing map[string]bool      // a deferred refresh is armed
+	ch       chan *Session
+}{pending: map[string]bool{}, last: map[string]time.Time{}, trailing: map[string]bool{}, ch: make(chan *Session, 4096)}
+
+// summaryStore resolves the current *Session when a deferred refresh fires.
+var summaryStore *Store
 
 func scheduleSummary(sess *Session) {
 	summaryQueue.mu.Lock()
@@ -166,13 +174,36 @@ func scheduleSummary(sess *Session) {
 		summaryQueue.mu.Unlock()
 		return
 	}
+	if wait := summaryMinInterval - time.Since(summaryQueue.last[sess.ID]); wait > 0 {
+		// Throttled: arm one trailing refresh so the final state still lands.
+		if !summaryQueue.trailing[sess.ID] {
+			summaryQueue.trailing[sess.ID] = true
+			id := sess.ID
+			time.AfterFunc(wait, func() {
+				summaryQueue.mu.Lock()
+				delete(summaryQueue.trailing, id)
+				summaryQueue.mu.Unlock()
+				cur := sess
+				if summaryStore != nil {
+					if s := summaryStore.Get(id); s != nil {
+						cur = s
+					}
+				}
+				cachedSummary(cur)
+			})
+		}
+		summaryQueue.mu.Unlock()
+		return
+	}
 	summaryQueue.pending[sess.ID] = true
+	summaryQueue.last[sess.ID] = time.Now()
 	summaryQueue.mu.Unlock()
 	select {
 	case summaryQueue.ch <- sess:
 	default:
 		summaryQueue.mu.Lock()
 		delete(summaryQueue.pending, sess.ID)
+		delete(summaryQueue.last, sess.ID)
 		summaryQueue.mu.Unlock()
 	}
 }
@@ -180,6 +211,7 @@ func scheduleSummary(sess *Session) {
 // startSummaryWorkers computes trace summaries off the request path (two
 // workers so a 50 MB transcript never starves the rest).
 func startSummaryWorkers(s *Store) {
+	summaryStore = s
 	for i := 0; i < 2; i++ {
 		go func() {
 			for sess := range summaryQueue.ch {
