@@ -250,19 +250,23 @@ func runServer() {
 			"tmuxPanes": tmuxPanes, "registeredPanes": len(paneRegistry.List()),
 		})
 	})
-	mux.HandleFunc("/events/claude", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
+	hookHandler := func(tool Tool) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var p ClaudeHookPayload
+			if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+				writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+				return
+			}
+			handleHook(store, tool, p)
+			writeJSON(w, map[string]any{"ok": true})
 		}
-		var p ClaudeHookPayload
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
-			return
-		}
-		handleClaudeHook(store, p)
-		writeJSON(w, map[string]any{"ok": true})
-	})
+	}
+	mux.HandleFunc("/events/claude", hookHandler(ToolClaude))
+	mux.HandleFunc("/events/codex", hookHandler(ToolCodex))
 	mux.HandleFunc("/api/permissions", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"requests": permStore.List()})
 	})

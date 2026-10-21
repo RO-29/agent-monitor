@@ -11,13 +11,14 @@ import (
 )
 
 type ClaudeHookPayload struct {
-	SessionID      string `json:"session_id"`
-	TranscriptPath string `json:"transcript_path"`
-	Cwd            string `json:"cwd"`
-	HookEventName  string `json:"hook_event_name"`
-	Message        string `json:"message"`
-	ToolName       string `json:"tool_name"`
-	Reason         string `json:"reason"`
+	SessionID        string `json:"session_id"`
+	TranscriptPath   string `json:"transcript_path"`
+	Cwd              string `json:"cwd"`
+	HookEventName    string `json:"hook_event_name"`
+	NotificationType string `json:"notification_type"`
+	Message          string `json:"message"`
+	ToolName         string `json:"tool_name"`
+	Reason           string `json:"reason"`
 }
 
 var permissionRe = regexp.MustCompile(`(?i)permission|approve|allow|confirm`)
@@ -27,7 +28,7 @@ var (
 	claudeTails  = map[string]func(){} // sessionId -> closer
 )
 
-func handleClaudeHook(s *Store, p ClaudeHookPayload) {
+func handleHook(s *Store, tool Tool, p ClaudeHookPayload) {
 	if p.SessionID == "" {
 		return
 	}
@@ -39,7 +40,7 @@ func handleClaudeHook(s *Store, p ClaudeHookPayload) {
 	}
 
 	base := UpsertInput{
-		Tool: ToolClaude, SessionID: p.SessionID,
+		Tool: tool, SessionID: p.SessionID,
 		Cwd: cwd, HasCwd: true,
 	}
 	// Persist the transcript path from every hook so /api/session/:id/full can
@@ -55,7 +56,9 @@ func handleClaudeHook(s *Store, p ClaudeHookPayload) {
 		in.State, in.HasState = StateRunning, true
 		in.EventKind, in.EventText = evt, msg
 		s.Upsert(in)
-		ensureClaudeTail(s, p.TranscriptPath, p.SessionID, cwd)
+		if tool == ToolClaude {
+			ensureClaudeTail(s, p.TranscriptPath, p.SessionID, cwd)
+		}
 
 	case "UserPromptSubmit", "PreToolUse", "PostToolUse":
 		txt := p.ToolName
@@ -68,7 +71,7 @@ func handleClaudeHook(s *Store, p ClaudeHookPayload) {
 		s.Upsert(in)
 
 	case "Notification":
-		isPerm := permissionRe.MatchString(msg)
+		isPerm := p.NotificationType == "permission_prompt" || permissionRe.MatchString(msg)
 		state := StateAwaitingInput
 		if isPerm {
 			state = StateAwaitingPermission
@@ -89,7 +92,7 @@ func handleClaudeHook(s *Store, p ClaudeHookPayload) {
 		s.Upsert(in)
 
 	case "SessionEnd":
-		s.SetState(ToolClaude, p.SessionID, StateCompleted, msg)
+		s.SetState(tool, p.SessionID, StateCompleted, msg)
 
 	default:
 		kind := evt
