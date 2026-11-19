@@ -105,6 +105,11 @@ func TestPromptInBoxAndDraft(t *testing.T) {
 	}
 	rule := strings.Repeat("─", 40)
 	scr := func(line string) string { return rule + "\n" + line + "\n" + rule + "\n" }
+	long := "line one of a long prompt\nplease review it\n\nEvaluate intent and run e2e"
+	scrolled := "── ↑ 10 more " + rule + "\n  please review it\n\n  Evaluate intent and run\n  e2e\n" + rule + "\n"
+	if !promptInBox(cliInputBox(scrolled), long) {
+		t.Fatal("promptInBox: a scrolled prompt shows only its end")
+	}
 	if boxDraft(scr("❯ ")) || boxDraft(scr(`❯ Try "edit host.go to…"`)) || !boxDraft(scr("❯ delete the old migration")) {
 		t.Fatal("boxDraft")
 	}

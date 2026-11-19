@@ -673,14 +673,19 @@ func typeFirstPrompt(h *HostInfo, prompt string) (bool, error) {
 	return true, hostSendKeys(h, []string{"Enter"})
 }
 
-// promptInBox is true when Claude's input box shows the start of the prompt, or its marker for pasted text.
+// promptInBox is true when Claude's input box shows the start or the end of the prompt (a long prompt scrolls
+// its start above "↑ N more"), or its marker for pasted text.
 func promptInBox(box, prompt string) bool {
 	if strings.Contains(box, "[Pasted text") {
 		return true
 	}
 	want := strings.Join(strings.Fields(prompt), " ")
 	got := strings.Join(strings.Fields(box), " ")
-	return want != "" && strings.Contains(got, clipRunes(want, 16))
+	if want == "" {
+		return false
+	}
+	r := []rune(want)
+	return strings.Contains(got, clipRunes(want, 16)) || strings.Contains(got, string(r[max(0, len(r)-16):]))
 }
 
 func clipRunes(s string, n int) string {
