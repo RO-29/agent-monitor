@@ -25,6 +25,8 @@ const TVPage = lazy(() => import("./TvRoute"));
 const FloatPage = lazy(() => import("./views/Float"));
 const ApprovalsPage = lazy(() => import("./views/Approvals"));
 const PairPage = lazy(() => import("./views/Pair"));
+const MachinesPage = lazy(() => import("./views/settings/Machines"));
+const PeerPage = lazy(() => import("./views/PeerPage"));
 const DevicesPage = lazy(() => import("./views/settings/Devices"));
 const NotifySettingsPage = lazy(() => import("./views/settings/NotifySettings"));
 const LimitsPage = lazy(() => import("./views/settings/Limits"));
@@ -136,6 +138,8 @@ export default function V3App() {
             </Suspense>
           }
         />
+        <Route path="/settings/machines" element={<Suspense fallback={null}><MachinesPage /></Suspense>} />
+        <Route path="/m/:peer" element={<Suspense fallback={null}><PeerPage /></Suspense>} />
         <Route path="/settings/notifications" element={<Suspense fallback={null}><NotifySettingsPage /></Suspense>} />
         <Route path="/settings/limits" element={<Suspense fallback={null}><LimitsPage /></Suspense>} />
         <Route path="/settings/voice" element={<Suspense fallback={null}><VoicePage /></Suspense>} />

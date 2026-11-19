@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 
 const TABS = [
   { to: "/settings/devices", label: "Devices" },
+  { to: "/settings/machines", label: "Machines" },
   { to: "/settings/notifications", label: "Notifications" },
   { to: "/settings/limits", label: "Limits" },
   { to: "/settings/voice", label: "Voice" },

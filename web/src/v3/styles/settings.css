@@ -53,3 +53,8 @@
 .v3 .pair-ic.ok{background:var(--ok-soft);color:var(--ok)}
 .v3 .pair-ic.err{background:var(--err-soft);color:var(--err)}
 .v3 .pair-ic.run{background:var(--run-soft);color:var(--run)}
+.v3 .peer-need,.v3 .peer-sess{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)}
+.v3 .peer-need{flex-direction:row;justify-content:space-between;align-items:center;gap:12px}
+.v3 .peer-row{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.v3 .peer-items{display:flex;flex-direction:column;gap:8px;padding:6px 0 4px 10px;border-left:2px solid var(--line)}
+.v3 .peer-pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 var(--f-mono)}
