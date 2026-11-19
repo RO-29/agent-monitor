@@ -70,6 +70,7 @@ fn or_dash(v: &str) -> &str {
 
 pub struct Mcp {
     daemon: String,
+    agents: Vec<String>,
     thread: String,
     depth: i64,
 }
@@ -88,7 +89,8 @@ pub fn run() -> i32 {
     if !v.is_empty() {
         daemon = v.trim_end_matches('/').to_string();
     }
-    let mc = Mcp { daemon, thread: getenv("AM_ORCH_THREAD"), depth: util::atoi_lenient(&getenv("AM_ORCH_DEPTH")) };
+    let agents = load_agent_names(&daemon);
+    let mc = Mcp { daemon, agents, thread: getenv("AM_ORCH_THREAD"), depth: util::atoi_lenient(&getenv("AM_ORCH_DEPTH")) };
     logf(format!("starting; daemon={} orch={}", mc.daemon, go_quote(&mc.thread)));
     mc.serve();
     0
@@ -327,7 +329,7 @@ impl Mcp {
         if tmux.fbool("ok") {
             for p in tmux.farr("panes").iter().filter(|p| p.is_obj()) {
                 let pid = p.fstr("PaneID");
-                if registered.contains(&pid) || !looks_like_agent(&p.fstr("CurrentCommand")) {
+                if registered.contains(&pid) || !looks_like_agent(&p.fstr("CurrentCommand"), &self.agents) {
                     continue;
                 }
                 rows.push(Row {
@@ -335,7 +337,7 @@ impl Mcp {
                     pane: pid,
                     agent: "(none)".into(),
                     alias: "-".into(),
-                    tool: guess_tool(&p.fstr("CurrentCommand")),
+                    tool: guess_tool(&p.fstr("CurrentCommand"), &self.agents),
                     cwd: p.fstr("CurrentPath"),
                     status: "unregistered",
                 });
@@ -1264,24 +1266,46 @@ fn clip_context(x: &str) -> String {
     format!("{}{}", &x[..cut], tail)
 }
 
-fn looks_like_agent(cmd: &str) -> bool {
-    let c = cmd.to_lowercase();
-    if matches!(c.as_str(), "node" | "claude.exe" | "claude" | "codex" | "cursor-agent" | "opencode") {
-        return true;
+const FALLBACK_AGENTS: &[&str] =
+    &["claude", "codex", "cursor-agent", "opencode", "hermes", "pi", "gemini", "amp", "goose", "qwen", "kiro-cli", "crush", "grok"];
+
+/// Agent binary names from the daemon's registry; the built-in list covers a daemon that is down or older.
+fn load_agent_names(daemon: &str) -> Vec<String> {
+    let fallback = || FALLBACK_AGENTS.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+    let url = format!("{}/api/agents/registry", daemon);
+    let v = match http::request("GET", &url, None, Some(Duration::from_secs(2))).and_then(http::decode) {
+        Ok(v) => v,
+        Err(_) => return fallback(),
+    };
+    let mut names = Vec::new();
+    for a in v.farr("agents") {
+        for b in a.farr("binaries") {
+            if let Some(n) = b.as_str() {
+                names.push(n.to_lowercase());
+            }
+        }
     }
-    c.contains("claude") || c.contains("codex") || c.contains("cursor-agent") || c.contains("opencode")
+    if names.is_empty() {
+        fallback()
+    } else {
+        names
+    }
 }
 
-fn guess_tool(cmd: &str) -> String {
+// A short name such as "pi" must match whole; longer names match inside a command line.
+fn agent_hit<'a>(c: &str, names: &'a [String]) -> Option<&'a str> {
+    names.iter().map(|n| n.as_str()).find(|n| c == *n || (n.len() >= 5 && c.contains(n)))
+}
+
+fn looks_like_agent(cmd: &str, names: &[String]) -> bool {
     let c = cmd.to_lowercase();
-    if c.contains("claude") {
-        "claude?".into()
-    } else if c.contains("codex") {
-        "codex?".into()
-    } else if c.contains("cursor-agent") {
-        "cursor-agent?".into()
-    } else if c.contains("opencode") {
-        "opencode?".into()
+    c == "node" || c == "claude.exe" || agent_hit(&c, names).is_some()
+}
+
+fn guess_tool(cmd: &str, names: &[String]) -> String {
+    let c = cmd.to_lowercase();
+    if let Some(n) = agent_hit(&c, names) {
+        format!("{}?", n)
     } else if c == "node" {
         "node?".into()
     } else {
@@ -1462,9 +1486,21 @@ mod tests {
 
     #[test]
     fn agent_guesses() {
-        assert!(looks_like_agent("node") && looks_like_agent("Claude") && !looks_like_agent("zsh"));
-        assert_eq!(guess_tool("claude.exe"), "claude?");
-        assert_eq!(guess_tool("zsh"), "zsh");
+        let names: Vec<String> = FALLBACK_AGENTS.iter().map(|n| n.to_string()).collect();
+        assert!(looks_like_agent("node", &names) && looks_like_agent("Claude", &names) && !looks_like_agent("zsh", &names));
+        assert_eq!(guess_tool("claude.exe", &names), "claude?");
+        assert_eq!(guess_tool("zsh", &names), "zsh");
+    }
+
+    #[test]
+    fn pi_and_hermes_are_agents_but_pip_is_not() {
+        let names: Vec<String> = FALLBACK_AGENTS.iter().map(|n| n.to_string()).collect();
+        assert!(looks_like_agent("pi", &names) && looks_like_agent("hermes", &names));
+        assert!(!looks_like_agent("pip", &names) && !looks_like_agent("pipe", &names) && !looks_like_agent("ping", &names));
+        assert_eq!(guess_tool("Hermes", &names), "hermes?");
+        assert_eq!(guess_tool("pi", &names), "pi?");
+        let from_daemon = vec!["claude".to_string(), "newagent".to_string()];
+        assert!(looks_like_agent("newagent-cli", &from_daemon) && !looks_like_agent("codex", &from_daemon));
     }
 
     #[test]
