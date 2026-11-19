@@ -1,6 +1,7 @@
 # Plan: every agent, every surface
 
 Branch `feat/agent-adapters` in worktree `~/agent-monitor-adapters`. Base: `main` at 3ba0ee0.
+Revision 2: changed after the Fable review (13 required changes, all applied below).
 
 ## Goal
 
@@ -11,147 +12,172 @@ Every coding agent on this Mac can:
 3. have that prompt answered from agent-monitor (phone, web, Mac app),
 4. call `talk_to_agent` and the other agent-monitor MCP tools.
 
-The user does nothing except run the daemon. The one exception is typing into a GUI app that has no
-outside input path (Cursor desktop chat, Claude desktop, Claude extension in VS Code): that needs a
-one-time macOS Accessibility grant, and it is phase 8, built only after the user agrees.
+The user does nothing except run the daemon, after one confirmation of the first wiring run (see
+"First run"). The one other exception is typing into a GUI app with no outside input path (Cursor desktop
+chat, Claude desktop, Claude extension in VS Code): that needs a one-time macOS Accessibility grant, and it
+is phase 8, built only after the user agrees.
 
 ## Fixed rules for the whole build
 
 - No build or test on this Mac. Every build and test runs on rohit-mac via `bin/remote-build.sh <sha> --test`.
-- Commit and push before each build. Run the privacy scan on every staged diff.
-- No new Go dependency. Config writers handle JSON, TOML and YAML with targeted edits.
+  Phase 1 extends that script: `--test` also runs `cargo test` in `rust/am-helper`, and prints the full
+  failing output, not only the last line.
+- Commit and push before each build. Privacy scan on every staged diff, now as `bin/privacy-scan.sh`
+  (added in phase 1, the same grep as before, exit 1 on a hit).
+- No new Go dependency. JSON edits splice bytes; TOML and YAML edits only append (see writer rules).
 - Code comments: one or two lines.
 - Nothing writes to an app bundle, `state.vscdb`, or a VS Code extension folder. No debug port, no signal to
   another process, no TCC bypass.
 
-## Safety rules for the config writer (phase 1, used by every later phase)
+## Writer rules (phase 1, used by every later phase)
 
-Every write into another agent's config file follows these rules:
+1. **Scope.** Wiring adds MCP server entries and hook entries only. It never changes permissions or approval
+   settings: `installClaudePermissions` (adds `Bash`, `Read`, `Write`, `Edit` to `permissions.allow`) and
+   `installCodexApproval` (sets `approval_mode = "auto"`) stay out of `wireAll` and remain manual commands.
+2. **Adoption.** An existing entry with the same `command` and `args` (path compared after resolving
+   symlinks and `~`) is adopted into the ledger as ours. Other keys in it (pi `exposure`, Codex
+   `.tools.*` subtables) are left alone and do not count as a difference.
+3. **User edits.** An entry with our name but a different `command`/`args` is `skipped: user-edited`.
+4. **Tombstone.** When the ledger has an entry and the file does not, the user removed it. The entry is
+   marked removed in the ledger and never added again until `agent-monitor wire --force <agent>`.
+5. **JSON keeps bytes.** No map round trip. The writer finds the target object with a token scanner and
+   splices the new member in, so key order, escapes and formatting of the rest of the file stay byte for
+   byte. If the scanner cannot place it, report `manual: <snippet>`. `~/.claude.json` (live sessions rewrite
+   it) is written with `claude mcp add --scope user` when the `claude` binary exists, else skipped.
+6. **TOML and YAML append only.** Without a parser, the writer cannot detect a parse error, a quoted header
+   or an inline table. Rule: append a new block only when our server name appears nowhere in the file
+   (plain substring check), else `manual: <snippet>`. Codex MCP entries prefer `codex mcp add`.
+7. **Codex hooks.** `hooks.json` entries are appended, never reordered or rewritten. The writer never
+   touches `trusted_hash` in `config.toml`. A new hook is reported `needs trust in Codex` until Codex
+   records a hash for it.
+8. **Hook dedupe** matches on the resolved script path (any path whose base name is `claude-hook.sh`,
+   `codex-hook.sh` or `cursor-hook.sh` under any agent-monitor checkout), never on the exact command string.
+9. **Backups.** Before the first write of a file each day: `<file>.bak-am-<YYYY-MM-DD>`, same mode as the
+   original (0600 stays 0600). Keep the newest 5 `.bak-am-*` per file. The existing `.bak-*` files from the
+   old installers are listed in `/api/agents/wiring` but not deleted.
+10. **Atomic write.** Temp file in the same directory, fsync, mode kept, rename. Before the rename compare
+    mtime and size with the read; if the file changed, retry once, then `skipped: changed during write`.
+11. **Ledger** at `stateDir()/wiring.json` (`~/.agent-monitor/wiring.json`). `agent-monitor unwire` removes
+    exactly the ledger's entries (splice out) and nothing else.
+12. **Paths.** Hook and MCP commands use `installDir` (setting, default `~/agent-monitor`), never
+    `os.Executable()`. Wiring runs only in the daemon whose binary sits in `installDir`, so a test daemon on
+    rohit-mac (`~/am-build`) never rewrites live entries. Old installers return errors instead of `os.Exit`.
 
-1. Read and parse the file. If it does not parse, write nothing and report `skipped: parse error`.
-2. If our entry exists with the same content, write nothing. If it exists with different content that
-   the user edited (it does not match any value we ever wrote, see the ledger), write nothing and report
-   `skipped: user-edited`.
-3. Before the first write of a file each day, copy it to `<file>.bak-am-<YYYY-MM-DD>` (mode kept).
-4. Write to a temp file in the same directory, fsync, then rename. Keep the original mode.
-5. Record each write in `~/.config/agent-monitor/wiring.json` (file, key, value hash, time).
-   `agent-monitor unwire` removes exactly those entries and nothing else.
-6. Setting `autoWire` (default true) turns the start-time wiring off. `agent-monitor wire --dry-run` prints
-   the planned changes and writes nothing.
-7. YAML: only append a new top-level block when the key is absent. When the key exists, report
-   `manual: add <snippet>` and write nothing.
+## First run
 
-## Phase 1: agent registry and start-time wiring
+`autoWire` has three states: `ask` (default), `on`, `off`. In `ask`, the daemon runs `wireAll(dry=true)` at
+start and shows the planned changes as one card in the web app and the phone ("agent-monitor wants to add
+its MCP server to pi, opencode, Hermes ... Allow?"). One tap sets `on`; after that, new installs are wired
+with no question. This is the one confirmation; the global rule forbids silent persistent changes.
+
+## Phase 1: agent registry and wiring
 
 New `agent_registry.go`:
 
 ```go
 type agentKind struct {
-    ID       string   // "claude", "codex", "cursor-agent", "pi", "hermes", "opencode", ...
-    Binaries []string // names searched on PATH and known install dirs
-    Wire     []wireStep // MCP entry, hook entry, extension file
+    ID       string         // "claude", "codex", "cursor-agent", "pi", "hermes", "opencode", ...
+    Binaries []string       // names searched on PATH and known install dirs
+    Wire     []wireStep     // MCP entry, hook entry
     Prompt   *promptMatcher // terminal prompt shape and answer keys; nil if a hook answers
-    ACP      *acpAgent // nil when the agent has no ACP mode
+    ACP      *acpAgent      // nil when the agent has no ACP mode
 }
 ```
 
-- `wireAll(dry bool) []wireResult` runs at daemon start in a goroutine, then every 10 minutes (new installs).
-  Each result: agent, file, action (`added`, `unchanged`, `skipped: <why>`, `manual: <snippet>`), and
-  `restart needed` for sessions that started before the write.
-- `GET /api/agents/wiring` returns the results. The web Settings page shows them (read-only list).
-- `installAll()` becomes a thin call to `wireAll(false)` with the old printout.
-- The hook and MCP commands point to the install path from settings (`installDir`, default
-  `~/agent-monitor`), never to `os.Executable()`: a test daemon on rohit-mac (`~/am-build`) must not rewrite
-  the live entries. Wiring runs only in the daemon whose binary sits in `installDir`.
-- The old installers call `os.Exit` on a missing file. They return errors instead, so wiring can never stop
-  the daemon.
-- Before the rename, compare the file's mtime and size with the values read in step 1; if the user saved
-  the file in between, retry once, then report `skipped: changed during write`.
-- Remove the `claude or codex` limit in `upsertRule` (approvals.go): any registry ID is valid.
-- `rust/am-helper/src/mcp.rs`: `looks_like_agent` and `guess_tool` take the registry's list (passed from the
-  daemon at helper start, with a built-in fallback list), so `register_self` from pi or hermes gets a kind.
-- `place.go`: label `claude-vscode` sessions ("VS Code: Claude extension").
+- `wireAll(dry bool) []wireResult` at daemon start (goroutine) and every 10 minutes. Result: agent, file,
+  action (`added`, `adopted`, `unchanged`, `removed by user`, `skipped: <why>`, `manual: <snippet>`,
+  `needs trust in Codex`), and `restart needed` for sessions older than the write.
+- `GET /api/agents/wiring`; the web Settings page lists it.
+- `installAll()` becomes `wireAll(false)` plus the two manual permission installers, as today.
+- Remove the `claude or codex` limit in `upsertRule` (`approvals.go:767`): any registry ID is valid.
+- `rust/am-helper/src/mcp.rs`: `looks_like_agent` and `guess_tool` read the registry list from the daemon
+  at helper start, with a built-in fallback list including pi and hermes.
+- `place.go`: label `claude-vscode` sessions "VS Code: Claude extension".
+- Hardcoded `/Users/rohit/bin/tmux-pane-id.sh` in `bin/codex-hook.sh:25` and `rust/am-helper/src/hook.rs:11`
+  becomes `$HOME/bin/tmux-pane-id.sh` with a fallback to the copy in `installDir/bin`.
 
-Agents wired in phase 1 (MCP entry only; hooks come in their own phase): Claude, Codex, cursor-agent (move
-`bin/install-cursor-hooks.py` logic into Go), pi (`~/.pi/agent/mcp.json`), opencode
-(`~/.config/opencode/opencode.json` `mcp`), Hermes (`~/.hermes/config.yaml` `mcp_servers`), and for the
-agents not installed here, the writers exist but run only when the binary is found: Gemini, Amp, Goose,
-Qwen, Kiro, Crush, Grok.
+Scope in phase 1: MCP entries for Claude, Codex, cursor-agent, pi, opencode, Hermes, and (only when the
+binary exists) Gemini, Amp, Goose, Qwen, Kiro, Crush, Grok. Hook entries: Claude and Cursor (the Python
+installer logic moves into Go with path-based dedupe), and Codex `hooks.json` (new Go owner, append only).
 
-Tests: one table test per writer with a temp HOME and golden files: absent file, empty file, our entry
-present, user-edited entry, parse error, YAML key present. A test that `unwire` restores the exact bytes.
+Tests (on rohit-mac): table tests per writer with a temp HOME: absent file, empty file, identical entry,
+adopted entry with extra keys, user-edited entry, tombstone, JSON with odd key order and `<>&` (bytes kept),
+TOML name present elsewhere, YAML key present, file changed during write, `unwire` restores the exact bytes.
+Fixtures copy the shapes of the real files on this Mac with values replaced.
 
-## Phase 2: Codex IPC socket (VS Code extension and the Codex app)
+## Phase 2: pi
 
-New `codex_ipc.go`, client for `~/.codex/ipc/ipc.sock` (4-byte little-endian length, then JSON).
+pi has no approval prompt of its own (`docs/security.md:3`): every tool runs unless an extension blocks it.
 
-1. Read the protocol from the installed extension's `out/extension.js` first and write it down in
-   `docs/codex-ipc.md` with the extension version.
-2. Read-only client: `initialize`, then follow `thread-stream-state-changed` snapshots and patches. Map each
-   thread to an agent-monitor place, so GUI Codex threads appear with live state.
-3. Send and answer: `thread-follower-start-turn`, `-command-approval-decision`, `-file-approval-decision`,
-   `-permissions-request-approval-response`. Enabled only when the extension version and each method's
-   version match the values in `docs/codex-ipc.md`; else read-only with a note on the place.
-4. One client connection only; reconnect with backoff; never hold the socket when the bus has no threads.
-
-Risk: undocumented protocol. A second client could disturb the extension; the first live test is
-read-only and watches the extension log for errors.
-
-## Phase 3: pi extension
-
-The daemon writes `~/.pi/agent/extensions/agent-monitor.ts` (plain source, owned by the ledger):
-
-- `tool_call` handler: POST the call to the daemon's permission endpoint and wait for the answer; return
-  `{block: true, reason}` on deny. Timeout: fall back to pi's own behaviour.
-- Auth: the extension reads the local control token from `~/.config/agent-monitor/` at load (mode 0600,
-  same file the hooks use) and never writes it into the extension source.
-- Inbound messages: long-poll the daemon for this session's queue and deliver with
+- The daemon writes `~/.pi/agent/extensions/agent-monitor.ts` only after the first-run confirmation.
+- Hold policy: a call holds for an answer only when an agent-monitor rule says `hold` or `deny` for it, or
+  for `bash` commands that match the existing "risky command" list. Held calls fail closed: no answer in
+  the timeout means `{block: true, reason: "no answer from agent-monitor"}`. Other calls run at once.
+- Inbound messages: long-poll the daemon from `session_start`, stop in `session_shutdown`; deliver with
   `pi.sendUserMessage(text, {deliverAs: "steer"})`.
-- Session discovery: read `~/.pi/agent/sessions/*.jsonl` for the place list and transcript.
+- Auth: none. Loopback calls are trusted by `localCaller` (`orch_git_api.go:246`), the same as the hooks.
+- MCP: prefer `pi.registerMcpServer` inside the extension over the `mcp.json` edit; keep the existing
+  hand-added `mcp.json` entry (adopted, not rewritten).
+- Sessions: `~/.pi/agent/sessions/--<path>--/*.jsonl`.
+- Live after `/reload` in pi, or on the next start.
 
-Live after `/reload` in pi, or on the next pi start.
+## Phase 3: Codex IPC socket (VS Code extension and the Codex app)
+
+Second clients are by design (`registerClient`, `client-discovery`), but a client is never passive.
+
+1. Write `docs/codex-ipc.md` from the installed extension (`out/extension.js` and
+   `webview/assets/app-initial-*.js` for the follower handshake), with the extension version and each
+   method's version (`thread-stream-state-changed` is 13).
+2. Client rules: never create or unlink the socket; answer every `client-discovery-request` with
+   `canHandle: false` at once; one connection, reconnect with backoff; connect while the socket exists and
+   disconnect after 10 minutes with no thread events.
+3. Read: follow `thread-stream-state-changed` snapshots and patches; honour `targetClientIds`.
+4. Send and answer (`thread-follower-start-turn`, `-command-approval-decision`, `-file-approval-decision`,
+   `-permissions-request-approval-response`): enabled only when every pinned version matches; else
+   read-only with a note on the place.
+5. First live test: read-only, watching the extension's log for errors, before any write method is enabled.
 
 ## Phase 4: opencode
 
-- Session reader: keep the JSON storage reader (1.1.x, installed here), add the SQLite `opencode.db`
-  reader for 1.2 and later (read-only, modernc sqlite already in the module graph).
-- HTTP adapter: find the TUI's server port (from the process and its listening socket), then
-  `POST /session/:id/prompt_async` to send, `GET /event` to follow, `POST /session/:id/permissions/:id` to
-  answer. When no port is found, fall back to tmux keys.
+- Keep the JSON storage reader (1.1.x, installed here); add a read-only SQLite `opencode.db` reader for
+  1.2 and later.
+- HTTP adapter: find the TUI's server port from its listening socket; `POST /session/:id/prompt_async` to
+  send, `GET /event` to follow, `POST /session/:id/permissions/:id` to answer. No port found: tmux keys.
 
 ## Phase 5: Hermes
 
-- MCP entry (phase 1), session reader for `~/.hermes/state.db` (read-only).
-- Prompt matcher and keys `o` once, `s` session, `a` always, `d` deny (Enter means deny: never send Enter
-  alone to a Hermes prompt).
+- Session reader for `~/.hermes/state.db` (read-only).
+- Prompt matcher, keys `o` once, `s` session, `a` always, `d` deny. Never send Enter alone to a Hermes
+  prompt: Enter means deny.
 - ACP built-in `hermes acp` for daemon-started threads.
 
-## Phase 6: ACP built-ins and native hooks for agents not installed here
+## Phase 6: ACP built-ins and hooks for agents not installed here
 
 ACP: `goose acp`, `kiro-cli acp`, `grok agent stdio`, Qwen, `pi-acp`. Hooks: Qwen and Kiro
-`PermissionRequest`, Crush `PreToolUse`, Amp plugin `tool.call`, Gemini policy TOML. Each ships with a
-test against the documented shape and stays marked `unverified` in `/api/agents/wiring` until a live run.
+`PermissionRequest`, Crush `PreToolUse`, Amp plugin `tool.call`, Gemini policy TOML. Each is tested against
+the documented shape and marked `unverified` in `/api/agents/wiring` until a live run.
 
 ## Phase 7: terminal prompt matchers
 
-aider (`y/n/a/s/d` then Enter), Goose, Grok, Gemini, muse. A matcher is added only from a real captured
-pane (fixture file in `testdata/prompts/<agent>.txt`). Agents with no capture keep the generic "open the
-terminal" card.
+aider (`y/n/a/s/d` then Enter), Goose, Grok, Gemini, muse. A matcher is added only from a real captured pane
+(`testdata/prompts/<agent>.txt`). Agents with no capture keep the generic "open the terminal" card.
 
 ## Phase 8 (needs the user's yes): Accessibility for GUI apps
 
-The signed `agent-monitor.app` asks for Accessibility once. Then: Cursor desktop chat (type and send; Enter
-runs, Escape skips a pending card), Claude desktop and the VS Code Claude extension (type and send).
-Watch Cursor's `desktop_bridge` gate: when Cursor turns it on, use `cursor desktop send` instead of typing.
+The `agent-monitor.app` asks for Accessibility once. The grant is tied to the code signature: an ad-hoc
+signature changes on each build and resets it, so phase 8 starts with a stable signing identity on
+rohit-mac. Then: Cursor desktop chat (type and send; Enter runs, Escape skips a pending card), Claude desktop
+and the VS Code Claude extension (type and send). When Cursor turns on its `desktop_bridge` gate, use
+`cursor desktop send` instead of typing.
 
 ## Order and gates
 
-Each phase: code, tests, commit, push, `remote-build.sh --test` on rohit-mac, a Codex review of the phase
-diff, then merge to `main` (fast-forward) and give the user the install command. A phase that fails its
+Phases run 1, 2 (pi), 3 (Codex IPC, highest risk), 4 to 7, then 8 on the user's yes. Each phase: code,
+tests, commit, push, privacy scan, `remote-build.sh --test` (Go and Rust) on rohit-mac, a Codex review of the
+phase diff, then a fast-forward merge to `main` and the install command for the user. A phase that fails a
 gate does not merge.
 
 ## Not verified at plan time
 
-The Codex IPC write methods, opencode port discovery, pi's extension API field names (read from the
-installed pi 1.5.0 docs before coding), hooks for the agents that are not installed, and which "muse" the
-user means.
+The Codex IPC write methods, opencode port discovery, hooks for agents not installed here, and which "muse"
+the user means.
