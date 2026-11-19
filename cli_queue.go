@@ -132,16 +132,26 @@ func clearDraft(id string) error {
 		}
 		return nil
 	}
-	n := min(utf8.RuneCountInString(d)+4, cliEditMaxRunes)
-	for n > 0 {
-		k := min(n, 200)
-		if err := cliIO.keys(target, slices.Repeat([]string{"BSpace"}, k)); err != nil {
+	// The screen read can fall short of the text, and the cursor may not be at its end: delete, read again, repeat.
+	for round := 0; round < 4 && d != ""; round++ {
+		if err := cliIO.keys(target, []string{"C-e"}); err != nil { // end of line, as in readline
 			return err
 		}
-		n -= k
+		n := min(utf8.RuneCountInString(d)+4, cliEditMaxRunes)
+		for n > 0 {
+			k := min(n, 200)
+			if err := cliIO.keys(target, slices.Repeat([]string{"BSpace"}, k)); err != nil {
+				return err
+			}
+			n -= k
+		}
+		time.Sleep(cliPause)
+		if _, err := cliIO.screen(target); err != nil {
+			return &orchHTTPError{http.StatusBadGateway, err.Error()}
+		}
+		d = cliDraft(target)
 	}
-	time.Sleep(cliPause)
-	if _, err := cliIO.screen(target); err != nil || cliDraft(target) != "" {
+	if d != "" {
 		return orchConflict("the terminal box still holds text; check the terminal")
 	}
 	return nil

@@ -755,3 +755,21 @@ func TestCLISendWithEmptyBashPrompt(t *testing.T) {
 		t.Fatalf("message in bash mode: %d %v typed %q keys %v", code, out, f.typed, f.sent)
 	}
 }
+
+// A box read that falls short of the text is deleted in rounds until the box reads empty.
+func TestCLIClearDraftRepeatsUntilEmpty(t *testing.T) {
+	id, f := setupCLITest(t, qop("enqueue", tn))
+	f.screens = []string{cliScreen("w3", ""), cliScreen("also on mac i checked", ""), scrEmpty}
+	if code, out := cliPost(id, "clear-draft", `{}`); code != 200 {
+		t.Fatalf("clear: %d %v", code, out)
+	}
+	ends := 0
+	for _, k := range f.sent {
+		if k[0] == "C-e" {
+			ends++
+		}
+	}
+	if ends != 2 {
+		t.Fatalf("rounds %d, keys %v", ends, f.sent)
+	}
+}
