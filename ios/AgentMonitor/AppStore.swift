@@ -8,7 +8,7 @@ enum AppTab: Hashable {
 
 /// Screens pushed inside the Settings tab.
 enum SettingsRoute: Hashable {
-    case server, agents, talks, panes, alerts, storage, commands
+    case server, agents, talks, panes, alerts, storage, commands, machines
 }
 
 enum ConnectionState: Equatable {
@@ -53,6 +53,13 @@ final class AppStore {
     private var appActive = true
     /// Thread ids that hold a needs-you item, with their parents.
     private(set) var needThreads: Set<String> = []
+
+    // Other machines (Settings, Machines): each one's needs-you list and last error, keyed by machine id.
+    var machines: [Machine] = Machines.all
+    var remoteNeeds: [String: [NeedsYouItem]] = [:]
+    var remoteDown: [String: String] = [:]
+    @ObservationIgnored var remoteSeen: Set<String> = []
+    @ObservationIgnored var remotePoll: Task<Void, Never>?
     #if DEBUG
     /// Replaces the daemon list for simulator screenshots.
     var debugNeedsYou: [NeedsYouItem]? { didSet { recomputeNeedThreads() } }
@@ -311,6 +318,7 @@ final class AppStore {
     func setForeground(_ active: Bool) {
         presenceTask?.cancel()
         appActive = active
+        setRemoteForeground(active)
         if active {
             Task { await loadNeedsYou() }
             presenceTask = Task {

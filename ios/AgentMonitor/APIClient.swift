@@ -10,6 +10,8 @@ struct APIError: LocalizedError {
 /// every call so a Settings change takes effect without a restart.
 struct APIClient {
     static let shared = APIClient()
+    /// Set for another machine; nil means the primary server in Config.
+    var machine: Machine? = nil
 
     var session: URLSession {
         let cfg = URLSessionConfiguration.default
@@ -19,7 +21,7 @@ struct APIClient {
     }
 
     func url(_ path: String) throws -> URL {
-        guard let base = Config.baseURL, let u = URL(string: base.absoluteString + path) else {
+        guard let base = machine?.baseURL ?? Config.baseURL, let u = URL(string: base.absoluteString + path) else {
             throw APIError(message: "Bad server URL")
         }
         return u
@@ -36,9 +38,18 @@ struct APIClient {
         }
     }
 
+    /// Adds this client's token: the machine's own, or the primary one.
+    func authorize(_ req: inout URLRequest) {
+        if let machine {
+            if let t = machine.token { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+        } else {
+            Self.authorize(&req)
+        }
+    }
+
     func get<T: Decodable>(_ path: String, as: T.Type) async throws -> T {
         var req = URLRequest(url: try url(path))
-        Self.authorize(&req)
+        authorize(&req)
         let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
         return try JSONDecoder().decode(T.self, from: data)
@@ -49,7 +60,7 @@ struct APIClient {
         var req = URLRequest(url: try url(path))
         if let timeout { req.timeoutInterval = timeout }
         req.httpMethod = "POST"
-        Self.authorize(&req)
+        authorize(&req)
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)

@@ -28,6 +28,8 @@ func TestRouteLevel(t *testing.T) {
 		{"POST", "/api/session/claude:x/cli-queue/send", LevelControl},
 		{"POST", "/api/orch/threads/ot_1/send", LevelControl},
 		{"POST", "/api/hosts/h1/answer", LevelControl},
+		{"POST", "/api/permission/p1/respond", LevelControl},
+		{"POST", "/api/push/presence", LevelView},
 		{"GET", "/api/session/claude:x/term", LevelAdmin},
 		{"GET", "/api/term", LevelAdmin},
 		{"GET", "/api/session/claude:x/pane", LevelAdmin},

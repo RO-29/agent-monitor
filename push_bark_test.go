@@ -160,3 +160,31 @@ func TestBarkLinkOpensInstallPage(t *testing.T) {
 		t.Fatalf("a relative url stays in the app: %s", got)
 	}
 }
+
+func TestBarkLabelHeadsTitleAndOpensApprovals(t *testing.T) {
+	t.Setenv("AGENT_MONITOR_HOME", t.TempDir())
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.Write([]byte(`{"code":200}`))
+	}))
+	defer srv.Close()
+	key := barkRandom(32)
+	bark.mu.Lock()
+	prevClient := bark.client
+	bark.cfg, bark.loaded, bark.phoneActive = BarkConfig{Enabled: true, Server: srv.URL, DeviceKey: "abcdefghij", Key: key, IV: barkRandom(16), Label: "studio"}, true, time.Time{}
+	bark.client = srv.Client()
+	bark.mu.Unlock()
+	t.Cleanup(func() {
+		bark.mu.Lock()
+		bark.cfg, bark.loaded, bark.client = BarkConfig{}, false, prevClient
+		bark.mu.Unlock()
+	})
+	if err := barkSend(ONotification{ID: "n1", Kind: "needs-you", Title: "Claude needs you", ThreadID: "ot_1"}, true); err != nil {
+		t.Fatal(err)
+	}
+	p := barkOpen(t, key, got)
+	if p["title"] != "[studio] Claude needs you" || p["url"] != "agentmonitor://approvals" {
+		t.Fatalf("payload %v", p)
+	}
+}

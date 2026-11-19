@@ -4,7 +4,7 @@ import Foundation
 extension APIClient {
     func orchAgents() async throws -> [OAgentInfo] {
         var req = URLRequest(url: try url("/api/orch/agents"))
-        Self.authorize(&req)
+        authorize(&req)
         let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
         struct Wrap: Decodable { var agents: [Lossy<OAgentInfo>]? }
@@ -44,7 +44,7 @@ extension APIClient {
                 do {
                     var req = URLRequest(url: try url("/api/orch/stream?after=\(after)"))
                     req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    Self.authorize(&req)
+                    authorize(&req)
                     let cfg = URLSessionConfiguration.default
                     // The daemon sends a heartbeat every 15 s, so 45 s of silence means a dead link.
                     cfg.timeoutIntervalForRequest = 45
@@ -104,7 +104,7 @@ extension APIClient {
         var req = URLRequest(url: try url("/api/orch/uploads"))
         req.httpMethod = "POST"
         req.timeoutInterval = 120
-        Self.authorize(&req)
+        authorize(&req)
         let boundary = "am-\(UUID().uuidString)"
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data()

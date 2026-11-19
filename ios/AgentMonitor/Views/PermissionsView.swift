@@ -19,6 +19,7 @@ struct PermissionsView: View {
                             .id(focusID(it))
                             .overlay(focusRing(focusID(it)))
                     }
+                    RemoteNeedsSection()
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -36,7 +37,7 @@ struct PermissionsView: View {
             }
             }
             .overlay {
-                if items.isEmpty {
+                if items.isEmpty && store.remoteNeedCount == 0 && store.remoteDown.isEmpty {
                     ContentUnavailableView {
                         Label("Nothing needs you", systemImage: "checkmark.shield")
                     } description: {

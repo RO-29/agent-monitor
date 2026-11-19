@@ -29,6 +29,7 @@ type BarkConfig struct {
 	Key       string `json:"key"`   // 32 ASCII characters, typed into Bark's encryption settings
 	IV        string `json:"iv"`    // 16 characters for Bark's settings form; each push sends its own IV
 	Sound     string `json:"sound"` // Bark sound name; "" = the Bark default
+	Label     string `json:"label"` // set on a second Mac: its name heads each alert title
 }
 
 const barkDefaultServer = "https://api.day.app"
@@ -170,7 +171,15 @@ func barkSend(no ONotification, force bool) error {
 	if no.Kind == "needs-you" || no.Kind == "error" {
 		level = "timeSensitive"
 	}
-	payload := map[string]string{"title": no.Title, "body": clipString(no.Body, 300), "url": barkLink(no),
+	title, link := no.Title, barkLink(no)
+	if cfg.Label != "" {
+		// The app opens a thread on its main server only; another machine's items show under Approvals.
+		title = "[" + cfg.Label + "] " + title
+		if strings.HasPrefix(link, "agentmonitor://thread/") {
+			link = "agentmonitor://approvals"
+		}
+	}
+	payload := map[string]string{"title": title, "body": clipString(no.Body, 300), "url": link,
 		"group": "agent-monitor", "level": level, "isArchive": "0"}
 	if no.ThreadID != "" {
 		payload["group"] = "am-" + no.ThreadID
@@ -263,7 +272,7 @@ func barkView() map[string]any {
 		hint = "…" + cfg.DeviceKey[n-4:]
 	}
 	return map[string]any{"enabled": cfg.Enabled, "server": cfg.Server, "deviceKeySet": cfg.DeviceKey != "", "deviceKeyHint": hint,
-		"key": cfg.Key, "iv": cfg.IV, "algorithm": "AES256", "mode": "CBC", "padding": "pkcs7", "sound": cfg.Sound, "phoneActive": active}
+		"key": cfg.Key, "iv": cfg.IV, "algorithm": "AES256", "mode": "CBC", "padding": "pkcs7", "sound": cfg.Sound, "label": cfg.Label, "phoneActive": active}
 }
 
 // barkDeviceKey takes a bare key or a Bark URL such as https://api.day.app/<key>/ and returns the key.
@@ -284,6 +293,7 @@ func registerPushRoutes(mux *http.ServeMux) {
 			Server    *string `json:"server"`
 			DeviceKey *string `json:"deviceKey"`
 			Sound     *string `json:"sound"`
+			Label     *string `json:"label"`
 			NewKey    bool    `json:"newKey"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&body); err != nil {
@@ -316,6 +326,9 @@ func registerPushRoutes(mux *http.ServeMux) {
 		}
 		if body.Sound != nil {
 			c.Sound = strings.TrimSpace(*body.Sound)
+		}
+		if body.Label != nil {
+			c.Label = clipString(strings.TrimSpace(*body.Label), 40)
 		}
 		if body.Enabled != nil {
 			c.Enabled = *body.Enabled

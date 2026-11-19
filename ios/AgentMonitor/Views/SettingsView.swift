@@ -29,6 +29,11 @@ struct SettingsView: View {
                     LabeledContent("Token") {
                         Text(savedToken).font(.subheadline.monospaced())
                     }
+                    NavigationLink(value: SettingsRoute.machines) {
+                        LabeledContent("Other machines") {
+                            Text(store.machines.isEmpty ? "None" : "\(store.machines.count)").font(.subheadline)
+                        }
+                    }
                     Button { Task { await checkHealth() } } label: {
                         HStack {
                             Text("Test connection")
@@ -148,6 +153,7 @@ struct SettingsView: View {
                 case .alerts: AlertSettingsView()
                 case .storage: StorageSettingsView()
                 case .commands: HistoryView()
+                case .machines: MachinesSettingsView()
                 }
             }
             .sensoryFeedback(.success, trigger: pairedHaptic)

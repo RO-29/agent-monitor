@@ -7,7 +7,7 @@ extension APIClient {
     func postJSON<B: Encodable>(_ path: String, _ body: B) async throws -> Data {
         var req = URLRequest(url: try url(path))
         req.httpMethod = "POST"
-        Self.authorize(&req)
+        authorize(&req)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(body)
         let (data, resp) = try await session.data(for: req)
@@ -18,7 +18,7 @@ extension APIClient {
     /// A GET request for a long-lived stream (SSE), with the same auth header.
     func streamRequest(_ path: String) throws -> URLRequest {
         var req = URLRequest(url: try url(path))
-        Self.authorize(&req)
+        authorize(&req)
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         return req
     }
