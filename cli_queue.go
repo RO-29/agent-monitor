@@ -581,6 +581,9 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		}
 	}
 	v.Items = mergeBangs(pendingBangs(ref, sessBusy()), v.Items)
+	if v.Items == nil {
+		v.Items = []CLIQueueItem{} // clients read items as a list
+	}
 	for i := range v.Items {
 		if it := &v.Items[i]; it.Kind == "bash" && it.Status == "running" && target != "" {
 			if screen == "" {

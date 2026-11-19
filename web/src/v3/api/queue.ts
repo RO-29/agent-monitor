@@ -163,7 +163,7 @@ export const cliApi = {
   async forget(threadId: string, session: string, id: string) {
     await req("POST", `/api/session/${enc(session)}/cli-queue/forget`, { id });
     const cur = views.get(threadId);
-    if (cur?.cli) set(threadId, { cli: { ...cur.cli, items: cur.cli.items.filter((x) => x.id !== id) } });
+    if (cur?.cli) set(threadId, { cli: { ...cur.cli, items: (cur.cli.items || []).filter((x) => x.id !== id) } });
   },
   async act(threadId: string, session: string, action: "send-now" | "edit" | "remove", id?: string) {
     const r = await req<{ text?: string; items?: CliItem[] }>("POST", `/api/session/${enc(session)}/cli-queue/${action}`, { id });
@@ -189,7 +189,7 @@ export function useQueue(threadId: string, session?: string, poll = false, opts:
     () => views.get(threadId) || EMPTY,
   );
   // While a ! command runs, its output on the terminal refreshes every 1.5 s.
-  const running = !!view.cli?.items.some((i) => i.kind === "bash" && i.status === "running");
+  const running = !!view.cli?.items?.some((i) => i.kind === "bash" && i.status === "running");
   useEffect(() => {
     if (!threadId || !poll || !running) return;
     const t = window.setInterval(() => void queueApi.load(threadId, session, cliAll), 1500);

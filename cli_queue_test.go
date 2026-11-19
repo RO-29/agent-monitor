@@ -715,3 +715,17 @@ func TestCLIClearDraft(t *testing.T) {
 		t.Fatalf("prompt open: %d keys %v", code, g.sent)
 	}
 }
+
+// Clients read items as a list: an empty queue is [] in JSON, never null.
+func TestCLIQueueViewEmptyItemsIsList(t *testing.T) {
+	id, f := setupCLITest(t, `{"type":"user","message":{"role":"user","content":"hi"}}`)
+	f.screens = []string{scrIdle}
+	v, _, err := cliQueueView(id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(v)
+	if !strings.Contains(string(b), `"items":[]`) {
+		t.Fatalf("items not a list: %s", b)
+	}
+}
