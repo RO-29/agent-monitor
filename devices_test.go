@@ -197,8 +197,9 @@ func TestDevicesAuth(t *testing.T) {
 
 func TestDevicesNoPasswordRequire(t *testing.T) {
 	e := newDevEnv(t, "")
-	if w := e.do("GET", "/api/secret", "", remoteAddr, nil); w.Code != 200 {
-		t.Fatalf("open server %d", w.Code)
+	// Secure default: with no password and no device requirement, another machine is still refused.
+	if w := e.do("GET", "/api/secret", "", remoteAddr, nil); w.Code != 401 {
+		t.Fatalf("no password, no requirement: %d, want 401", w.Code)
 	}
 	_, tok := e.create("phone")
 	setRequire(true)

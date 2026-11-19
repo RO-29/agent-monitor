@@ -86,6 +86,8 @@ type approvalDecision struct {
 	Surface      string            `json:"surface,omitempty"`
 	// OptionID picks one of Approval.Options (ACP agents).
 	OptionID string `json:"optionId,omitempty"`
+	// limited: the sender is below admin, so it may not add a lasting rule ("always").
+	limited bool
 	// AlwaysScope "claude" returns the CLI's permission_suggestions instead of adding an agent-monitor rule.
 	AlwaysScope string `json:"alwaysScope,omitempty"`
 	// ApplySuggestions is the web alias for always + alwaysScope "claude".
@@ -677,6 +679,9 @@ func (s *ApprovalStore) decide(id string, d approvalDecision) (*Approval, int, e
 	if d.ApplySuggestions && d.Behavior == "allow" {
 		d.Always, d.AlwaysScope = true, "claude"
 	}
+	if d.limited && d.Always {
+		return nil, http.StatusForbidden, fmt.Errorf("always adds a lasting rule and needs admin access; allow once instead")
+	}
 	if d.UpdatedInput != nil && a.Agent != "claude" {
 		return nil, http.StatusBadRequest, fmt.Errorf("updatedInput is supported only for Claude approvals")
 	}
@@ -972,6 +977,7 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 				bad(http.StatusBadRequest, "bad json")
 				return
 			}
+			d.limited = callerLevel(r) < LevelAdmin
 			a, code, err := s.decide(parts[0], d)
 			if err != nil {
 				bad(code, err.Error())

@@ -38,6 +38,9 @@ type Device struct {
 	LastIP     string `json:"lastIp,omitempty"`
 	RevokedAt  int64  `json:"revokedAt,omitempty"`
 	Current    bool   `json:"current"`
+	Kind       string `json:"kind"`              // device (a person's app) or machine (another daemon)
+	Level      string `json:"level"`             // view, control or admin; a machine is never admin
+	BoundIP    string `json:"boundIp,omitempty"` // a machine grant works only from the address that paired
 	hash       []byte
 }
 
@@ -104,8 +107,15 @@ func openDeviceStore(dir string) (*DeviceStore, error) {
 		db.Close()
 		return nil, err
 	}
+	// Devices paired before levels existed are the user's own: they stay admin.
+	for _, col := range []string{`kind TEXT NOT NULL DEFAULT 'device'`, `level TEXT NOT NULL DEFAULT 'admin'`, `bound_ip TEXT NOT NULL DEFAULT ''`} {
+		if _, err := db.Exec(`ALTER TABLE devices ADD COLUMN ` + col); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			db.Close()
+			return nil, err
+		}
+	}
 	s := &DeviceStore{db: db, now: time.Now}
-	rows, err := db.Query(`SELECT id, name, token_hash, created_at, last_used_at, last_ip, revoked_at FROM devices ORDER BY created_at`)
+	rows, err := db.Query(`SELECT id, name, token_hash, created_at, last_used_at, last_ip, revoked_at, kind, level, bound_ip FROM devices ORDER BY created_at`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -114,7 +124,7 @@ func openDeviceStore(dir string) (*DeviceStore, error) {
 	for rows.Next() {
 		d := &Device{}
 		var h string
-		if err := rows.Scan(&d.ID, &d.Name, &h, &d.CreatedAt, &d.LastUsedAt, &d.LastIP, &d.RevokedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &h, &d.CreatedAt, &d.LastUsedAt, &d.LastIP, &d.RevokedAt, &d.Kind, &d.Level, &d.BoundIP); err != nil {
 			return nil, err
 		}
 		d.hash, _ = hex.DecodeString(h)
@@ -130,11 +140,26 @@ func hashToken(tok string) []byte {
 	return h[:]
 }
 
-// Create adds a device and returns its token; the token is never stored or logged.
+// Create adds a device of kind device at level admin (the user's own app) and returns its token.
 func (s *DeviceStore) Create(name string) (*Device, string, error) {
+	return s.CreateGrant(name, "device", "")
+}
+
+// CreateGrant adds a device or machine grant; the token is never stored or logged. A machine starts at
+// view and can never be admin; a device defaults to admin.
+func (s *DeviceStore) CreateGrant(name, kind, level string) (*Device, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 80 {
 		return nil, "", errors.New("name is required (at most 80 characters)")
+	}
+	if kind != "machine" {
+		kind = "device"
+	}
+	if level == "" {
+		level = map[string]string{"device": "admin", "machine": "view"}[kind]
+	}
+	if parseLevel(level) == LevelNone || (kind == "machine" && level == "admin") {
+		return nil, "", errors.New("level must be view or control for a machine, and view, control or admin for a device")
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -143,10 +168,10 @@ func (s *DeviceStore) Create(name string) (*Device, string, error) {
 	tok := deviceTokenPrefix + base64.RawURLEncoding.EncodeToString(raw)
 	id := make([]byte, 6)
 	_, _ = rand.Read(id)
-	d := &Device{ID: "dv_" + hex.EncodeToString(id), Name: name, CreatedAt: s.now().UnixMilli(), hash: hashToken(tok)}
+	d := &Device{ID: "dv_" + hex.EncodeToString(id), Name: name, CreatedAt: s.now().UnixMilli(), hash: hashToken(tok), Kind: kind, Level: level}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, err := s.db.Exec(`INSERT INTO devices (id, name, token_hash, created_at) VALUES (?,?,?,?)`, d.ID, d.Name, hex.EncodeToString(d.hash), d.CreatedAt); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO devices (id, name, token_hash, created_at, kind, level) VALUES (?,?,?,?,?,?)`, d.ID, d.Name, hex.EncodeToString(d.hash), d.CreatedAt, d.Kind, d.Level); err != nil {
 		return nil, "", err
 	}
 	s.devs = append(s.devs, d)
@@ -205,6 +230,43 @@ func (s *DeviceStore) List(currentID string) []Device {
 		out = append(out, c)
 	}
 	return out
+}
+
+// SetLevel changes a grant's level; a machine cannot become admin. It returns false for an unknown id.
+func (s *DeviceStore) SetLevel(id, level string) (*Device, bool, error) {
+	if parseLevel(level) == LevelNone {
+		return nil, true, errors.New("level must be view, control or admin")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, d := range s.devs {
+		if d.ID != id {
+			continue
+		}
+		if d.Kind == "machine" && level == "admin" {
+			return nil, true, errors.New("a machine grant cannot be admin")
+		}
+		if _, err := s.db.Exec(`UPDATE devices SET level=? WHERE id=?`, level, id); err != nil {
+			return nil, true, err
+		}
+		d.Level = level
+		c := *d
+		return &c, true, nil
+	}
+	return nil, false, nil
+}
+
+// BindIP records the address a machine grant paired from, once.
+func (s *DeviceStore) BindIP(id, ip string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, d := range s.devs {
+		if d.ID == id && d.Kind == "machine" && d.BoundIP == "" && ip != "" {
+			if _, err := s.db.Exec(`UPDATE devices SET bound_ip=? WHERE id=?`, ip, id); err == nil {
+				d.BoundIP = ip
+			}
+		}
+	}
 }
 
 // Revoke marks a device revoked; it returns false for an unknown id.
@@ -391,13 +453,15 @@ func deviceRoutes(mux *http.ServeMux, s *DeviceStore) {
 			return
 		}
 		var in struct {
-			Name string `json:"name"`
+			Name  string `json:"name"`
+			Kind  string `json:"kind"`
+			Level string `json:"level"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in); err != nil {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "bad json"})
 			return
 		}
-		d, tok, err := s.Create(in.Name)
+		d, tok, err := s.CreateGrant(in.Name, in.Kind, in.Level)
 		if err != nil {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
@@ -405,6 +469,30 @@ func deviceRoutes(mux *http.ServeMux, s *DeviceStore) {
 		log.Printf("devices: created %s (%s)", d.ID, d.Name)
 		base := pairBase(r, os.Getenv("AGENT_MONITOR_BIND"), daemonPort(), interfaceIPs)
 		writeJSONStatus(w, http.StatusCreated, map[string]any{"device": d, "token": tok, "pairUrl": base + "/pair#" + s.NewPairCode(tok)})
+	})
+	mux.HandleFunc("PATCH /api/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !localCaller(r) {
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "change access on the Mac itself"})
+			return
+		}
+		var in struct {
+			Level string `json:"level"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "bad json"})
+			return
+		}
+		d, ok, err := s.SetLevel(r.PathValue("id"), in.Level)
+		switch {
+		case !ok:
+			writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "device not found"})
+		case err != nil:
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		default:
+			log.Printf("devices: %s (%s) is now %s", d.ID, d.Name, d.Level)
+			liveConns.closeDevice(r, d.ID) // open streams were authorised at the old level
+			writeJSON(w, map[string]any{"ok": true, "device": d})
+		}
 	})
 	mux.HandleFunc("DELETE /api/devices/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
@@ -453,6 +541,7 @@ func deviceRoutes(mux *http.ServeMux, s *DeviceStore) {
 		http.SetCookie(w, &http.Cookie{Name: deviceCookieName, Value: tok, Path: "/", HttpOnly: true,
 			SameSite: http.SameSiteLaxMode, Secure: secureRequest(r), MaxAge: 400 * 24 * 3600})
 		s.Touch(d.ID, remoteIP(r))
+		s.BindIP(d.ID, remoteIP(r))
 		d.Current = true
 		writeJSON(w, map[string]any{"ok": true, "device": d})
 	})

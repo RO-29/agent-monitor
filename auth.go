@@ -62,19 +62,47 @@ func wantsHTML(r *http.Request) bool {
 // (the password stops working remotely when requireDeviceToken is on).
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if localCaller(r) || authPublicPath(r) {
+		if localCaller(r) {
+			next.ServeHTTP(w, withCaller(r, caller{level: LevelAdmin}))
+			return
+		}
+		if authPublicPath(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
+		need := routeLevel(r.Method, r.URL.Path)
+		if need == levelLocal {
+			logAccess(r, requestDevice(r), need, http.StatusForbidden)
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "only processes on this Mac may call this route"})
+			return
+		}
 		if d := requestDevice(r); d != nil {
+			lvl := parseLevel(d.Level)
+			if d.Kind == "machine" && lvl > LevelControl {
+				lvl = LevelControl
+			}
+			if d.Kind == "machine" && d.BoundIP != "" && remoteIP(r) != d.BoundIP {
+				logAccess(r, d, need, http.StatusUnauthorized)
+				writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"error": "this machine grant works only from the address that paired it"})
+				return
+			}
+			if lvl < need {
+				logAccess(r, d, need, http.StatusForbidden)
+				writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "this device has " + d.Level + " access; this needs " + need.String()})
+				return
+			}
 			deviceStore.Touch(d.ID, remoteIP(r))
 			noteDeviceAgent(d.ID, d.Name, r.UserAgent())
-			liveConns.track(d.ID, w, r, next)
+			rec := &statusRecorder{ResponseWriter: w, code: http.StatusOK}
+			liveConns.track(d.ID, rec, withCaller(r, caller{level: lvl, device: d}), next)
+			logAccess(r, d, need, rec.code)
 			return
 		}
 		require := requireDeviceToken()
 		if authPassword == "" && !require {
-			next.ServeHTTP(w, r)
+			// Secure default: beyond this Mac, nothing works without a paired device (or a password).
+			logAccess(r, nil, need, http.StatusUnauthorized)
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"error": "pair this device first: agent-monitor accepts only paired devices from other machines"})
 			return
 		}
 		if r.URL.Path == "/api/login" {
@@ -93,7 +121,7 @@ func authMiddleware(next http.Handler) http.Handler {
 				return
 			}
 			if passwordAuthed(r) {
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(w, withCaller(r, caller{level: LevelAdmin}))
 				return
 			}
 			if bearer {
