@@ -343,7 +343,13 @@ func TestRustMCPMatchesGo(t *testing.T) {
 		t.Fatalf("go side answered only %d lines", n)
 	}
 	diffLines(t, "JSON-RPC output", rustOut, goOut)
-	diffLines(t, "daemon requests", strings.Join(rustD.log, "\n"), strings.Join(goD.log, "\n"))
+	var rustReqs []string
+	for _, l := range rustD.log {
+		if !strings.HasPrefix(l, "GET /api/agents/registry") { // only the Rust helper reads the agent list at start
+			rustReqs = append(rustReqs, l)
+		}
+	}
+	diffLines(t, "daemon requests", strings.Join(rustReqs, "\n"), strings.Join(goD.log, "\n"))
 	if !strings.Contains(logs, "[mcp-perm] starting; daemon="+rustSrv.URL+` orch="ot_t"`) || !strings.Contains(logs, "stdin closed; exiting") {
 		t.Fatalf("stderr log: %s", logs)
 	}
