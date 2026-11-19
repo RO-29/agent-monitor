@@ -423,6 +423,30 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
       </SelectCtx.Provider>
       </ChildCtx.Provider>
       <SelectBar sel={sel} blocks={blocks} title={row.title} />
+      {q.cli?.draft && mode === "tmux" && (
+        <div className="wdraft" role="status">
+          <span className="wdraft-k">In the terminal box</span>
+          <pre className="wdraft-t">{q.cli.draft}</pre>
+          <div className="wdraft-a">
+            <button
+              className="btn sm ghost"
+              title="Move this text into the message box here and clear it in the terminal"
+              onClick={() => {
+                const d = q.cli?.draft || "";
+                void cliApi
+                  .clearDraft(row.id, sid)
+                  .then(() => setText((cur: string) => (cur.trim() ? `${cur}\n${d}` : d)))
+                  .catch((e: Error) => showToast("Not moved", e.message, { kind: "alert" }));
+              }}
+            >
+              Edit here
+            </button>
+            <button className="btn sm ghost" title="Delete this text in the terminal box" onClick={() => void cliApi.clearDraft(row.id, sid).catch((e: Error) => showToast("Not cleared", e.message, { kind: "alert" }))}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
       <QueueList
         ref={qref}
         threadId={row.id}

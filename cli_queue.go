@@ -72,6 +72,71 @@ func noteBang(session, cmd string, queued bool) {
 	cliBangs.m[session] = append(cliBangs.m[session], cliBang{ID: fmt.Sprintf("bang-%d-%d", now, cliBangs.n), Cmd: strings.TrimSpace(cmd), At: now, Queued: queued})
 }
 
+// draftOf is the typed text in Claude Code's input box: the box without its prompt sign, placeholder or queue hint.
+func draftOf(screen string) string {
+	lines := strings.Split(strings.TrimSpace(cliInputBox(screen)), "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+	first := strings.TrimSpace(lines[0])
+	bash := strings.HasPrefix(first, "!")
+	lines[0] = strings.TrimLeft(first, "❯>!› ")
+	for i := range lines {
+		lines[i] = strings.TrimSpace(lines[i])
+	}
+	t := strings.TrimSpace(strings.Join(lines, "\n"))
+	if t == "" || strings.HasPrefix(t, `Try "`) || strings.Contains(strings.ToLower(t), cliHint) {
+		return ""
+	}
+	if bash {
+		t = "!" + t
+	}
+	return t
+}
+
+// cliDraft reads the terminal's input box with dim text (placeholder, suggestions) left out.
+func cliDraft(target string) string {
+	s, err := cliIO.typedScreen(target)
+	if err != nil || s == "" {
+		return ""
+	}
+	return draftOf(s)
+}
+
+// clearDraft deletes the text in the terminal's input box with Backspace, then checks that it is gone.
+func clearDraft(id string) error {
+	ref := resolveWatched(id)
+	target := cliIO.target(ref.ID)
+	if target == "" {
+		return orchConflict("agent-monitor cannot reach this terminal")
+	}
+	defer cliLock(ref.ID)()
+	scr, err := cliIO.screen(target)
+	if err != nil {
+		return &orchHTTPError{http.StatusBadGateway, err.Error()}
+	}
+	if panePromptOpen(scr) {
+		return orchConflict("a prompt is open in the terminal; answer it first")
+	}
+	d := cliDraft(target)
+	if d == "" {
+		return nil
+	}
+	n := min(utf8.RuneCountInString(d)+4, cliEditMaxRunes)
+	for n > 0 {
+		k := min(n, 200)
+		if err := cliIO.keys(target, slices.Repeat([]string{"BSpace"}, k)); err != nil {
+			return err
+		}
+		n -= k
+	}
+	time.Sleep(cliPause)
+	if _, err := cliIO.screen(target); err != nil || cliDraft(target) != "" {
+		return orchConflict("the terminal box still holds text; check the terminal")
+	}
+	return nil
+}
+
 // bangLive returns the output under a running "! cmd" line on the screen, up to the input box; "" when not shown.
 func bangLive(screen, cmd string) string {
 	key := clipRunes(strings.Join(strings.Fields(cmd), " "), 40)
@@ -403,6 +468,8 @@ type CLIQueueView struct {
 	Note      string `json:"note,omitempty"`
 	CanRemove bool   `json:"canRemove"`
 	RemoveWhy string `json:"removeWhy,omitempty"`
+	// Draft is text typed in the terminal's input box and not sent yet (not the placeholder or hint).
+	Draft string `json:"draft,omitempty"`
 }
 
 // cliTerm reads and types into a session's terminal, host first; tests swap it.
@@ -521,6 +588,9 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 			}
 			it.Live = bangLive(screen, strings.TrimPrefix(it.Text, "!"))
 		}
+	}
+	if target != "" {
+		v.Draft = cliDraft(target)
 	}
 	users := len(cliUserItems(items))
 	switch {
@@ -970,7 +1040,7 @@ func typeBang(send func(string, bool) error, text string, bang bool) error {
 	return send(text, true)
 }
 
-// serveCLIQueue handles /api/session/{id}/cli-queue[/send|/send-now|/edit|/remove|/forget]; false for other paths.
+// serveCLIQueue handles /api/session/{id}/cli-queue[/send|/send-now|/edit|/remove|/forget|/clear-draft]; false for other paths.
 func serveCLIQueue(w http.ResponseWriter, r *http.Request, path string) bool {
 	id, action, ok := strings.Cut(path, "/cli-queue")
 	if !ok || id == "" || (action != "" && !strings.HasPrefix(action, "/")) {
@@ -1012,6 +1082,14 @@ func serveCLIQueue(w http.ResponseWriter, r *http.Request, path string) bool {
 			return true
 		}
 		writeJSON(w, map[string]any{"ok": true, "queued": queued})
+		return true
+	}
+	if action == "clear-draft" {
+		if err := clearDraft(id); err != nil {
+			orchWriteErr(w, err)
+			return true
+		}
+		writeJSON(w, map[string]any{"ok": true})
 		return true
 	}
 	if action == "forget" { // only agent-monitor's record; nothing is typed into the terminal

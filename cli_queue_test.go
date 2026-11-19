@@ -675,3 +675,43 @@ func TestBangLive(t *testing.T) {
 		t.Fatal("another command has no output here")
 	}
 }
+
+func TestDraftOf(t *testing.T) {
+	rule := strings.Repeat("─", 40)
+	box := func(l ...string) string { return "out\n" + rule + "\n" + strings.Join(l, "\n") + "\n" + rule + "\n" }
+	cases := map[string]string{
+		box("❯ "):                                 "",
+		box(`❯ Try "edit host.go to…"`):           "",
+		box("❯ delete the old migration"):         "delete the old migration",
+		box("❯ first line", "  second"):           "first line\nsecond",
+		box("! ls -la"):                           "!ls -la",
+		box("! "):                                 "",
+		box("❯ Press up to edit queued messages"): "",
+	}
+	for scr, want := range cases {
+		if got := draftOf(scr); got != want {
+			t.Errorf("%q: got %q want %q", scr, got, want)
+		}
+	}
+}
+
+// Clear removes a draft with Backspace and checks the box; a prompt on screen refuses with no keys.
+func TestCLIClearDraft(t *testing.T) {
+	id, f := setupCLITest(t, qop("enqueue", tn))
+	f.screens = []string{cliScreen("delete the old migration", ""), scrEmpty}
+	if code, out := cliPost(id, "clear-draft", `{}`); code != 200 {
+		t.Fatalf("clear: %d %v", code, out)
+	}
+	n := 0
+	for _, k := range f.sent {
+		n += len(k)
+	}
+	if n < len("delete the old migration") {
+		t.Fatalf("backspaces %d", n)
+	}
+	id2, g := setupCLITest(t, qop("enqueue", tn))
+	g.screens = []string{scrPrompt}
+	if code, _ := cliPost(id2, "clear-draft", `{}`); code != 409 || len(g.sent) != 0 {
+		t.Fatalf("prompt open: %d keys %v", code, g.sent)
+	}
+}

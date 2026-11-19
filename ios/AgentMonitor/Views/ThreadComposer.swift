@@ -67,6 +67,26 @@ struct Composer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let d = queue?.draft, !d.isEmpty, reachable {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("IN THE TERMINAL BOX").font(Typo.ui(10.5, .semibold)).tracking(0.5).foregroundStyle(Tok.muted)
+                    Text(d).font(Typo.mono(13)).foregroundStyle(Tok.fg).lineLimit(4)
+                        .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+                    HStack(spacing: 8) {
+                        Spacer()
+                        Button("Edit here") {
+                            Task {
+                                if await act("clear-draft", nil) { text = withInsert(text, d) }
+                            }
+                        }.buttonStyle(.am(.ghost)).disabled(acting)
+                        Button("Clear") { Task { _ = await act("clear-draft", nil) } }.buttonStyle(.am(.ghost)).disabled(acting)
+                    }
+                }
+                .padding(10)
+                .background(Tok.panel, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Tok.line2, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                .padding(.horizontal, 4)
+            }
             if let q = queue, q.supported, let qi = q.items, !qi.isEmpty {
                 queueBox(q, qi)
             }
@@ -428,18 +448,26 @@ struct Composer: View {
         }
     }
 
-    private func act(_ action: String, _ id: String?) async {
-        guard let sessionID else { return }
+    @discardableResult
+    private func act(_ action: String, _ id: String?) async -> Bool {
+        guard let sessionID else { return false }
         acting = true
         defer { acting = false }
+        var ok = false
         do {
             try await APIClient.shared.cliQueueAction(sessionID, action: action, itemID: id)
             error = nil
-            status = action == "send-now" ? "\(cliName) stops the turn and sends the queue." : action == "forget" ? "Cleared." : "Removed from the queue."
+            ok = true
+            switch action {
+            case "send-now": status = "\(cliName) stops the turn and sends the queue."
+            case "forget", "clear-draft": status = "Cleared."
+            default: status = "Removed from the queue."
+            }
         } catch {
             self.error = error.localizedDescription
         }
         await loadQueue(sessionID)
+        return ok
     }
 
     private func loadQueue(_ sid: String) async {

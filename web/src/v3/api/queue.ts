@@ -34,6 +34,8 @@ export interface CliView {
   note?: string;
   canRemove: boolean;
   removeWhy?: string;
+  /** Text typed in the terminal's input box and not sent yet. */
+  draft?: string;
 }
 export interface QView {
   items: QItem[];
@@ -150,6 +152,12 @@ export const cliApi = {
   async send(session: string, text: string, attachments?: string[]) {
     const r = await req<{ queued?: boolean }>("POST", `/api/session/${enc(session)}/cli-queue/send`, attachments?.length ? { text, attachments } : { text });
     return !!r.queued;
+  },
+  /** Deletes the text in the terminal's input box; refused while a prompt is open. */
+  async clearDraft(threadId: string, session: string) {
+    await req("POST", `/api/session/${enc(session)}/cli-queue/clear-draft`, {});
+    const cur = views.get(threadId);
+    if (cur?.cli) set(threadId, { cli: { ...cur.cli, draft: undefined } });
   },
   /** Forgets a sent ! command whose result never reached the transcript; nothing is typed into the terminal. */
   async forget(threadId: string, session: string, id: string) {

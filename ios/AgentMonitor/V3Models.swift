@@ -349,6 +349,8 @@ struct CLIQueueView: Decodable {
     var note: String?
     var canRemove: Bool
     var removeWhy: String?
+    /// Text typed in the terminal's input box and not sent yet.
+    var draft: String?
 }
 
 // MARK: - Terminal question (a question or plan shown in the Claude Code pane)
