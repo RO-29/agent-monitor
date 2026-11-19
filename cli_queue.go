@@ -127,6 +127,9 @@ func clearDraft(id string) error {
 	}
 	d := cliDraft(target)
 	if d == "" {
+		if cliBashEmpty(target) { // leave an empty bash mode, so the box is a plain prompt again
+			return cliIO.keys(target, []string{"BSpace"})
+		}
 		return nil
 	}
 	n := min(utf8.RuneCountInString(d)+4, cliEditMaxRunes)
@@ -836,8 +839,23 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 		return false, orchConflict("a question or permission prompt is open in the terminal")
 	}
 	text = strings.TrimRight(text, " \t\r\n")
+	// An empty bash prompt ("!" alone) is a mode, not text: a ! command uses it, a message leaves it first.
+	inBash := false
+	if tool == ToolClaude && cliBashEmpty(target) {
+		if bang {
+			inBash = true
+		} else {
+			if err := cliIO.keys(target, []string{"BSpace"}); err != nil {
+				return false, err
+			}
+			time.Sleep(cliBangPause)
+			if screen, err = cliIO.screen(target); err != nil {
+				return false, &orchHTTPError{http.StatusBadGateway, err.Error()}
+			}
+		}
+	}
 	// Text typed into the box by hand would join this message (or turn a ! command into prompt text).
-	if (bang || tool == ToolClaude && cliSeesDim(target)) && cliBoxHasText(screen, target) {
+	if !inBash && (bang || tool == ToolClaude && cliSeesDim(target)) && cliBoxHasText(screen, target) {
 		// A message sent a moment ago sits in the box until Claude Code moves it to its queue.
 		for end := time.Now().Add(cliBoxSettle); ; {
 			time.Sleep(cliBangPause)
@@ -853,8 +871,10 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 		}
 	}
 	if bang && tool == ToolClaude {
-		if err := cliEnterBash(target); err != nil {
-			return false, err
+		if !inBash {
+			if err := cliEnterBash(target); err != nil {
+				return false, err
+			}
 		}
 		if err := cliIO.text(target, strings.TrimLeft(text[1:], " "), true); err != nil {
 			return false, err
@@ -994,6 +1014,12 @@ func screenQueued(screen string) []string {
 }
 
 // cliTypedEmpty is true when the box holds only dim text (a placeholder or a suggested prompt).
+// cliBashEmpty: Claude Code is in bash mode with nothing typed after its "!" prompt.
+func cliBashEmpty(target string) bool {
+	scr, err := cliIO.typedScreen(target)
+	return err == nil && strings.TrimSpace(cliInputBox(scr)) == "!"
+}
+
 func cliTypedEmpty(target string) bool {
 	scr, err := cliIO.typedScreen(target)
 	return err == nil && cliBoxEmpty(scr)

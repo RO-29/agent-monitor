@@ -740,3 +740,18 @@ func TestDraftOfKeepsTypedBang(t *testing.T) {
 		t.Fatalf("draft %q, want !ls", d)
 	}
 }
+
+// The terminal already in bash mode with an empty "!" prompt: a ! command uses the mode, a message leaves it first.
+func TestCLISendWithEmptyBashPrompt(t *testing.T) {
+	id, f := setupCLITest(t)
+	f.sess = &Session{Tool: ToolClaude, State: StateAwaitingInput, RecentEvents: []RecentEvent{{Kind: "Stop"}}}
+	f.screens = []string{scrBash}
+	if code, out := cliPost(id, "send", `{"text":"!cat 1"}`); code != 200 || strings.Join(f.typed, "|") != "cat 1⏎" {
+		t.Fatalf("bang in bash mode: %d %v %q", code, out, f.typed)
+	}
+	f.typed, f.sent, f.screens, f.n = nil, nil, []string{scrBash, scrIdle}, 0
+	if code, out := cliPost(id, "send", `{"text":"why did it fail"}`); code != 200 || strings.Join(f.typed, "|") != "why did it fail⏎" ||
+		len(f.sent) == 0 || f.sent[0][0] != "BSpace" {
+		t.Fatalf("message in bash mode: %d %v typed %q keys %v", code, out, f.typed, f.sent)
+	}
+}
