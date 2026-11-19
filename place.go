@@ -155,7 +155,9 @@ func sessionPlace(id string) SessionPlace {
 	if s != nil {
 		p.Origin = s.Origin
 		if s.TranscriptPath != "" {
-			p.Journey = journeyOf(s.TranscriptPath)
+			if j := journeyOf(s.TranscriptPath); j != nil {
+				p.Journey = j // a transcript with no entrypoint (Cursor) has none; the list stays empty, never null
+			}
 		}
 	}
 	// After a restart an ended session has no entrypoint yet; its transcript still knows the last place.

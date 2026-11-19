@@ -252,7 +252,7 @@ function TermKV({ row }: { row: Row }) {
     <>
       <KV k="Runs in" v={p.detail ? `${p.label} · ${p.detail}` : p.label} />
       {p.origin && <KV k="Started from" v={p.origin} />}
-      {p.journey.length > 1 && (
+      {(p.journey?.length ?? 0) > 1 && (
         <div className="wjourney" aria-label="Places this session ran in">
           <span className="wjourney-k">Journey</span>
           <ol>

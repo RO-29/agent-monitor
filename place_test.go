@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +53,18 @@ func TestPlaceNowDesktopAndEnded(t *testing.T) {
 	store.Upsert(UpsertInput{Tool: ToolClaude, SessionID: "d2", Entrypoint: "cli", HasEntrypoint: true, State: StateCompleted, HasState: true})
 	if k, _, d := placeNow("claude:d2", store.Get("claude:d2")); k != "ended" || d != "last in Terminal" {
 		t.Fatalf("ended: %s %q", k, d)
+	}
+}
+
+func TestPlaceJourneyNeverNull(t *testing.T) {
+	prev := store
+	t.Cleanup(func() { store = prev })
+	store = NewStore()
+	path := filepath.Join(t.TempDir(), "cursor.jsonl")
+	_ = os.WriteFile(path, []byte(`{"role":"user"}`+"\n"), 0o644)
+	store.Upsert(UpsertInput{Tool: ToolCursor, SessionID: "c1", TranscriptPath: path})
+	b, _ := json.Marshal(sessionPlace("cursor:c1"))
+	if !strings.Contains(string(b), `"journey":[]`) {
+		t.Fatalf("place %s", b)
 	}
 }
