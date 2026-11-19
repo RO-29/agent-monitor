@@ -19,5 +19,6 @@ func registerV3Routes(mux *http.ServeMux) {
 	registerHostRoutes(mux)     // host_registry.go: session hosts and terminal sessions
 	registerUsageRoutes(mux)    // usage_limits.go: plan usage windows and local token totals
 	registerCommandRoutes(mux)  // session_cmds.go: ! command history across sessions
+	registerWiringRoutes(mux)   // wire_run.go: agent wiring status, first-run confirmation, agent registry
 	registerVoiceRoutes(mux)    // voice.go: dictation cleanup through ~/voice-dictation/clean.sh
 }

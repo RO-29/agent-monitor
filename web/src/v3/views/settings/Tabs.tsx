@@ -7,6 +7,7 @@ const TABS = [
   { to: "/settings/limits", label: "Limits" },
   { to: "/settings/voice", label: "Voice" },
   { to: "/settings/storage", label: "Storage" },
+  { to: "/settings/agents", label: "Agents" },
   { to: "/settings/templates", label: "Templates" },
   { to: "/settings/schedules", label: "Schedules" },
 ];

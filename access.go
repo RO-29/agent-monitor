@@ -72,6 +72,11 @@ var accessRules = []accessRule{
 	{"", "/debug/", "", levelLocal},
 	{"", "/api/notify/install$", "", levelLocal},
 
+	// Wiring edits agent config files: reading the plan needs control, approving it needs admin (named, not the default).
+	{"POST", "/api/agents/wiring/confirm$", "", LevelAdmin},
+	{"GET HEAD", "/api/agents/wiring$", "", LevelControl},
+	{"GET HEAD", "/api/agents/registry$", "", LevelView},
+
 	// Terminals are a shell: admin only.
 	{"", "/api/term$", "", LevelAdmin},
 	{"", "/api/session/", "/term", LevelAdmin},

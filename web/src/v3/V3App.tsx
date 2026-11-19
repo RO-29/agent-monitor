@@ -32,6 +32,7 @@ const NotifySettingsPage = lazy(() => import("./views/settings/NotifySettings"))
 const LimitsPage = lazy(() => import("./views/settings/Limits"));
 const VoicePage = lazy(() => import("./views/settings/Voice"));
 const StoragePage = lazy(() => import("./views/settings/Storage"));
+const WiringPage = lazy(() => import("./views/settings/Wiring"));
 const CommandsPage = lazy(() => import("./views/Commands"));
 const TemplatesPage = lazy(() => import("./views/settings/Templates"));
 const SchedulesPage = lazy(() => import("./views/settings/Schedules"));
@@ -144,6 +145,7 @@ export default function V3App() {
         <Route path="/settings/limits" element={<Suspense fallback={null}><LimitsPage /></Suspense>} />
         <Route path="/settings/voice" element={<Suspense fallback={null}><VoicePage /></Suspense>} />
         <Route path="/settings/storage" element={<Suspense fallback={null}><StoragePage /></Suspense>} />
+        <Route path="/settings/agents" element={<Suspense fallback={null}><WiringPage /></Suspense>} />
         <Route path="/commands" element={<Suspense fallback={null}><CommandsPage /></Suspense>} />
         <Route path="/settings/templates" element={<Suspense fallback={null}><TemplatesPage /></Suspense>} />
         <Route path="/settings/schedules" element={<Suspense fallback={null}><SchedulesPage /></Suspense>} />

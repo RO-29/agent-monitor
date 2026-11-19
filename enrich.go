@@ -35,6 +35,8 @@ type Settings struct {
 	Notify NotifySettings `json:"notify"`
 	// UploadMaxAgeHours deletes attached files older than this; 0 = 30 days, -1 = keep until the quota.
 	UploadMaxAgeHours int `json:"uploadMaxAgeHours"`
+	// InstallDir holds the agent-monitor binary and bin/ hooks that wiring writes into agent configs; empty means ~/agent-monitor.
+	InstallDir string `json:"installDir,omitempty"`
 }
 
 var settings = struct {

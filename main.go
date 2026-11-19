@@ -45,6 +45,10 @@ func main() {
 			// "install" wires hooks and MCP entries for Claude and Codex; "install-hooks" is an alias.
 			installAll()
 			return
+		case "wire":
+			os.Exit(runWireCmd(os.Args[2:]))
+		case "unwire":
+			os.Exit(runUnwireCmd(os.Args[2:]))
 		case "mcp-perm-server", "run", "__pty-leader":
 			// The Rust am-helper next to this binary serves these modes; there is no Go copy.
 			execRustHelper(os.Args[1:])
@@ -173,6 +177,7 @@ func runServer() {
 	mux := http.NewServeMux()
 	registerTraceRoutes(mux)
 	registerV3Routes(mux)
+	startWiring()
 	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
 		all := store.All()
 		// ?waiting=1 returns only sessions waiting on the user; the full list is several MB.
