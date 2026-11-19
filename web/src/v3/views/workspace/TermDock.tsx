@@ -11,6 +11,8 @@ export interface TermTarget {
   cwd: string;
 }
 export const drivenTerm = (id: string, cwd: string): TermTarget => ({ key: `t:${id}`, url: `/api/orch/threads/${encodeURIComponent(id)}/term`, cwd });
+/** The agent's own terminal: a live tmux client on its session, so the panel shows exactly what the terminal shows. */
+export const agentTerm = (sessionId: string, cwd: string): TermTarget => ({ key: `a:${sessionId}`, url: `/api/session/${encodeURIComponent(sessionId)}/term`, cwd });
 export const cwdTerm = (cwd: string): TermTarget | null => (cwd && cwd.startsWith("/") ? { key: `c:${cwd}`, url: `/api/term?cwd=${encodeURIComponent(cwd)}`, cwd } : null);
 
 // One open flag for the whole Workspace, so the panel stays open across thread switches.

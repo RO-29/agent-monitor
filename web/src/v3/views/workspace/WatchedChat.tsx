@@ -20,7 +20,7 @@ import type { Row } from "../../model";
 import { BarMenu, blocksOf, FoldItem, NarrowBarItems, RunBlock, useTick } from "./DrivenChat";
 import { DiffView } from "./Diff";
 import { useDiffNav } from "./git";
-import { cwdTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
+import { agentTerm, cwdTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
 import type { WatchedFeedState } from "./watched";
 import { nativeSid } from "./handover";
 import { p7 } from "../../api/p7";
@@ -339,7 +339,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
               Trace
             </button>
             <button role="menuitem" onClick={toggleTerm} disabled={!row.cwd}>
-              {termOpen ? "Hide terminal" : "Terminal"}
+              {termOpen ? "Hide terminal" : mode === "tmux" && pane.target ? "Agent terminal (live)" : "Terminal"}
               <kbd className="wkbd hidephone">ctrl+`</kbd>
             </button>
             <FoldItem />
@@ -495,7 +495,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
       </Composer>
       </>
       )}
-      <TermDock target={cwdTerm(row.cwd)} />
+      <TermDock target={mode === "tmux" && pane.target ? agentTerm(sid, row.cwd) : cwdTerm(row.cwd)} />
       {dnav.cur && row.cwd && <DiffView threadId={`cwd:${row.cwd}`} nav={dnav.cur} onClose={dnav.close} onFile={dnav.setFile} />}
     </section>
     </FillCtx.Provider>

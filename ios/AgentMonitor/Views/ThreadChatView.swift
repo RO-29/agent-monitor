@@ -35,6 +35,7 @@ struct ThreadChatView: View {
     @State private var selected: Set<String> = []
     @State private var includeReplies = true
     @State private var showHistory = false
+    @State private var showScreen = false
     @State private var confirmEnd = false
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
@@ -113,6 +114,7 @@ struct ThreadChatView: View {
         .toolbar(fullscreen ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(fullscreen)
         .overlay(alignment: .top) { if fullscreen { exitStrip } }
+        .sheet(isPresented: $showScreen) { if let sid = sessionID { TerminalScreen(sessionID: sid) } }
         .sheet(isPresented: $showHistory) {
             if let sid = sessionID {
                 CommandHistorySheet(sessionID: sid, run: canRunBash ? { cmd in await runBash(sid, cmd) } : nil)
@@ -273,6 +275,7 @@ struct ThreadChatView: View {
             Button { setFullscreen(true) } label: { Label("Read Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") }
             if sessionID != nil, canRunBash {
                 Button { showHistory = true } label: { Label("Command History", systemImage: "clock.arrow.circlepath") }
+                Button { showScreen = true } label: { Label("Terminal Screen", systemImage: "terminal") }
             }
             if let sid = sessionID, canRunBash {
                 if sessionLive {

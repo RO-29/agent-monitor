@@ -117,7 +117,7 @@ func termAllowed(r *http.Request) (bool, string) {
 	return true, ""
 }
 
-func (m *termManager) serve(w http.ResponseWriter, r *http.Request, key, cwd string) {
+func (m *termManager) serve(w http.ResponseWriter, r *http.Request, key, cwd string, argv ...string) {
 	if ok, why := termAllowed(r); !ok {
 		writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": why})
 		return
@@ -132,7 +132,7 @@ func (m *termManager) serve(w http.ResponseWriter, r *http.Request, key, cwd str
 		return
 	}
 	cols, rows := termSize(r.URL.Query().Get("cols"), 80), termSize(r.URL.Query().Get("rows"), 24)
-	s, created, err := m.get(key, cwd, cols, rows)
+	s, created, err := m.get(key, cwd, cols, rows, argv...)
 	if err != nil {
 		code := http.StatusInternalServerError
 		if errors.Is(err, errTermLimit) {
@@ -190,7 +190,7 @@ func termSize(v string, def int) int {
 
 var errTermLimit = errors.New("too many terminals: close one first")
 
-func (m *termManager) get(key, cwd string, cols, rows int) (*termSession, bool, error) {
+func (m *termManager) get(key, cwd string, cols, rows int, argv ...string) (*termSession, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if s := m.sessions[key]; s != nil {
@@ -204,6 +204,9 @@ func (m *termManager) get(key, cwd string, cols, rows int) (*termSession, bool, 
 		shell = "/bin/zsh"
 	}
 	cmd := exec.Command(shell, "-l")
+	if len(argv) > 0 {
+		cmd = exec.Command(argv[0], argv[1:]...)
+	}
 	cmd.Dir = cwd
 	cmd.Env = termEnv(os.Environ())
 	f, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
@@ -416,4 +419,42 @@ func (cl *termClient) writeLoop() {
 			}
 		}
 	}
+}
+
+// agentTmuxSession names the tmux session that holds a watched session's pane, or "".
+func agentTmuxSession(id string) string {
+	pane := ""
+	if h := hostForSession(id); h != nil {
+		pane = h.TmuxPane
+	}
+	if pane == "" && paneRegistry != nil {
+		if reg := paneRegistry.Get(id); reg != nil {
+			pane = reg.PaneID
+		}
+	}
+	if pane == "" {
+		return ""
+	}
+	out, err := exec.Command("tmux", "display-message", "-p", "-t", pane, "#{session_name}").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// serveAgentTerm mirrors the agent's own terminal: a tmux client attached to its session.
+// ignore-size keeps this client from resizing the user's real terminal.
+func serveAgentTerm(w http.ResponseWriter, r *http.Request, id string) {
+	name := agentTmuxSession(id)
+	if name == "" {
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "this session runs in no tmux pane agent-monitor can mirror"})
+		return
+	}
+	cwd := homeDir()
+	if s := store.Get(id); s != nil && s.Cwd != "" {
+		if st, err := os.Stat(s.Cwd); err == nil && st.IsDir() {
+			cwd = s.Cwd
+		}
+	}
+	termMgr.serve(w, r, "agent:"+id, cwd, "tmux", "attach-session", "-t", "="+name, "-f", "ignore-size")
 }
