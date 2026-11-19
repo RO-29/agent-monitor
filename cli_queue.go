@@ -494,13 +494,21 @@ func cliLock(id string) func() {
 	return mu.Unlock
 }
 
+// isBoxRule is a horizontal rule of Claude Code's input box; a named session prints its name inside the top one.
+func isBoxRule(t string) bool {
+	if !strings.HasPrefix(t, "─") && !strings.HasPrefix(t, "━") {
+		return false
+	}
+	return strings.Count(t, "─")+strings.Count(t, "━") >= 20
+}
+
 // cliInputBox returns the lines between the last two horizontal rules: Claude Code's input box.
 func cliInputBox(screen string) string {
 	lines := strings.Split(strings.TrimRight(screen, "\n"), "\n")
 	var rules []int
 	for i, ln := range lines {
 		t := strings.TrimSpace(ln)
-		if utf8.RuneCountInString(t) >= 20 && strings.Trim(t, "─━") == "" {
+		if isBoxRule(t) {
 			rules = append(rules, i)
 		}
 	}

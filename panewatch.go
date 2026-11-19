@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // Claude shows decision prompts in its TUI — AskUserQuestion menus and
@@ -30,7 +29,7 @@ func panePromptOpen(screen string) bool {
 		if rePanePrompt.MatchString(ln) {
 			last = i
 		}
-		if t := strings.TrimSpace(ln); utf8.RuneCountInString(t) >= 20 && strings.Trim(t, "─━") == "" {
+		if isBoxRule(strings.TrimSpace(ln)) {
 			rules = append(rules, i)
 		}
 	}

@@ -642,3 +642,24 @@ func TestCLIForgetBang(t *testing.T) {
 		t.Fatalf("%d records left", n)
 	}
 }
+
+// A named session prints its name inside the top rule of the input box.
+func TestCLIInputBoxNamedSession(t *testing.T) {
+	top := strings.Repeat("─", 60) + " bloat-repetition-cleanup-plan ─"
+	scr := "  done\n" + top + "\n! \n" + strings.Repeat("─", 90) + "\n  ! for shell mode\n"
+	if got := strings.TrimSpace(cliInputBox(scr)); got != "!" {
+		t.Fatalf("box %q, want !", got)
+	}
+	if isBoxRule("── a note") || isBoxRule("text ────────────────────────────") {
+		t.Fatal("short or text-first lines are not rules")
+	}
+}
+
+// A named session's input box below menu-like text means no prompt is open.
+func TestPanePromptNamedSession(t *testing.T) {
+	top := strings.Repeat("─", 60) + " my-session ─"
+	scr := "Pick one:\n❯ 1. Yes\n  2. No\nI chose 1.\n" + top + "\n❯ \n" + strings.Repeat("─", 80) + "\n"
+	if panePromptOpen(scr) {
+		t.Fatal("a drawn input box under the text means the menu is not open")
+	}
+}

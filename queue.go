@@ -603,7 +603,7 @@ func tuiQueued(pane string) []string {
 	var out []string
 	for _, ln := range lines[start:] {
 		t := strings.TrimSpace(ln)
-		if strings.HasPrefix(t, "╭") || (t != "" && strings.Trim(t, "─━═-") == "") {
+		if strings.HasPrefix(t, "╭") || isBoxRule(t) || (t != "" && strings.Trim(t, "─━═-") == "") {
 			break
 		}
 		t = strings.TrimSpace(strings.TrimLeft(t, "❯>│ "))
