@@ -13,16 +13,19 @@ for a in "$@"; do [[ $a == --test ]] && TEST=1 || REF=$a; done
 SHA=$(ssh "$HOST" "set -e; cd ~/$DIR; git fetch -q origin; git rev-parse --short '$REF'")
 OUT="$HOME/agent-monitor-builds/$SHA"
 echo "build $SHA on $HOST"
-ssh "$HOST" "set -euo pipefail
+# bash, whatever the login shell is: zsh stops on an empty glob and set -e must hold.
+ssh "$HOST" bash -s <<EOF
+set -euo pipefail
 export PATH=\$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin
 cd ~/$DIR && git checkout -q --detach $SHA
 ( cd web && npm ci --no-audit --no-fund >/dev/null && npx tsc -b && npm run build >/dev/null )
 go vet . && go build -o agent-monitor .
 ( cd rust/am-helper && cargo build --release -q )
 AM_APP_COPY=0 bash desk/build.sh >/dev/null
-[[ $TEST == 1 ]] && go test ./... | tail -1
-mkdir -p out && rm -rf out/* && cp agent-monitor rust/am-helper/target/release/am-helper out/ && ditto agent-monitor.app out/agent-monitor.app
-echo $SHA > out/COMMIT"
+if [[ $TEST == 1 ]]; then go test ./... | tail -1; fi
+rm -rf out && mkdir out && cp agent-monitor rust/am-helper/target/release/am-helper out/ && ditto agent-monitor.app out/agent-monitor.app
+echo $SHA > out/COMMIT
+EOF
 mkdir -p "$OUT"
 rsync -a --delete "$HOST:$DIR/out/" "$OUT/"
 echo "copied to $OUT"
