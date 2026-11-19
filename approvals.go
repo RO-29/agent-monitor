@@ -292,6 +292,7 @@ type hookPayload struct {
 	Command        string   `json:"command"`
 	WorkspaceRoots []string `json:"workspace_roots"`
 	MCPServer      string   `json:"mcp_server_name"`
+	CursorVersion  string   `json:"cursor_version"`
 }
 
 // cursorPayload maps a Cursor permission hook onto the fields Claude's hook uses.
@@ -569,8 +570,16 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 	holdAll := s.settings.ApprovalsMode == approvalsModeHold
 	s.mu.Unlock()
 	// Cursor runs this hook for every command: what its own lists already decide passes through unchanged.
+	// The CLI and the desktop app keep separate lists; the desktop ignores an "allow" for a call it would ask about.
 	if hook == hookCursor && !holdAll {
-		if pol := cursorPolicy(a.ToolName, a.Input); pol != "" {
+		pol := ""
+		if cursorFromCLI(p.CursorVersion) {
+			pol = cursorPolicy(a.ToolName, a.Input)
+		} else if pol = cursorDesktopPolicy(a.ToolName, a.Input); pol == "" && s.settingsSkipWhenFocused() && cursorDesktopInFront() {
+			passHook(w, hook)
+			return
+		}
+		if pol != "" {
 			out := map[string]any{"permission": pol}
 			if pol == "deny" {
 				out["user_message"], out["agent_message"] = "Blocked by your Cursor deny list", "Blocked by your Cursor deny list"
@@ -636,6 +645,12 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 	// A decision landed at the same moment; it is already in the channel.
 	d := <-pa.reply
 	writeJSON(w, hookResponse(hook, a, d))
+}
+
+func (s *ApprovalStore) settingsSkipWhenFocused() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.settings.SkipWhenFocused
 }
 
 // passHook answers with no opinion: an empty 204, or "ask" for Cursor, which blocks on an empty reply.

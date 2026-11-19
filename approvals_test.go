@@ -23,6 +23,10 @@ func newApprovalEnv(t *testing.T) *approvalEnv {
 	t.Helper()
 	s := newApprovalStore(t.TempDir())
 	s.focused = func(string) bool { return false }
+	prevFront, prevRules := cursorDesktopInFront, cursorDesktopRulesFn
+	cursorDesktopInFront = func() bool { return false }
+	cursorDesktopRulesFn = func() *cursorDesktopRules { return nil }
+	t.Cleanup(func() { cursorDesktopInFront, cursorDesktopRulesFn = prevFront, prevRules })
 	mux := http.NewServeMux()
 	s.routes(mux)
 	srv := httptest.NewServer(mux)
@@ -569,8 +573,41 @@ func TestCursorPolicyFollowsCursorLists(t *testing.T) {
 		}
 	}
 	e := newApprovalEnv(t)
-	r := <-e.startHook("cursor", map[string]any{"hook_event_name": "beforeShellExecution", "conversation_id": "c2", "command": "git log"})
+	r := <-e.startHook("cursor", map[string]any{"hook_event_name": "beforeShellExecution", "conversation_id": "c2", "command": "git log", "cursor_version": "2026.11.17-f532c45"})
 	if r.body["permission"] != "allow" || len(e.s.pending) != 0 {
 		t.Fatalf("allowlisted command waited: %+v", r)
+	}
+}
+
+// The desktop app ignores the CLI lists and its "allow" answer: a call it asks about gets a card, unless Cursor is in front.
+func TestCursorDesktopUsesItsOwnRules(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	_ = os.MkdirAll(filepath.Join(home, ".cursor"), 0o755)
+	_ = os.WriteFile(filepath.Join(home, ".cursor", "cli-config.json"), []byte(`{"permissions":{"allow":["Mcp(**)"]}}`), 0o644)
+	e := newApprovalEnv(t)
+	mcp := map[string]any{"hook_event_name": "beforeMCPExecution", "conversation_id": "d1", "mcp_server_name": "agent-monitor",
+		"tool_name": "permission_prompt", "tool_input": map[string]any{"x": 1}, "cursor_version": "3.30.14"}
+	ch := e.startHook("cursor", mcp)
+	a := e.waitPending()
+	if a.ToolName != "mcp__agent-monitor__permission_prompt" {
+		t.Fatalf("approval: %+v", a)
+	}
+	e.post("/api/approvals/"+a.ID+"/decide", map[string]any{"behavior": "deny"})
+	<-ch
+	cursorDesktopInFront = func() bool { return true }
+	if r := <-e.startHook("cursor", mcp); r.body["permission"] != "ask" || len(e.s.pending) != 0 {
+		t.Fatalf("Cursor in front: %+v", r)
+	}
+	cursorDesktopRulesFn = func() *cursorDesktopRules {
+		return &cursorDesktopRules{UseYoloMode: true, YoloCommandAllowlist: []string{"git status"}, MCPAllowedTools: []string{"agent-monitor:permission_prompt"}}
+	}
+	if r := <-e.startHook("cursor", mcp); r.body["permission"] != "allow" {
+		t.Fatalf("desktop allowlist: %+v", r)
+	}
+	for cmd, want := range map[string]string{"git status": "allow", "git status; rm -rf /": "", "make": ""} {
+		if got := cursorDesktopPolicy("Bash", map[string]any{"command": cmd}); got != want {
+			t.Fatalf("%q: %q want %q", cmd, got, want)
+		}
 	}
 }
