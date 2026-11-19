@@ -7,8 +7,30 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-// codex-hook.sh runs this script by its literal path.
-const PANE_SCRIPT: &str = "/Users/rohit/bin/tmux-pane-id.sh";
+use std::path::{Path, PathBuf};
+
+// codex-hook.sh looks in $HOME/bin first, then beside this helper's bin dir.
+fn pick_pane_script(home: Option<&Path>, exe_dir: Option<&Path>, exists: impl Fn(&Path) -> bool) -> PathBuf {
+    let home_copy = home.map(|h| h.join("bin").join("tmux-pane-id.sh"));
+    if let Some(p) = &home_copy {
+        if exists(p) {
+            return p.clone();
+        }
+    }
+    if let Some(d) = exe_dir {
+        let p = d.join("bin").join("tmux-pane-id.sh");
+        if exists(&p) {
+            return p;
+        }
+    }
+    home_copy.unwrap_or_else(|| PathBuf::from("tmux-pane-id.sh"))
+}
+
+fn pane_script() -> PathBuf {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf()));
+    pick_pane_script(home.as_deref(), exe_dir.as_deref(), |p| p.is_file())
+}
 
 pub fn run(args: &[String]) -> i32 {
     match args.first().map(|s| s.as_str()) {
@@ -327,7 +349,7 @@ fn tmux_out(args: &[&[u8]]) -> Option<Vec<u8>> {
 
 fn resolve_pane(sid: &[u8]) -> Option<Vec<u8>> {
     let out = Command::new("/bin/sh")
-        .arg(PANE_SCRIPT)
+        .arg(pane_script())
         .arg(ppid().to_string())
         .env("CODEX_THREAD_ID", OsStr::from_bytes(sid))
         .stdin(Stdio::null())
@@ -468,6 +490,17 @@ fn shell_capture_body(mut b: Vec<u8>) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pane_script_prefers_home_then_install_dir() {
+        let home = Path::new("/h");
+        let exe = Path::new("/i");
+        let has = |want: &'static [&'static str]| move |p: &Path| want.iter().any(|w| Path::new(w) == p);
+        assert_eq!(pick_pane_script(Some(home), Some(exe), has(&["/h/bin/tmux-pane-id.sh", "/i/bin/tmux-pane-id.sh"])), PathBuf::from("/h/bin/tmux-pane-id.sh"));
+        assert_eq!(pick_pane_script(Some(home), Some(exe), has(&["/i/bin/tmux-pane-id.sh"])), PathBuf::from("/i/bin/tmux-pane-id.sh"));
+        assert_eq!(pick_pane_script(Some(home), Some(exe), has(&[])), PathBuf::from("/h/bin/tmux-pane-id.sh"));
+        assert_eq!(pick_pane_script(None, None, has(&[])), PathBuf::from("tmux-pane-id.sh"));
+    }
 
     #[test]
     fn grep_and_sed_like_shell() {

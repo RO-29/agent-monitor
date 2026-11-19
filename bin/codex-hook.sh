@@ -21,8 +21,10 @@ event=$(printf '%s' "$PAYLOAD" | /usr/bin/python3 -c 'import json,sys; print(jso
 session_id=$(printf '%s' "$PAYLOAD" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id", ""))' 2>/dev/null) || session_id=''
 
 resolve_pane() {
-  local pane match=''
-  pane=$(CODEX_THREAD_ID="$session_id" /bin/sh /Users/rohit/bin/tmux-pane-id.sh "$PPID") || pane=''
+  local pane match='' pane_script
+  pane_script=$HOME/bin/tmux-pane-id.sh
+  [ -f "$pane_script" ] || pane_script=${BASH_SOURCE[0]%/*}/tmux-pane-id.sh
+  pane=$(CODEX_THREAD_ID="$session_id" /bin/sh "$pane_script" "$PPID") || pane=''
   if [ -n "$pane" ]; then
     printf '%s\n' "$pane"
     return 0

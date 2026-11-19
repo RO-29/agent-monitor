@@ -42,6 +42,8 @@ func entryLabel(e string) string {
 	switch e {
 	case "claude-desktop":
 		return "Claude desktop app"
+	case "claude-vscode":
+		return "VS Code: Claude extension"
 	case "cli":
 		return "Terminal"
 	case "sdk-cli", "sdk-ts", "sdk-py":
@@ -79,6 +81,8 @@ func placeNow(id string, s *Session) (kind, label, detail string) {
 	switch s.Entrypoint {
 	case "claude-desktop":
 		return "desktop", "Claude desktop app", "view and approvals here; type in the desktop app"
+	case "claude-vscode":
+		return "desktop", "VS Code: Claude extension", "view and approvals here; type in VS Code"
 	case "sdk-cli", "sdk-ts", "sdk-py":
 		return "thread", "SDK run", "a program drives it; view only"
 	}
