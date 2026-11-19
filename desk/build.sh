@@ -32,3 +32,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "built $APP"
+
+# Launchpad shows ~/Applications: refresh that copy when it exists (AM_APP_COPY=0 skips it).
+DEST="${AM_APP_DEST:-$HOME/Applications/$APP}"
+if [[ "${AM_APP_COPY:-1}" == "1" && -d "$DEST" ]]; then
+  rm -rf "$DEST" && ditto "$APP" "$DEST" && echo "copied to $DEST (restart the app to use it)"
+fi
