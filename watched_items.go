@@ -526,16 +526,28 @@ func claudeUserText(raw json.RawMessage) (string, bool) {
 		Text string `json:"text"`
 	}
 	_ = json.Unmarshal(raw, &parts)
-	var texts []string
+	var texts, real []string
 	for _, p := range parts {
 		switch p.Type {
 		case "tool_result":
 			return "", true
 		case "text":
 			texts = append(texts, p.Text)
+			if !isReminderBlock(p.Text) {
+				real = append(real, p.Text)
+			}
 		}
 	}
+	// Claude desktop puts a <system-reminder> part before the user's own text; keep the user's text.
+	if len(real) > 0 {
+		return strings.Join(real, "\n\n"), false
+	}
 	return strings.Join(texts, "\n\n"), false
+}
+
+func isReminderBlock(s string) bool {
+	t := strings.TrimSpace(s)
+	return strings.HasPrefix(t, "<system-reminder>") && strings.HasSuffix(t, "</system-reminder>")
 }
 
 type wCodexPayload struct {

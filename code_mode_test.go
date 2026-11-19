@@ -175,3 +175,14 @@ func TestRepeatedErrorsGroup(t *testing.T) {
 		t.Fatalf("error items %d repeat %d, want 1 and 3", n, rep)
 	}
 }
+
+func TestClaudeUserTextDesktopReminder(t *testing.T) {
+	raw := json.RawMessage(`[{"type":"text","text":"<system-reminder>\nno project folder\n</system-reminder>\n\n"},{"type":"text","text":"teset desktop claude code sesison"}]`)
+	if got, _ := claudeUserText(raw); claudePromptText(got) != "teset desktop claude code sesison" {
+		t.Fatalf("got %q", got)
+	}
+	only := json.RawMessage(`[{"type":"text","text":"<system-reminder>x</system-reminder>"}]`)
+	if got, _ := claudeUserText(only); claudePromptText(got) != "" {
+		t.Fatalf("a reminder-only message is meta, got %q", got)
+	}
+}
