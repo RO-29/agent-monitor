@@ -22,7 +22,13 @@ cd ~/$DIR && git checkout -q --detach $SHA
 go vet . && go build -o agent-monitor .
 ( cd rust/am-helper && cargo build --release -q )
 AM_APP_COPY=0 bash desk/build.sh >/dev/null
-if [[ $TEST == 1 ]]; then go test ./... | tail -1; fi
+if [[ $TEST == 1 ]]; then
+  # A failing run prints everything, not only the last line.
+  ( cd rust/am-helper && cargo test 2>&1 ) > /tmp/am-cargo-test.out || { cat /tmp/am-cargo-test.out; echo "CARGO TEST FAILED"; exit 1; }
+  tail -3 /tmp/am-cargo-test.out
+  go test ./... > /tmp/am-go-test.out 2>&1 || { cat /tmp/am-go-test.out; echo "GO TEST FAILED"; exit 1; }
+  tail -1 /tmp/am-go-test.out
+fi
 rm -rf out && mkdir out && cp agent-monitor rust/am-helper/target/release/am-helper out/ && ditto agent-monitor.app out/agent-monitor.app
 echo $SHA > out/COMMIT
 EOF
