@@ -158,5 +158,9 @@ func sessionPlace(id string) SessionPlace {
 			p.Journey = journeyOf(s.TranscriptPath)
 		}
 	}
+	// After a restart an ended session has no entrypoint yet; its transcript still knows the last place.
+	if n := len(p.Journey); n > 0 && p.Kind == "ended" && p.Detail == "last in Unknown" {
+		p.Detail = "last in " + p.Journey[n-1].Label
+	}
 	return p
 }
