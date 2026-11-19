@@ -8,6 +8,8 @@ set -euo pipefail
 # Machine-specific settings (AM_DEFAULT_SERVER, AM_IOS_TEAM) live outside the repository.
 [[ -f "$HOME/.config/agent-monitor/build.env" ]] && source "$HOME/.config/agent-monitor/build.env"
 REPO="${AM_REPO:-$HOME/agent-monitor}"
+# Commit count plus 500: the repository restarted on 2026-11-19, and build numbers must keep rising.
+BUILD=$(( $(git -C "$REPO" rev-list --count HEAD) + 500 ))
 TEAM="${AM_IOS_TEAM:-QV5FFU8R79}"
 STATE="$HOME/.agent-monitor/ios-resign"
 OTA="$HOME/.agent-monitor/ios-ota"
@@ -27,7 +29,7 @@ BASE="https://$HOST/ios-ota/$TOKEN"
 log "build $(git -C "$REPO" rev-parse --short HEAD) for team $TEAM"
 xcodebuild -project "$REPO/ios/AgentMonitor.xcodeproj" -scheme AgentMonitor -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath "$STATE/build" -allowProvisioningUpdates \
-  DEVELOPMENT_TEAM="$TEAM" AM_DEFAULT_SERVER="${AM_DEFAULT_SERVER:-}" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$(git -C "$REPO" rev-list --count HEAD)" MARKETING_VERSION="1.0.$(git -C "$REPO" rev-list --count HEAD)" build -quiet
+  DEVELOPMENT_TEAM="$TEAM" AM_DEFAULT_SERVER="${AM_DEFAULT_SERVER:-}" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" MARKETING_VERSION="1.0.$BUILD" build -quiet
 APP="$STATE/build/Build/Products/Release-iphoneos/AgentMonitor.app"
 [[ -d "$APP" ]] || { log "no app at $APP"; exit 1; }
 
