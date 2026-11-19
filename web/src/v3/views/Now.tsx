@@ -1,3 +1,4 @@
+import { PeerNeedsBox, usePeerFeed } from "./peers";
 import { AskKeysCtx, askFromApproval, WsApproval } from "./workspace/WsApproval";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -61,6 +62,7 @@ type Unit =
   | { kind: "stack"; s: Stack; at: number; repo: string; latest?: V3Thread };
 
 export default function Now() {
+  const peerFeed = usePeerFeed();
   const st = useV3();
   const live = useLive();
   const nav = useNavigate();
@@ -162,6 +164,7 @@ export default function Now() {
             <h2>{loading ? "Loading…" : nNeed ? `${nNeed} need${nNeed > 1 ? "" : "s"} you` : "Nothing needs you"}</h2>
             {meta.length > 0 && <span className="muted">{meta.join(" · ")}</span>}
           </div>
+          <PeerNeedsBox feed={peerFeed} />
           {loading && <Loading rows={6} />}
           {st.threadsStatus === "error" && rows.length === 0 && <ErrorState error={st.threadsError} />}
 

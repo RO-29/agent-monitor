@@ -58,3 +58,13 @@
 .v3 .peer-row{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px}
 .v3 .peer-items{display:flex;flex-direction:column;gap:8px;padding:6px 0 4px 10px;border-left:2px solid var(--line)}
 .v3 .peer-pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 var(--f-mono)}
+.v3 .peer-needs{display:flex;flex-direction:column;gap:4px;padding:8px 10px;margin:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.v3 .peer-needs-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.v3 .peer-chip{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:6px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.v3 .peer-threads{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
+.v3 .peer-thead{display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit}
+.v3 .peer-wait{font-size:11px;font-weight:600;color:var(--need)}
+.v3 .peer-trow{display:grid;grid-template-columns:8px 1fr auto;gap:6px;align-items:center;padding:3px 2px;text-decoration:none;color:inherit;font-size:13px}
+.v3 .peer-trow:hover{background:var(--panel-2);border-radius:6px}
+.v3 .peer-dot{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.v3 .peer-dot.run{background:var(--run)} .v3 .peer-dot.need{background:var(--need)}

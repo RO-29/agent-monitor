@@ -24,7 +24,9 @@ func peerPair(t *testing.T, level string) (string, string) {
 	t.Cleanup(func() { ds.Close(); deviceStore, authPassword, peerLoopbackOK = prevStore, prevPw, prevOK })
 	mux := http.NewServeMux()
 	registerDeviceRoutes(mux)
-	stub := func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true, "level": callerLevel(r).String()}) }
+	stub := func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"ok": true, "level": callerLevel(r).String()})
+	}
 	mux.HandleFunc("GET /api/needs-you", stub)
 	mux.HandleFunc("GET /api/health", stub)
 	mux.HandleFunc("GET /api/term", stub)

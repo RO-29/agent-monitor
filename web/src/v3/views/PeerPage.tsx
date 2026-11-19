@@ -1,36 +1,19 @@
 // One other machine: its requests and its sessions, read through this Mac's grant there (/api/m/<peer>/...).
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { decidePeer, PEER_PLACE, type PeerNeed, type PeerSession } from "./peers";
 import { fmtAgo } from "../../lib/format";
 import { machinesApi } from "../api/machines";
 import { Markdown } from "../components/Markdown";
 import { showToast } from "../../app/toast";
 import "../styles/settings.css";
 
-interface PeerNeed {
-  kind: string;
-  key: string;
-  title?: string;
-  message?: string;
-  agent?: string;
-  approval?: { approvalId?: string; id?: string; tool?: string; summary?: string };
-}
-interface PeerSession {
-  id: string;
-  title?: string;
-  firstMessage?: string;
-  state: string;
-  cwd: string;
-  lastActivityAt: number;
-  entrypoint?: string;
-}
 interface PeerItem {
   id: string;
   kind: string;
   text: string;
 }
 
-const PLACE: Record<string, string> = { "claude-desktop": "Desktop", cli: "Terminal", "sdk-cli": "SDK" };
 
 function SessionItems({ peer, id }: { peer: string; id: string }) {
   const [items, setItems] = useState<PeerItem[] | null>(null);
@@ -66,7 +49,8 @@ export default function PeerPage() {
   const [needs, setNeeds] = useState<PeerNeed[]>([]);
   const [sessions, setSessions] = useState<PeerSession[] | null>(null);
   const [err, setErr] = useState("");
-  const [open, setOpen] = useState("");
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(params.get("s") || "");
   const load = useCallback(() => {
     machinesApi
       .peer<{ items: PeerNeed[] }>(peer, "GET", "needs-you")
@@ -87,13 +71,7 @@ export default function PeerPage() {
     return () => window.clearInterval(t);
   }, [load]);
   const decide = async (n: PeerNeed, behavior: "allow" | "deny") => {
-    const id = n.approval?.approvalId || n.approval?.id || n.key;
-    try {
-      await machinesApi.peer(peer, "POST", `approvals/${encodeURIComponent(id)}/decide`, { behavior, surface: "peer" });
-      load();
-    } catch (e) {
-      showToast(behavior === "allow" ? "Not allowed" : "Not denied", (e as Error).message, { kind: "alert" });
-    }
+    if (await decidePeer(peer, n, behavior)) load();
   };
   return (
     <div className="view pad">
@@ -136,7 +114,7 @@ export default function PeerPage() {
             <button className="peer-row" onClick={() => setOpen(open === s.id ? "" : s.id)} aria-expanded={open === s.id}>
               <b>{s.title || (s.firstMessage || "").slice(0, 80) || s.id}</b>
               <span className="muted sm">
-                {PLACE[s.entrypoint || ""] ? `${PLACE[s.entrypoint || ""]} · ` : ""}
+                {PEER_PLACE[s.entrypoint || ""] ? `${PEER_PLACE[s.entrypoint || ""]} · ` : ""}
                 {s.state} · {s.cwd.replace(/^\/Users\/[^/]+/, "~")} · {fmtAgo(s.lastActivityAt)}
               </span>
             </button>

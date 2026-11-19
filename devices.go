@@ -543,8 +543,8 @@ func deviceRoutes(mux *http.ServeMux, s *DeviceStore) {
 		s.Touch(d.ID, remoteIP(r))
 		s.BindIP(d.ID, remoteIP(r))
 		d.Current = true
-		if d.Kind == "machine" && code != "" {
-			// Another daemon claims the code once and keeps the token; a person's device gets only the cookie.
+		if code != "" {
+			// The one-time code is the secret: its claimant gets the token (a daemon or an app keeps it; a browser uses the cookie).
 			writeJSON(w, map[string]any{"ok": true, "device": d, "token": tok})
 			return
 		}

@@ -1,5 +1,6 @@
 // /approvals: the request queue that agent-monitor.app shows by itself when an agent waits for you.
 // The list is GET /api/needs-you and nothing else, so it matches every other surface.
+import { PeerNeedsBox, usePeerFeed } from "./peers";
 import { settleThread } from "../api/orch";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { setTheme, useTheme } from "../../app/prefs";
@@ -91,6 +92,7 @@ function toReq(it: NeedsYouItem, live: Map<string, Approval>): Req | null {
 }
 
 export default function ApprovalsPage() {
+  const peerFeed = usePeerFeed();
   useEffect(startV3Live, []);
   const [theme, toggleTheme] = useTheme();
   useEffect(() => {
@@ -290,6 +292,7 @@ export default function ApprovalsPage() {
             <span className="muted sm">{loading ? "" : "Requests from your agents show here as they arrive."}</span>
           </div>
         )}
+        <PeerNeedsBox feed={peerFeed} compact />
         {others.length > 0 && (
           <section className="apv-queue" aria-label="Other requests">
             <div className="apv-eb">

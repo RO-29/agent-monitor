@@ -12,6 +12,7 @@ import { agentKey } from "../../components/AgentIcon";
 import { useV3 } from "../../live";
 import { ChipRow, groupHits, hitHref, markedTerms, SessionHitRow, typedChips, useTitleOf, useTranscriptSearch, withoutChips } from "./search";
 import { UsageMini } from "../../components/Usage";
+import { PeerThreads } from "../peers";
 import { FoldHead, useFold } from "../../components/fold";
 
 const HOUR = 3600_000;
@@ -377,6 +378,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
           </div>
         )}
       </div>
+      <PeerThreads />
       <UsageMini />
       {menu && <RowMenu r={rows.find((x) => x.id === menu.r.id) || menu.r} x={menu.x} y={menu.y} onClose={closeMenu} />}
     </aside>
