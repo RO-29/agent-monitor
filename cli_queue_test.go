@@ -729,3 +729,14 @@ func TestCLIQueueViewEmptyItemsIsList(t *testing.T) {
 		t.Fatalf("items not a list: %s", b)
 	}
 }
+
+// A "!" typed in bash mode is draft text, not a second prompt sign: Clear must see and erase it.
+func TestDraftOfKeepsTypedBang(t *testing.T) {
+	rule := strings.Repeat("─", 40)
+	if d := draftOf("x\n" + rule + "\n! !\n" + rule + "\n  ! for shell mode"); d != "!!" {
+		t.Fatalf("draft %q, want !!", d)
+	}
+	if d := draftOf("x\n" + rule + "\n❯ !ls\n" + rule); d != "!ls" {
+		t.Fatalf("draft %q, want !ls", d)
+	}
+}

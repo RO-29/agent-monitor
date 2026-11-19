@@ -327,6 +327,16 @@ func hostCallWithin(h *HostInfo, req hostRequest, dial, total time.Duration) (ho
 
 func hostSendText(h *HostInfo, text string, enter bool) error {
 	paste := asPaste(text)
+	if paste && h.Agent == "claude" {
+		paste = false
+		err := typeAsKeys(text, func(t string) error { _, err := hostCall(h, hostRequest{Op: "input", Data: t}); return err },
+			func(k []string) error { return hostSendKeys(h, k) })
+		if err != nil {
+			return err
+		}
+		text = ""
+		time.Sleep(hostEnterDelay)
+	}
 	if paste {
 		text = "\x1b[200~" + text + "\x1b[201~" // one bracketed paste, as a terminal sends it
 	}
@@ -425,6 +435,12 @@ func targetCapture(target string, lines int, plain bool) (string, error) {
 	if h, isHost, err := targetHost(target); isHost {
 		if err != nil {
 			return "", err
+		}
+		// The helper's screen copy handles a subset of escapes and can lose rows; tmux, when the host runs in it, does not.
+		if h.TmuxPane != "" {
+			if s, err := tmuxCaptureFn(h.TmuxPane, lines, plain); err == nil && strings.TrimSpace(s) != "" {
+				return s, nil
+			}
 		}
 		return hostScreen(h, lines)
 	}
@@ -628,12 +644,19 @@ func typeFirstPrompt(h *HostInfo, prompt string) (bool, error) {
 			return false, nil
 		}
 	}
-	data := prompt
-	if asPaste(prompt) {
-		data = "\x1b[200~" + prompt + "\x1b[201~"
-	}
-	if _, err := hostCall(h, hostRequest{Op: "input", Data: data}); err != nil {
-		return false, err
+	if asPaste(prompt) && h.Agent == "claude" {
+		if err := typeAsKeys(prompt, func(t string) error { _, err := hostCall(h, hostRequest{Op: "input", Data: t}); return err },
+			func(k []string) error { return hostSendKeys(h, k) }); err != nil {
+			return false, err
+		}
+	} else {
+		data := prompt
+		if asPaste(prompt) {
+			data = "\x1b[200~" + prompt + "\x1b[201~"
+		}
+		if _, err := hostCall(h, hostRequest{Op: "input", Data: data}); err != nil {
+			return false, err
+		}
 	}
 	if h.Agent == "claude" {
 		landed := false

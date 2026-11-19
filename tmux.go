@@ -109,11 +109,65 @@ func asPaste(text string) bool {
 
 var pasteSettle = 300 * time.Millisecond
 
+// Claude Code marks a paste as pasted content, which the model trusts less than typed text; so it gets typed parts.
+var (
+	typeChunk = 120
+	typePause = 25 * time.Millisecond
+)
+
+// typeAsKeys types text in short parts; each line break is "\" then Enter, Claude Code's newline in every terminal.
+func typeAsKeys(text string, sendText func(string) error, sendKeys func([]string) error) error {
+	for i, line := range strings.Split(text, "\n") {
+		if i > 0 {
+			if err := sendText("\\"); err != nil {
+				return err
+			}
+			time.Sleep(typePause)
+			if err := sendKeys([]string{"Enter"}); err != nil {
+				return err
+			}
+			time.Sleep(typePause)
+		}
+		r := []rune(line)
+		for len(r) > 0 {
+			n := min(len(r), typeChunk)
+			if err := sendText(string(r[:n])); err != nil {
+				return err
+			}
+			r = r[n:]
+			time.Sleep(typePause)
+		}
+	}
+	return nil
+}
+
+// paneIsClaude tells whether a registered Claude Code session runs in the tmux pane.
+func paneIsClaude(paneID string) bool {
+	if paneRegistry == nil {
+		return false
+	}
+	for _, p := range paneRegistry.List() {
+		if p.PaneID == paneID && p.Tool == ToolClaude {
+			return true
+		}
+	}
+	return false
+}
+
 func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 	if paneID == "" {
 		return errors.New("paneID required")
 	}
 	paste := asPaste(text)
+	if paste && paneIsClaude(paneID) {
+		paste = false
+		err := typeAsKeys(text, func(t string) error { return exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", t).Run() },
+			func(k []string) error { return SendKeysToTmuxPane(paneID, k) })
+		if err != nil {
+			return err
+		}
+		text = ""
+	}
 	if paste {
 		// One bracketed paste: typed fast as keys, a long or multi-line text loses its start in Claude Code.
 		buf := "am-paste-" + strings.TrimPrefix(paneID, "%")

@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -223,12 +225,12 @@ func TestEndSessionExitsTheAgent(t *testing.T) {
 	}
 }
 
-// A long or multi-line text reaches the host as one bracketed paste; a short line stays plain keys.
-func TestHostSendTextPastesLongText(t *testing.T) {
+// Claude Code gets a multi-line text typed, with "\" Enter per line break: a paste would reach the model as pasted content.
+func TestHostSendTextTypesLinesForClaude(t *testing.T) {
 	withBoxRegistry(t)
-	prev := pasteSettle
-	pasteSettle = time.Millisecond
-	t.Cleanup(func() { pasteSettle = prev })
+	prev, prevPause := pasteSettle, typePause
+	pasteSettle, typePause = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { pasteSettle, typePause = prev, prevPause })
 	b := &boxHost{drawn: true}
 	h := serveBoxHost(t, b, os.Getpid(), "")
 	long := "look at these\n\n- /a.png\n- /b.png"
@@ -239,7 +241,28 @@ func TestHostSendTextPastesLongText(t *testing.T) {
 		t.Fatal(err)
 	}
 	in, keys := b.got()
-	if len(in) != 2 || in[0] != "\x1b[200~"+long+"\x1b[201~" || in[1] != "short" || len(keys) != 1 || keys[0] != "Enter" {
+	want := []string{"look at these", "\\", "\\", "- /a.png", "\\", "- /b.png", "short"}
+	if !slices.Equal(in, want) || len(keys) != 4 {
 		t.Fatalf("inputs %q keys %v", in, keys)
+	}
+}
+
+// A host in a tmux pane is read through tmux, which renders every escape; the helper's copy is the fallback.
+func TestTargetCapturePrefersTmuxForHost(t *testing.T) {
+	withBoxRegistry(t)
+	b := &boxHost{drawn: true}
+	h := serveBoxHost(t, b, os.Getpid(), "")
+	if _, err := hostRegistry.Register(hostRegistration{HostID: h.HostID, Pid: os.Getpid(), AgentPid: os.Getpid(), Agent: "claude", Cwd: "/tmp", Socket: h.Socket, TmuxPane: "%77"}); err != nil {
+		t.Fatal(err)
+	}
+	prev := tmuxCaptureFn
+	t.Cleanup(func() { tmuxCaptureFn = prev })
+	tmuxCaptureFn = func(p string, _ int, _ bool) (string, error) { return "from tmux " + p, nil }
+	if s, _ := targetCapture(hostTargetPrefix+h.HostID, 40, true); s != "from tmux %77" {
+		t.Fatalf("got %q", s)
+	}
+	tmuxCaptureFn = func(string, int, bool) (string, error) { return "", errors.New("no pane") }
+	if s, _ := targetCapture(hostTargetPrefix+h.HostID, 40, true); !strings.Contains(s, "Claude Code") {
+		t.Fatalf("fallback got %q", s)
 	}
 }

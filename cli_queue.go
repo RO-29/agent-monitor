@@ -80,7 +80,14 @@ func draftOf(screen string) string {
 	}
 	first := strings.TrimSpace(lines[0])
 	bash := strings.HasPrefix(first, "!")
-	lines[0] = strings.TrimLeft(first, "❯>!› ")
+	// Only the one prompt sign goes: in bash mode a typed "!" follows the "!" prompt.
+	for _, p := range []string{"❯", "›", ">", "!"} {
+		if r, ok := strings.CutPrefix(first, p); ok {
+			first = r
+			break
+		}
+	}
+	lines[0] = strings.TrimSpace(first)
 	for i := range lines {
 		lines[i] = strings.TrimSpace(lines[i])
 	}
@@ -910,6 +917,8 @@ func cliEnterBash(target string) error {
 			}
 		}
 	}
+	// Erase each "!" typed above, so nothing is left in the box.
+	_ = cliIO.keys(target, []string{"BSpace", "BSpace"})
 	return orchConflict("Claude Code did not switch to bash mode; the command was not sent")
 }
 
