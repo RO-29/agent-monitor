@@ -222,3 +222,24 @@ func TestEndSessionExitsTheAgent(t *testing.T) {
 		t.Fatalf("state %s, want completed", st)
 	}
 }
+
+// A long or multi-line text reaches the host as one bracketed paste; a short line stays plain keys.
+func TestHostSendTextPastesLongText(t *testing.T) {
+	withBoxRegistry(t)
+	prev := pasteSettle
+	pasteSettle = time.Millisecond
+	t.Cleanup(func() { pasteSettle = prev })
+	b := &boxHost{drawn: true}
+	h := serveBoxHost(t, b, os.Getpid(), "")
+	long := "look at these\n\n- /a.png\n- /b.png"
+	if err := hostSendText(h, long, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := hostSendText(h, "short", false); err != nil {
+		t.Fatal(err)
+	}
+	in, keys := b.got()
+	if len(in) != 2 || in[0] != "\x1b[200~"+long+"\x1b[201~" || in[1] != "short" || len(keys) != 1 || keys[0] != "Enter" {
+		t.Fatalf("inputs %q keys %v", in, keys)
+	}
+}

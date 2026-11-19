@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // TmuxPane is a snapshot of one tmux pane.
@@ -101,19 +102,40 @@ func isDescendant(tree map[int][]int, root, target int) bool {
 }
 
 // SendToTmuxPane types text literally (-l) and sends Enter as a separate command.
+// asPaste: text with a line break or over 300 characters goes as one bracketed paste.
+func asPaste(text string) bool {
+	return strings.Contains(text, "\n") || utf8.RuneCountInString(text) > 300
+}
+
+var pasteSettle = 300 * time.Millisecond
+
 func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 	if paneID == "" {
 		return errors.New("paneID required")
 	}
-	if text != "" {
+	paste := asPaste(text)
+	if paste {
+		// One bracketed paste: typed fast as keys, a long or multi-line text loses its start in Claude Code.
+		buf := "am-paste-" + strings.TrimPrefix(paneID, "%")
+		load := exec.Command("tmux", "load-buffer", "-b", buf, "-")
+		load.Stdin = strings.NewReader(text)
+		if err := load.Run(); err != nil {
+			return err
+		}
+		if err := exec.Command("tmux", "paste-buffer", "-p", "-d", "-b", buf, "-t", paneID).Run(); err != nil {
+			return err
+		}
+	} else if text != "" {
 		if err := exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", text).Run(); err != nil {
 			return err
 		}
 	}
 	if sendEnter {
-		// Tiny delay so the literal text is registered before Enter — some
-		// tmux versions race when commands fire back-to-back.
+		// The text must be registered before Enter; a paste needs longer.
 		time.Sleep(20 * time.Millisecond)
+		if paste {
+			time.Sleep(pasteSettle)
+		}
 		if err := exec.Command("tmux", "send-keys", "-t", paneID, "Enter").Run(); err != nil {
 			return err
 		}

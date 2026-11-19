@@ -99,6 +99,11 @@ def agent():
         if not sid:
             return
         aid = "claude:" + sid
+        long = "\n".join(["LONG-START count the file lines below and reply with the number only.", ""] +
+                          [f"- /tmp/smoke/file-{i:02d}.png (image/png, {300 + i} KB)" for i in range(12)] + ["LONG-END"])
+        c, _, _ = call("POST", f"/api/session/{aid}/cli-queue/send", {"text": long})
+        check("long multi-line message sent", c == 200)
+        check("long message arrives whole", wait_for(tmux, "12", 60), screen(tmux)[-300:])
         time.sleep(2)
         c, _, b = call("POST", f"/api/session/end/{aid}")
         check("end session", c == 200 and js(b).get("ended") is True, b[:160])

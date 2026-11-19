@@ -326,6 +326,10 @@ func hostCallWithin(h *HostInfo, req hostRequest, dial, total time.Duration) (ho
 }
 
 func hostSendText(h *HostInfo, text string, enter bool) error {
+	paste := asPaste(text)
+	if paste {
+		text = "\x1b[200~" + text + "\x1b[201~" // one bracketed paste, as a terminal sends it
+	}
 	if text != "" {
 		if _, err := hostCall(h, hostRequest{Op: "input", Data: text}); err != nil {
 			return err
@@ -334,6 +338,9 @@ func hostSendText(h *HostInfo, text string, enter bool) error {
 	if enter {
 		if text != "" {
 			time.Sleep(hostEnterDelay)
+		}
+		if paste {
+			time.Sleep(pasteSettle)
 		}
 		_, err := hostCall(h, hostRequest{Op: "keys", Keys: []string{"Enter"}})
 		return err
@@ -621,7 +628,11 @@ func typeFirstPrompt(h *HostInfo, prompt string) (bool, error) {
 			return false, nil
 		}
 	}
-	if _, err := hostCall(h, hostRequest{Op: "input", Data: prompt}); err != nil {
+	data := prompt
+	if asPaste(prompt) {
+		data = "\x1b[200~" + prompt + "\x1b[201~"
+	}
+	if _, err := hostCall(h, hostRequest{Op: "input", Data: data}); err != nil {
 		return false, err
 	}
 	if h.Agent == "claude" {
