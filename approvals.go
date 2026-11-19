@@ -764,8 +764,8 @@ func (s *ApprovalStore) upsertRule(r Rule) (Rule, error) {
 	default:
 		return r, fmt.Errorf("action must be allow, deny or hold")
 	}
-	if r.Agent != "" && r.Agent != "claude" && r.Agent != "codex" {
-		return r, fmt.Errorf("agent must be claude or codex")
+	if r.Agent != "" && !isRegistryID(r.Agent) && r.Agent != "cursor" {
+		return r, fmt.Errorf("unknown agent %q", r.Agent)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
