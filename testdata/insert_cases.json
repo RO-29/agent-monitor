@@ -1,0 +1,15 @@
+[
+  {"name": "one-line bash in bash mode", "raw": "ls -la", "lang": "bash", "bash": true, "cur": "", "want": "!ls -la"},
+  {"name": "no bash mode keeps the text", "raw": "ls -la", "lang": "bash", "bash": false, "cur": "", "want": "ls -la"},
+  {"name": "unlabeled ! line is shell", "raw": "! bash ~/agent-monitor/ios/resign.sh --force", "lang": "", "bash": true, "cur": "", "want": "!bash ~/agent-monitor/ios/resign.sh --force"},
+  {"name": "unlabeled $ line is shell", "raw": "$ go test ./...", "lang": "", "bash": true, "cur": "", "want": "!go test ./..."},
+  {"name": "console transcript keeps the command", "raw": "$ ls\na.txt\nb.txt", "lang": "console", "bash": true, "cur": "", "want": "!ls"},
+  {"name": "backslash continuation joins", "raw": "go build \\\n  -o am .", "lang": "sh", "bash": true, "cur": "", "want": "!go build -o am ."},
+  {"name": "here-document stays as it is", "raw": "cat > f <<EOF\nrm -rf build\nEOF", "lang": "bash", "bash": true, "cur": "", "want": "cat > f <<EOF\nrm -rf build\nEOF"},
+  {"name": "loop stays as it is", "raw": "for f in *.go; do\n  gofmt -l $f\ndone", "lang": "bash", "bash": true, "cur": "", "want": "for f in *.go; do\n  gofmt -l $f\ndone"},
+  {"name": "non-shell code unchanged", "raw": "$ not a prompt in go\nfmt.Println(1)", "lang": "go", "bash": true, "cur": "", "want": "$ not a prompt in go\nfmt.Println(1)"},
+  {"name": "plain text block", "raw": "  some notes  ", "lang": "", "bash": true, "cur": "", "want": "some notes"},
+  {"name": "draft gets the command as text", "raw": "make test", "lang": "sh", "bash": true, "cur": "please run this:  ", "want": "please run this:\nmake test"},
+  {"name": "bash draft keeps the !", "raw": "make test", "lang": "sh", "bash": true, "cur": "!cd web", "want": "!cd web\n!make test"},
+  {"name": "code appended to a draft", "raw": "x := 1", "lang": "go", "bash": false, "cur": "look at", "want": "look at\nx := 1"}
+]

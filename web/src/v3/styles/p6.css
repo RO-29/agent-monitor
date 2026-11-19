@@ -1,0 +1,134 @@
+/* Phase 6: notifications, settings tabs, spend bars, driven tags, close confirm and the spend-limit composer. */
+
+/* rail and tab badges for unread notifications */
+.v3 .drail .rb em.un{background:var(--accent);color:#fff}
+.v3 .tabbar .bd.un{background:var(--accent);color:#fff}
+
+/* driven tag next to an agent badge */
+.v3 .drv{margin-right:6px;display:inline-flex;align-items:center;font:600 9.5px var(--f-ui);letter-spacing:.05em;text-transform:uppercase;border-radius:4px;padding:1px 5px;background:var(--accent-soft);color:var(--accent);flex:none;line-height:14px;vertical-align:middle}
+
+/* settings tabs and fields */
+.v3 .sx-tabs{display:flex;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.v3 .sx-tabs a{padding:7px 12px;font-size:13px;color:var(--fg-2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.v3 .sx-tabs a:hover{color:var(--fg)}
+.v3 .sx-tabs a.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+.v3 .sx .ibox .sx-switch{align-items:flex-start;margin:0;padding:9px 0;border-top:1px solid var(--line);font-weight:500}
+.v3 .sx .ibox h3 + .sx-switch,.v3 .sx .ibox p + .sx-switch{border-top:0;padding-top:2px}
+.v3 .sx-switch .sx-track{margin-top:1px}
+.v3 .sx-sw-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.v3 .sx-sw-t small{font-weight:400;font-size:12px;color:var(--muted)}
+.v3 .sx-warn{background:var(--need-soft);color:var(--fg);border:1px solid color-mix(in srgb,var(--need) 35%,var(--line));border-radius:10px;padding:9px 12px;font-size:12.5px}
+.v3 .sx-times{margin:2px 0 10px 46px;gap:14px}
+.v3 .sx-times label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg-2)}
+.v3 .sx-times .inp{padding:5px 8px;font-size:13px;background:var(--panel-2);color:var(--fg)}
+.v3 .sx-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.v3 .sx-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.v3 .sx-field label{font-size:12.5px;font-weight:600}
+.v3 .sx-field small{color:var(--muted);font-size:12px}
+.v3 .sx-usd{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);max-width:180px}
+.v3 .sx-usd span{padding:0 0 0 10px;color:var(--muted);font:500 13px var(--f-mono)}
+.v3 .sx-usd .inp{border:0;background:none;padding:7px 10px 7px 4px;font-size:14px;width:100%;min-width:0;color:var(--fg)}
+.v3 .sx-usd:focus-within{box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}
+.v3 .sx-rates{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+.v3 .sx-rate{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 32px;gap:8px;align-items:center}
+.v3 .sx-rate.h span{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.v3 .sx-rate .inp{padding:6px 8px;font-size:12.5px;background:var(--panel-2);color:var(--fg);min-width:0}
+.v3 .sx-save{padding:2px 0 4px;margin-top:0}
+.v3 .sx-copy-r .inp{flex:1;min-width:0;padding:7px 10px;font-size:12.5px;background:var(--panel-2);color:var(--fg)}
+
+/* spend bar */
+.v3 .spb{display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.v3 .spb + .spb{margin-top:10px}
+.v3 .spb-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.v3 .spb-h > span:first-child{color:var(--fg-2)}
+.v3 .spb-t{position:relative;height:6px;border-radius:999px;background:var(--panel-3);overflow:hidden}
+.v3 .spb-t i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--ok)}
+.v3 .spb-t b{position:absolute;top:0;bottom:0;width:1px;background:var(--line-2)}
+.v3 .spb.warn .spb-t i{background:var(--need)}
+.v3 .spb.over .spb-t i{background:var(--err)}
+.v3 .spb.over .spb-h .mono{color:var(--err)}
+.v3 .spb-n{font-size:11.5px;color:var(--muted)}
+.v3 .spb-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* /notifications */
+.v3 .nt .viewhead{max-width:760px}
+.v3 .nt-f{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.v3 .nt-f button{border:1px solid var(--line);background:var(--panel);color:var(--fg-2);border-radius:999px;padding:4px 11px;font:500 12.5px var(--f-ui);display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.v3 .nt-f button.on{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+.v3 .nt-f button b{font-size:11px;background:var(--accent);color:#fff;border-radius:999px;padding:0 6px;line-height:16px}
+.v3 .nt-g{max-width:760px;margin-bottom:18px}
+.v3 .nt-g h3{font:600 11px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.v3 .nt-g ul{list-style:none;margin:0;padding:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.v3 .nt-i + .nt-i{border-top:1px solid var(--line)}
+.v3 .nt-b{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;padding:12px 14px;color:inherit;font:inherit;cursor:pointer}
+.v3 .nt-b:hover{background:var(--panel-2)}
+.v3 .nt-b:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.v3 .nt-ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font:700 12px var(--f-ui);flex:none;margin-top:1px;background:var(--panel-3);color:var(--fg-2)}
+.v3 .nt-i.k-needs-you .nt-ic{background:var(--need-soft);color:var(--need)}
+.v3 .nt-i.k-finished .nt-ic{background:var(--ok-soft);color:var(--ok)}
+.v3 .nt-i.k-error .nt-ic{background:var(--err-soft);color:var(--err)}
+.v3 .nt-i.k-spend .nt-ic{background:var(--accent-soft);color:var(--accent)}
+.v3 .nt-m{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.v3 .nt-t{display:flex;gap:8px;align-items:center;min-width:0;flex-wrap:wrap}
+.v3 .nt-t b{font-weight:500;font-size:13.5px;color:var(--fg-2)}
+.v3 .nt-i.unread .nt-t b{font-weight:600;color:var(--fg)}
+.v3 .nt-i.resolved .nt-ic{background:var(--ok-soft);color:var(--ok)}
+.v3 .nt-body{color:var(--fg-2);font-size:12.5px;overflow-wrap:anywhere}
+.v3 .nt-meta{display:flex;gap:10px;font-size:11.5px;color:var(--muted);min-width:0}
+.v3 .nt-dot{width:6px;height:6px;border-radius:50%;background:var(--need);flex:none;margin-top:8px}
+/* Notifications and Settings: one centred column at wide widths */
+.v3 .view.pad.nt,.v3 .view.pad.sx:not(.wsform){padding-inline:max(24px,calc((100% - 860px) / 2))}
+.v3 .nt .viewhead,.v3 .nt-g,.v3 .sx:not(.wsform) .sx-col{max-width:none}
+@media (max-width:760px){.v3 .view.pad.nt,.v3 .view.pad.sx:not(.wsform){padding-inline:12px}}
+
+/* workspace: close confirm, spend-limit composer, removed worktree */
+.v3 .ws .wconfirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--err-soft);border-bottom:1px solid color-mix(in srgb,var(--err) 30%,var(--line));padding:8px 16px;font-size:12.5px}
+.v3 .ws .wconfirm > span{flex:1 1 240px;min-width:0}
+.v3 .ws .wblock{border:1px solid color-mix(in srgb,var(--err) 40%,var(--line));background:linear-gradient(var(--err-soft),var(--err-soft)),var(--panel);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.v3 .ws .wblock .x{display:flex;flex-direction:column;gap:2px;font-size:12.5px;min-width:0}
+.v3 .ws .wblock .x b{font-size:13px}
+.v3 .ws .wblock .x span{color:var(--fg-2)}
+.v3 .ws .wblock .a{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.v3 .ws .wmoved{border:1px solid var(--line);background:var(--panel-2);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px}
+.v3 .ws .wmoved > span{flex:1 1 220px;color:var(--fg-2)}
+.v3 .wask .btns .btn.cr{border-style:dashed}
+.v3 .ws .wnewerr{border:1px solid color-mix(in srgb,var(--err) 40%,var(--line));background:var(--err-soft);border-radius:10px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
+.v3 .ws .wnewerr b{color:var(--err)}
+
+/* inbox and control: a driven row's detail */
+.v3 .drvd{display:flex;flex-direction:column;gap:12px;padding:18px 22px;overflow:auto;min-height:0}
+.v3 .drvd .dhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.v3 .drvd .dhead h3{margin:0;font-size:16px;font-weight:600;min-width:0}
+.v3 .drvd .out{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.v3 .drvd .kvs{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--fg-2)}
+.v3 .drvd .kvs b{color:var(--fg);font-weight:600}
+.v3 .drvd .reply{display:flex;gap:8px}
+.v3 .drvd .reply textarea{flex:1;min-width:0;resize:vertical;border:1px solid var(--line-2);border-radius:9px;background:var(--panel);color:var(--fg);padding:8px 10px;font:13px var(--f-ui)}
+.v3 .drvd .blk{border:1px solid color-mix(in srgb,var(--err) 40%,var(--line));background:var(--err-soft);border-radius:10px;padding:9px 11px;font-size:12.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.v3 .drvd .blk > span{flex:1 1 200px}
+@media (max-width:640px){
+  .v3 .sx-times{margin-left:0}
+  .v3 .sx-rate{grid-template-columns:minmax(0,1fr) 64px 64px 28px;gap:6px}
+  .v3 .drvd{padding:12px}
+}
+.v3 .ws .wgit-a{display:flex;gap:6px;margin-top:8px}
+.v3 .msgv .mblock{display:flex;align-items:center;gap:10px;background:var(--err-soft);font-size:13px}
+.v3 .drv:last-child{margin-right:0}
+
+/* Mac app (data-shell=mac): its toolbar segments replace the rail's place links and the phone tab bar */
+:root[data-shell="mac"] .v3 .tabbar{display:none}
+:root[data-shell="mac"] .v3 .main{padding-bottom:0}
+/* Mac app: View > Appearance and the Go menu replace the rail entirely */
+@media (min-width:761px){
+  :root[data-shell="mac"] .v3 .shell.desk{grid-template-columns:minmax(0,1fr)}
+  :root[data-shell="mac"] .v3 .shell.desk > .drail{display:none}
+}
+
+/* foldable sections (components/fold.tsx) */
+.v3 .fold-h{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-align:left;min-width:0}
+.v3 .fold-h:hover{color:var(--fg)}
+.v3 .fold-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.v3 .fold-i{display:inline-block;width:10px;font-size:14px;line-height:1;color:var(--muted);transition:transform .12s}
+.v3 .fold-i.open{transform:rotate(90deg)}
+.v3 .ws .wbox.fold-c h4{margin-bottom:0}
+.v3 .fold-s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}

@@ -1,0 +1,73 @@
+/* Plan usage meters: thread list footer and Settings, Limits. */
+.v3 .umt{display:flex;flex-direction:column;gap:4px;font-size:12.5px;min-width:0}
+.v3 .umt-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.v3 .umt-h > span:first-child{color:var(--fg-2)}
+.v3 .umt-t{position:relative;height:6px;border-radius:999px;background:var(--panel-3);overflow:hidden}
+.v3 .umt-t i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--ok)}
+.v3 .umt.warn .umt-t i{background:var(--need)}
+.v3 .umt.over .umt-t i{background:var(--err)}
+.v3 .umt.over .umt-h .mono{color:var(--err)}
+.v3 .umt-r{font-size:11.5px;color:var(--muted)}
+.v3 .umt.c{gap:3px;font-size:11.5px}
+.v3 .umt.c .umt-t{height:4px}
+.v3 .umt.c .umt-r{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.v3 .umini{display:flex;flex-direction:column;gap:8px;padding:8px 12px 10px;border-top:1px solid var(--line);background:var(--panel-2)}
+.v3 .umini.fold-c{padding-bottom:8px}
+.v3 .umini-top{display:flex;align-items:center;gap:8px;min-width:0}
+.v3 .umini-hd{font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:var(--muted);flex:none}
+.v3 .umini-sum{flex:1;min-width:0;font-size:11.5px;color:var(--fg-2)}
+.v3 .umini-lk{margin-left:auto;font-size:11.5px;color:var(--muted);flex:none}
+.v3 .umini-lk:hover{color:var(--accent)}
+.v3 .umini-a{display:flex;flex-direction:column;gap:4px}
+.v3 .umini-n{font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:var(--muted)}
+.v3 .umini-n.claude{color:var(--claude)}
+.v3 .umini-n.codex{color:var(--codex)}
+.v3 .umini-m{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.v3 .ucard h3{display:flex;align-items:center;gap:8px}
+.v3 .ucard-w{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:4px 0 8px}
+.v3 .ucard-wi{display:flex;flex-direction:column;gap:8px;min-width:0}
+.v3 .uhist{display:flex;flex-direction:column;gap:2px}
+.v3 .uhist svg{display:block}
+.v3 .uhist-l{stroke:var(--accent)}
+.v3 .uhist-g{stroke:var(--line-2);stroke-dasharray:3 3;stroke-width:1}
+.v3 .uhist-x{display:flex;justify-content:space-between;font-size:10.5px}
+.v3 .usrc{font-size:11.5px;margin:6px 0 0;overflow-wrap:anywhere}
+.v3 .uloc-h{margin:14px 0 4px;font-size:12.5px;font-weight:600}
+.v3 .ulocs{display:flex;flex-direction:column}
+.v3 .uloc{display:grid;grid-template-columns:minmax(0,2fr) repeat(5,minmax(0,1fr));gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px;align-items:baseline}
+.v3 .uloc small{display:block;font-size:11px}
+.v3 .uloc > span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.v3 .umt.stale .umt-t{opacity:.45}
+.v3 .umt.stale .umt-h .mono{color:var(--muted)}
+.v3 .umt.stale .umt-r{color:var(--need)}
+@media (max-width:640px){
+  .v3 .uloc{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .v3 .uloc > span:first-child{grid-column:1/-1}
+  .v3 .uloc > span:not(:first-child){text-align:left}
+}
+.v3 .usx{margin-bottom:22px}
+.v3 .usx-h{margin:0 0 10px;font-size:14px;font-weight:600}
+.v3 .umini-a.umini-lo{display:block;font-size:11.5px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v3 .umini-lo b{font-weight:500}
+.v3 .umini-lk.umini-lk2{margin-left:0}
+.v3 .umini-more{margin-left:auto;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:0 6px}
+.v3 .umod-hd{display:flex;align-items:center;gap:10px;margin:14px 0 4px}
+.v3 .umod-hd .uloc-h{margin:0;flex:1}
+.v3 .umods{display:flex;flex-direction:column}
+.v3 .umod{display:grid;grid-template-columns:minmax(0,2.2fr) repeat(6,minmax(0,1fr));gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px;align-items:baseline}
+.v3 .umod > span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.v3 .umod-th{font-size:11.5px;color:var(--muted);border-top:0;padding-top:2px}
+.v3 .umod-m{display:flex;gap:6px;align-items:baseline;min-width:0}
+.v3 .umod-m b{font-weight:600;flex:none}
+.v3 .umod-sum{font-weight:600}
+.v3 .umod-none{padding:8px 0;border-top:1px solid var(--line)}
+.v3 .ucard.uoff h3{margin:0}
+.v3 .ucard.uoff{opacity:.8}
+@media (max-width:640px){
+  .v3 .umod{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .v3 .umod > span:first-child{grid-column:1/-1}
+  .v3 .umod > span:not(:first-child){text-align:left}
+  .v3 .umod-th{display:none}
+}

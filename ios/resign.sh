@@ -1,0 +1,81 @@
+#!/bin/bash
+# Builds AgentMonitor for iOS, signs it with the Xcode account's team, and installs it on the paired iPhone.
+# Usage: ios/resign.sh [--force]. Skips when this build was installed under 20 h ago, so it is safe to run often.
+# With no reachable iPhone and AM_IOS_OTA=1 (a paid team) it publishes the build over Tailscale and pushes the link.
+set -euo pipefail
+
+# Machine-specific settings (AM_DEFAULT_SERVER, AM_IOS_TEAM) live outside the repository.
+[[ -f "$HOME/.config/agent-monitor/build.env" ]] && source "$HOME/.config/agent-monitor/build.env"
+REPO="${AM_REPO:-$HOME/agent-monitor}"
+TEAM="${AM_IOS_TEAM:-QV5FFU8R79}"
+DEVICE="${AM_IOS_DEVICE:-}"
+STATE="$HOME/.agent-monitor/ios-resign"
+OUT="$STATE/build"
+STAMP="$STATE/last-install"
+MIN_AGE=$((20 * 3600))
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:$PATH" # /usr/local/bin: the tailscale CLI
+mkdir -p "$STATE"
+log() { echo "$(date '+%F %T') $*"; }
+
+HEAD=$(git -C "$REPO" rev-parse --short HEAD)
+# Skip a recent install of this same build; a new commit installs at once.
+if [[ "${1:-}" != "--force" && -f "$STAMP" ]]; then
+  age=$(( $(date +%s) - $(stat -f %m "$STAMP") ))
+  if (( age < MIN_AGE )) && [[ "$(cat "$STAMP")" == "$HEAD" ]]; then log "skip: $HEAD installed $((age / 3600)) h ago"; exit 0; fi
+fi
+
+# Away from the Mac's Wi-Fi: publish the build for an install over Tailscale and push its link, once per build
+# and again after 4 days (the free profile lasts 7). Installing still needs one tap on the iPhone.
+ota_fallback() {
+  local stamp="$STATE/last-ota" age=999999
+  [[ -f "$stamp" ]] && age=$(( $(date +%s) - $(stat -f %m "$stamp") ))
+  if [[ "$(cat "$stamp" 2>/dev/null)" == "$HEAD" ]] && (( age < 4 * 86400 )); then log "skip: $HEAD already offered over Tailscale"; return 0; fi
+  local link
+  link=$(bash "$REPO/ios/ota.sh" | tee /dev/stderr | sed -n 's/^Open on the iPhone (Tailscale on): //p')
+  [[ -n "$link" ]] || { log "ota.sh printed no link"; return 1; }
+  curl -sf -X POST -H 'Content-Type: application/json' "http://127.0.0.1:${AGENT_MONITOR_PORT:-7777}/api/notify/install" \
+    -d "{\"build\":\"$HEAD\",\"url\":\"$link\"}" >/dev/null || { log "could not send the install notification"; return 1; }
+  echo "$HEAD" > "$stamp"
+  log "offered $HEAD over Tailscale"
+}
+
+# Pick the named device, else the first connected iPhone that is reachable now.
+json="$STATE/devices.json"
+xcrun devicectl list devices --json-output "$json" >/dev/null 2>&1 || { log "devicectl failed"; exit 1; }
+DEVICE=$(/usr/bin/python3 - "$json" "$DEVICE" <<'PY'
+import json, sys
+want = sys.argv[2]
+devs = json.load(open(sys.argv[1])).get("result", {}).get("devices", [])
+def ok(d):
+    cp = d.get("connectionProperties", {})
+    return cp.get("tunnelState") in ("connected", "disconnected") and cp.get("pairingState") == "paired" and d.get("hardwareProperties", {}).get("platform") == "iOS"
+for d in devs:
+    ident, name = d.get("identifier", ""), d.get("deviceProperties", {}).get("name", "")
+    if want and want not in (ident, name):
+        continue
+    if ok(d) and d.get("connectionProperties", {}).get("transportType") in ("wired", "localNetwork"):
+        print(ident, d.get("hardwareProperties", {}).get("udid", "")); break
+PY
+)
+read -r DEVICE UDID <<<"$DEVICE"
+if [[ -z "$DEVICE" ]]; then
+  log "no reachable paired iPhone (same Wi-Fi or USB needed)"
+  # iOS downloads but does not install a free-team build over the internet; set AM_IOS_OTA=1 with a paid team.
+  [[ "${AM_IOS_OTA:-0}" == "1" ]] && ota_fallback
+  exit 0
+fi
+# A free team signs only for registered devices, so build for this phone and let Xcode register it.
+DEST='generic/platform=iOS'
+[[ -n "${UDID:-}" ]] && DEST="platform=iOS,id=$UDID"
+
+log "build $HEAD for team $TEAM"
+xcodebuild -project "$REPO/ios/AgentMonitor.xcodeproj" -scheme AgentMonitor -configuration Release \
+  -destination "$DEST" -derivedDataPath "$OUT" -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+  DEVELOPMENT_TEAM="$TEAM" AM_DEFAULT_SERVER="${AM_DEFAULT_SERVER:-}" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$(git -C "$REPO" rev-list --count HEAD)" MARKETING_VERSION="1.0.$(git -C "$REPO" rev-list --count HEAD)" build -quiet
+APP="$OUT/Build/Products/Release-iphoneos/AgentMonitor.app"
+[[ -d "$APP" ]] || { log "no app at $APP"; exit 1; }
+
+log "install on $DEVICE"
+xcrun devicectl device install app --device "$DEVICE" "$APP"
+echo "$HEAD" > "$STAMP"
+log "done; profile expires $(security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | /usr/bin/plutil -extract ExpirationDate raw -o - - 2>/dev/null || echo unknown)"

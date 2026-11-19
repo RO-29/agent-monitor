@@ -1,0 +1,55 @@
+/* Settings pages (Devices) and the /pair page. */
+.v3 .sx-col{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:760px}
+.v3 .sx .ibox h3{justify-content:flex-start}
+.v3 .sx .ibox h3 .muted{font-weight:400;margin-left:auto}
+.v3 .sx-p{margin:0 0 10px;color:var(--fg-2);font-size:12.5px;max-width:68ch}
+.v3 .sx-note{display:block;margin:6px 0 0;color:var(--muted);font-size:12px}
+.v3 .sx-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.v3 .sx-row.end{justify-content:flex-end;margin-top:12px}
+.v3 .sx-grow{flex:1 1 220px;padding:7px 10px;font-size:13px}
+
+.v3 .sx-copy{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.v3 .sx-copy-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.v3 .sx-copy-r{display:flex;gap:8px;min-width:0}
+.v3 .sx-copy-r .inp{flex:1;min-width:0;padding:7px 10px;font-size:12.5px;background:var(--panel-2);color:var(--fg)}
+.v3 .sx-made{border-color:var(--need);box-shadow:0 0 0 3px var(--need-soft)}
+.v3 .sx-made h3{flex-wrap:wrap}
+
+.v3 .sx-devs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.v3 .sx-dev{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.v3 .sx-dev:first-child{border-top:0;padding-top:2px}
+.v3 .sx-dev.off .sx-dev-n b{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line-2)}
+.v3 .sx-dev-m{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.v3 .sx-dev-n{display:flex;align-items:center;gap:8px;min-width:0}
+.v3 .sx-dev-n b{font-size:13.5px;font-weight:600;min-width:0}
+.v3 .sx-dev-meta{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:12px}
+.v3 .sx-revoke{color:var(--err);margin-left:auto}
+.v3 .sx-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1 1 100%;background:var(--err-soft);border-radius:9px;padding:6px 8px 6px 12px;font-size:12.5px}
+.v3 .sx-confirm.wide{margin:12px 0 0;background:var(--need-soft)}
+.v3 .sx-confirm > span{flex:1 1 160px;color:var(--fg)}
+
+.v3 .sx-switch{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:8px;position:relative}
+.v3 .sx-switch input{position:absolute;opacity:0;width:36px;height:20px;margin:0;cursor:inherit}
+.v3 .sx-switch.dis{cursor:not-allowed}
+.v3 .sx-switch.dis > span:last-child{color:var(--muted)}
+.v3 .sx-track{width:36px;height:20px;border-radius:999px;background:var(--line-2);position:relative;flex:none;transition:background .15s}
+.v3 .sx-track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.v3 .sx-switch input:checked + .sx-track{background:var(--ok)}
+.v3 .sx-switch input:checked + .sx-track::after{transform:translateX(16px)}
+.v3 .sx-switch input:focus-visible + .sx-track{box-shadow:0 0 0 3px var(--accent-soft)}
+.v3 .sx-switch input:disabled + .sx-track{opacity:.5}
+@media (prefers-reduced-motion:reduce){.v3 .sx-track,.v3 .sx-track::after{transition:none}}
+@media (max-width:640px){
+  .v3 .sx-confirm > span{flex-basis:100%}
+}
+
+/* /pair */
+.v3.pairpg{display:grid;place-items:center;padding:24px 16px;overflow:auto}
+.v3 .pair-card{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 24px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;text-align:center}
+.v3 .pair-card h1{font-family:var(--f-display);font-weight:500;font-size:26px;margin:0}
+.v3 .pair-card p{margin:0;color:var(--fg-2);font-size:13px}
+.v3 .pair-card .btn{align-self:center;padding:8px 18px;font-weight:600}
+.v3 .pair-ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;margin:0 auto;font:600 20px var(--f-ui)}
+.v3 .pair-ic.ok{background:var(--ok-soft);color:var(--ok)}
+.v3 .pair-ic.err{background:var(--err-soft);color:var(--err)}
+.v3 .pair-ic.run{background:var(--run-soft);color:var(--run)}

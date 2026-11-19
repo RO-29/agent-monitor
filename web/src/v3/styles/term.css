@@ -1,0 +1,37 @@
+/* Workspace terminal panel (phase 6 A): bottom split on desktop, full screen on phone. */
+.v3 .ws .wterm{flex:none;position:relative;display:flex;flex-direction:column;min-height:120px;border-top:1px solid var(--line-2);background:var(--bg);z-index:5}
+.v3 .ws .wterm.full{position:fixed;inset:0;z-index:60;height:auto;border-top:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.v3 .ws .wterm-grip{position:absolute;left:0;right:0;top:-4px;height:8px;cursor:row-resize;z-index:2;touch-action:none}
+.v3 .ws .wterm-grip::after{content:"";position:absolute;left:50%;top:2px;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line-2);opacity:0;transition:opacity .12s}
+.v3 .ws .wterm-grip:hover::after,.v3 .ws .wterm-grip:focus-visible::after{opacity:1}
+body.wterm-dragging{cursor:row-resize;user-select:none}
+.v3 .ws .wterm-h{display:flex;align-items:center;gap:10px;padding:4px 8px 4px 14px;min-height:36px;border-bottom:1px solid var(--line);background:var(--panel-2);flex:none;font-size:12.5px}
+.v3 .ws .wterm-h b{font-weight:600;font-size:12.5px}
+.v3 .ws .wterm-cwd{color:var(--muted);min-width:0;font-size:12px}
+.v3 .ws .wterm-st{font-size:11.5px;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.v3 .ws .wterm-st::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--idle)}
+.v3 .ws .wterm-st.ok::before{background:var(--ok)}
+.v3 .ws .wterm-st.run::before{background:var(--run)}
+.v3 .ws .wterm-st.need{color:var(--need)}
+.v3 .ws .wterm-st.need::before{background:var(--need)}
+.v3 .ws .wterm-st.err{color:var(--err)}
+.v3 .ws .wterm-st.err::before{background:var(--err)}
+.v3 .ws .wterm-body{position:relative;flex:1;min-height:0}
+.v3 .ws .wterm-x{position:absolute;inset:6px 4px 4px 12px}
+.v3 .ws .wterm-x .xterm{height:100%}
+.v3 .ws .wterm-x .xterm-viewport{background:transparent}
+.v3 .ws .wterm-over{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(460px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line-2);border-radius:10px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;z-index:3}
+.v3 .ws .wterm-over b{font-size:13px}
+.v3 .ws .wterm-over span{color:var(--fg-2)}
+.v3 .ws .wterm-over > .btn{align-self:flex-start;margin-top:2px}
+.v3 .ws .wterm-over-a{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.v3 .ws .wterm-msg{padding:16px 18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--fg-2)}
+.v3 .ws .wterm-msg b{color:var(--fg)}
+.v3 .ws .wkbd{font:11px var(--f-mono);color:var(--muted);margin-left:auto;padding-left:12px}
+.v3 .ws .wopen-m button{display:flex;align-items:center}
+@media (max-width:760px){
+  .v3 .ws .wterm-x{inset:6px 4px 4px 8px}
+  .v3 .ws .wterm-cwd{max-width:40vw}
+}
+@media (prefers-reduced-motion:reduce){.v3 .ws .wterm-grip::after{transition:none}}
+.v3 .ws .wopen-m button:disabled{color:var(--muted);cursor:default;background:none}

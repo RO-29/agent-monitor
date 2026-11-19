@@ -1,0 +1,36 @@
+/* Dictation controls (lib/voice.tsx) and bash mode (workspace/bash.tsx). */
+.v3 .vox-mic{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:30px;height:30px;padding:0 8px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);cursor:pointer;flex:none;font:500 12px var(--f-ui)}
+.v3 .vox-mic:hover:not(:disabled){color:var(--fg);background:var(--panel-2)}
+.v3 .vox-mic:disabled{opacity:.45;cursor:default}
+.v3 .vox-mic.on{color:var(--err);border-color:color-mix(in srgb,var(--err) 45%,var(--line));background:var(--err-soft)}
+.v3 .vox-mic.on svg{animation:vox-pulse 1.2s ease-in-out infinite}
+@keyframes vox-pulse{50%{opacity:.4}}
+@media (prefers-reduced-motion:reduce){.v3 .vox-mic.on svg{animation:none}}
+.v3 .vox-chip{display:inline-flex;align-items:center;gap:2px;font:500 12px var(--f-ui);flex:none}
+.v3 .vox-clean{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:4px 10px;cursor:pointer;font:inherit}
+.v3 .vox-x{border:0;background:none;color:var(--muted);cursor:pointer;padding:4px 6px;font:inherit}
+.v3 .vox-x:hover{color:var(--fg)}
+.v3 .vox-field{position:relative;display:flex;align-items:center;gap:6px;width:100%}
+.v3 .vox-field > .inp{flex:1;min-width:0}
+.v3 .vox-field .vox-mic{height:32px}
+
+/* bash mode */
+.v3 .ws .wcomp.wbash{border-color:color-mix(in srgb,var(--need) 55%,var(--line-2))}
+.v3 .ws .wcomp.wbash:focus-within{border-color:var(--need);box-shadow:0 0 0 3px var(--need-soft)}
+.v3 .ws .wbash-in{display:flex;align-items:flex-start}
+.v3 .ws .wbash-in > textarea{flex:1;min-width:0}
+.v3 .ws .wbash-p{flex:none;padding:12px 0 4px 14px;font:600 14px/1.5 var(--f-mono);color:var(--need)}
+.v3 .ws .wcomp.wbash textarea{font:13.5px/1.5 var(--f-mono);padding-left:8px}
+.v3 .ws .wbash-tag{font:600 11px var(--f-ui);color:var(--need);background:var(--need-soft);border-radius:999px;padding:2px 8px;flex:none}
+.v3 .ws .whist{position:relative;flex:none}
+.v3 .ws .whist-b{border:1px solid var(--line);background:none;color:var(--muted);border-radius:999px;height:30px;padding:0 10px;font:500 12px var(--f-ui);cursor:pointer}
+.v3 .ws .whist-b:hover,.v3 .ws .whist-b[aria-expanded="true"]{color:var(--fg);background:var(--panel-2)}
+.v3 .ws .whist-m{position:absolute;left:0;bottom:calc(100% + 6px);z-index:31;width:min(460px,80vw);max-height:320px;overflow:auto;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;box-shadow:var(--shadow);padding:4px}
+.v3 .ws .whist-h{display:flex;gap:8px;padding:4px 8px 6px;font:500 12px var(--f-ui);color:var(--muted)}
+.v3 .ws .whist-r{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 8px;border-radius:6px;min-width:0}
+.v3 .ws .whist-r:hover{background:color-mix(in srgb,var(--fg) 6%,transparent)}
+.v3 .ws .whist-c{font:12.5px var(--f-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.v3 .ws .whist-x{font:11px var(--f-mono);flex:none}
+.v3 .ws .whist-x.bad{color:var(--err)}
+.v3 .ws .whist-r .btn{flex:none}
+.v3 .ws .whist-e{padding:6px 8px 8px;font-size:12.5px;color:var(--muted)}

@@ -1,0 +1,48 @@
+# compiled binary
+/agent-monitor
+
+# AgentTV widget build artifact (built via tv/build.sh)
+/AgentTV.app
+/AgentBar.app
+/AgentFloat.app
+
+# Xcode per-user state (not part of the shared project)
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
+
+# runtime logs
+/agent-monitor.log
+/agent-monitor.out.log
+/agent-monitor.err.log
+
+# embedded data dir written at runtime
+.agent-monitor/
+
+# IDE / editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# planning + per-machine settings (not part of the published source)
+.claude/
+.planning/
+
+# local dev handoff / notes (not published)
+/HANDOFF.md
+web/tsconfig.tsbuildinfo
+/agent-monitor.app
+/rust/am-helper/target
+/am-helper
+/am-helper.hooks
+
+# go test -cpuprofile leaves these
+*.test
+*.prof
+.review/
+.vm-build/
+# machine- and company-specific files stay local
+bin/create-agent-build-vm.sh
+bin/vm-build.sh
+bin/vm-git-token.sh
+mac/com.rohit.agent-monitor.plist

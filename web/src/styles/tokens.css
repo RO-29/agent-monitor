@@ -1,0 +1,164 @@
+/* Design tokens — dark first (default), light kept as a toggle.
+   Values match web/legacy-index.html so the two UIs feel continuous. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-0: #07080b;
+  --bg-1: #0c0e13;
+  --bg-2: #11141b;
+  --bg-3: #161a23;
+  --bg-4: #1c2230;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-bright: rgba(255, 255, 255, 0.18);
+  --text: #e6ebf2;
+  --text-2: #a8b2c1;
+  --muted: #6b7585;
+  --muted-2: #4a5260;
+  --accent: #7dd3fc;
+  --accent-strong: #38bdf8;
+  --accent-glow: rgba(125, 211, 252, 0.25);
+  --green: #4ade80;
+  --green-glow: rgba(74, 222, 128, 0.3);
+  --yellow: #fbbf24;
+  --orange: #fb923c;
+  --red: #f87171;
+  --red-glow: rgba(248, 113, 113, 0.45);
+  --magenta: #c084fc;
+  --magenta-glow: rgba(192, 132, 252, 0.3);
+  --blue: #60a5fa;
+  --teal: #06b6d4;
+  --tool-claude: #d97757;
+  --tool-codex: #10a37f;
+  --tool-opencode: #a78bfa;
+  --tool-cursor: #38bdf8;
+  --tool-cursor-agent: #06b6d4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
+  /* span families (flame graph + span tree); literal so charts stay stable */
+  --fam-bash: #4ade80;
+  --fam-read: #60a5fa;
+  --fam-edit: #fbbf24;
+  --fam-agent: #c084fc;
+  --fam-mcp: #06b6d4;
+  --fam-web: #f472b6;
+  --fam-other: #8b95a5;
+  --fam-model: rgba(230, 235, 242, 0.16);
+  --fam-user: #e6ebf2;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --rail-w: 220px;
+  --list-w: 380px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-0: #fafaf7;
+  --bg-1: #ffffff;
+  --bg-2: #f4f4ef;
+  --bg-3: #e9e9e1;
+  --bg-4: #dedacf;
+  --border: rgba(15, 18, 25, 0.08);
+  --border-strong: rgba(15, 18, 25, 0.16);
+  --border-bright: rgba(15, 18, 25, 0.22);
+  --text: #1a1f2c;
+  --text-2: #4a5260;
+  --muted: #6b7280;
+  --muted-2: #94a3b8;
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-glow: rgba(2, 132, 199, 0.18);
+  --green: #16a34a;
+  --green-glow: rgba(22, 163, 74, 0.22);
+  --yellow: #d97706;
+  --orange: #ea580c;
+  --red: #dc2626;
+  --red-glow: rgba(220, 38, 38, 0.28);
+  --magenta: #9333ea;
+  --magenta-glow: rgba(147, 51, 234, 0.22);
+  --blue: #2563eb;
+  --teal: #0891b2;
+  --tool-claude: #c2410c;
+  --tool-codex: #047857;
+  --tool-opencode: #7c3aed;
+  --tool-cursor: #0284c7;
+  --tool-cursor-agent: #0891b2;
+  --shadow-sm: 0 1px 2px rgba(15, 18, 25, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 18, 25, 0.08);
+  --shadow-lg: 0 16px 40px rgba(15, 18, 25, 0.12);
+  --fam-bash: #16a34a;
+  --fam-read: #2563eb;
+  --fam-edit: #d97706;
+  --fam-agent: #9333ea;
+  --fam-mcp: #0891b2;
+  --fam-web: #db2777;
+  --fam-other: #6b7280;
+  --fam-model: rgba(26, 31, 44, 0.14);
+  --fam-user: #1a1f2c;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--accent-strong);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+.mono,
+.num {
+  font-family: var(--font-mono);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--muted);
+}
+.t2 {
+  color: var(--text-2);
+}
+.k {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}

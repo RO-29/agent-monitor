@@ -1,0 +1,70 @@
+/* C · Messages: conversation list plus chat. Follows the shell theme. */
+.v3 .msgv{flex:1;min-height:0;display:grid;grid-template-columns:330px minmax(0,1fr);background:var(--panel)}
+.v3 .msgv.phone{grid-template-columns:minmax(0,1fr)}
+.v3 .msgv .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.v3 .msgv .mls{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.v3 .msgv.phone .mls{border-right:0}
+.v3 .msgv .top{padding:14px 16px 10px;display:grid;gap:10px;flex:none}
+.v3 .msgv .top h3{font:700 20px var(--f-ui);margin:0}
+.v3 .msgv .mseg{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:2px;font-size:12.5px}
+.v3 .msgv .mseg button{flex:1;text-align:center;padding:4px;border-radius:7px;color:var(--fg-2);border:0;background:none;cursor:pointer}
+.v3 .msgv .mseg button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.08)}
+.v3 .msgv .mscroll{overflow:auto;min-height:0;flex:1}
+.v3 .msgv .mnone{padding:16px;color:var(--muted);font-size:13px}
+.v3 .msgv .cv{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;padding:10px 16px;align-items:center;border-top:1px solid var(--line);color:var(--fg);text-decoration:none}
+.v3 .msgv .cv:hover{background:var(--panel-2);text-decoration:none}
+.v3 .msgv .cv.on{background:var(--accent-soft)}
+.v3 .msgv .cv .nm{font-weight:600;font-size:14px}
+.v3 .msgv .cv .ln{color:var(--fg-2);font-size:13px}
+.v3 .msgv .cv .when{color:var(--muted);font-size:12px}
+.v3 .msgv .badge{background:var(--need);color:#fff;font:700 11px var(--f-ui);border-radius:999px;padding:1px 7px}
+.v3 .msgv .avs{position:relative;width:40px;height:40px}
+.v3 .msgv .avs .ag{width:40px;height:40px;border-radius:50%;font-size:15px}
+.v3 .msgv .avs .st{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid var(--panel)}
+.v3 .msgv .st.need{background:var(--need)} .v3 .msgv .st.run{background:var(--run)} .v3 .msgv .st.ok{background:var(--ok)}
+.v3 .msgv .st.err{background:var(--err)} .v3 .msgv .st.mut{background:var(--line-2)}
+
+.v3 .msgv .mchat{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0}
+.v3 .msgv .mhd{display:flex;gap:10px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);min-width:0}
+.v3 .msgv .mhd .mgrow{flex:1;min-width:0}
+.v3 .msgv .mhd .ag{width:22px;height:22px;border-radius:6px;font-size:11px}
+.v3 .msgv .mhd .msub{color:var(--muted);font-size:12px}
+.v3 .msgv .mhd .mback{border:0;background:none;font-size:24px;line-height:1;padding:0 6px 2px 0;color:var(--accent);cursor:pointer}
+.v3 .msgv .mbody{padding:18px 22px;display:flex;flex-direction:column;gap:12px;background:var(--bg);overflow:auto;min-height:0}
+.v3 .msgv .mb{max-width:72%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.v3 .msgv .mb-me{align-self:flex-end;background:var(--accent);color:var(--panel);border-bottom-right-radius:5px}
+.v3 .msgv .mb-me .txt{white-space:pre-wrap}
+.v3 .msgv .mb-ag{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:5px;color:var(--fg)}
+.v3 .msgv .mb-ag .md > :first-child{margin-top:0}
+.v3 .msgv .mb-ag .md > :last-child{margin-bottom:0}
+.v3 .msgv .mb-ag pre{max-width:100%;overflow:auto}
+.v3 .msgv .mtool{align-self:flex-start;font:12px var(--f-mono);color:var(--muted);padding-left:4px}
+.v3 .msgv .mtool.bad{color:var(--err)}
+.v3 .msgv .mtool.live{color:var(--run)}
+.v3 .msgv .mday{align-self:center;font-size:11.5px;color:var(--muted)}
+.v3 .msgv .mday.err{color:var(--err)}
+.v3 .msgv .mmore{align-self:center;border:1px solid var(--line-2);background:var(--panel);color:var(--fg-2);border-radius:999px;padding:3px 12px;font-size:12px;cursor:pointer}
+.v3 .msgv .mreq{align-self:flex-start;max-width:78%;min-width:min(300px,100%);background:var(--panel);border:1px solid var(--need);border-radius:16px;border-bottom-left-radius:5px;padding:12px 14px;display:grid;gap:10px;color:var(--fg)}
+.v3 .msgv .mreq code{white-space:pre-wrap;word-break:break-word;font-size:12.5px}
+.v3 .msgv .mreq .mgrow{flex:1}
+.v3 .msgv .mreq .macts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.v3 .msgv .mreq .macts .btn{border-radius:10px;padding:8px;justify-content:center}
+.v3 .msgv .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.v3 .msgv .qq{display:grid;gap:10px}
+.v3 .msgv .mopts{display:grid;gap:6px}
+.v3 .msgv .mopts button,.v3 .msgv .mopts input{text-align:left;border:1px solid var(--line-2);background:var(--panel-2);border-radius:10px;padding:8px 12px;font:14px var(--f-ui);color:var(--fg);cursor:pointer}
+.v3 .msgv .mopts button:hover{border-color:var(--fg-2)}
+.v3 .msgv .mopts button.w{color:var(--fg-2)}
+.v3 .msgv .mopts input{cursor:text;outline:none}
+.v3 .msgv .mcompose{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.v3 .msgv .mcompose input{flex:1;min-width:0;border:1px solid var(--line-2);border-radius:20px;padding:9px 14px;background:var(--panel-2);color:var(--fg);font:14px var(--f-ui);outline:none}
+.v3 .msgv .mcompose input:focus{border-color:var(--accent)}
+.v3 .msgv .mcompose .btn.pri{border-radius:20px;padding:6px 16px}
+.v3 .msgv.phone .mbody{padding:12px}
+.v3 .msgv.phone .mb{max-width:88%}
+.v3 .msgv.phone .mreq{max-width:92%}
+.v3 .msgv.phone .mhd{padding:10px 12px}
+.v3 .msgv .mb-ag .md > div > :first-child{margin-top:0}
+.v3 .msgv .mb-ag .md > div > :last-child{margin-bottom:0}
+.v3 .msgv .mb-ag table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:12.5px}
+.v3 .msgv .mb-ag th,.v3 .msgv .mb-ag td{padding:3px 8px;border:1px solid var(--line);text-align:left}

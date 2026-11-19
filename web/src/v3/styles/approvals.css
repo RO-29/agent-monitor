@@ -1,0 +1,124 @@
+/* /approvals: the request queue in agent-monitor.app's Approvals window (about 400 x 600) and in a browser. */
+.v3.apv{display:flex;flex-direction:column;background:var(--bg);font-size:13px}
+.v3.apv .sp{flex:1}
+.v3.apv .apv-top{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel);flex:none;min-height:40px}
+.v3.apv .apv-top b{font-family:var(--f-display);font-size:16px;font-weight:600;letter-spacing:-.01em}
+.v3.apv .apv-count{background:var(--need);color:var(--bg);font-weight:700;font-size:11.5px;border-radius:999px;padding:0 7px;line-height:18px;font-variant-numeric:tabular-nums}
+.v3.apv .apv-keys{display:inline-flex;gap:3px;align-items:center}
+.v3.apv .apv-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px;width:100%;max-width:820px;margin:0 auto}
+.v3.apv .apv-warn{color:var(--err);background:var(--err-soft);border-radius:8px;padding:6px 10px}
+
+/* the request at the top */
+.v3.apv .apv-focus{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--need);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow);animation:apv-in .22s ease-out}
+@keyframes apv-in{from{opacity:0;transform:translateY(12px)}}
+@media (prefers-reduced-motion:reduce){.v3.apv .apv-focus{animation:none}}
+.v3.apv .apv-head{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.v3.apv .apv-glyph{width:36px;height:36px;border-radius:10px;background:var(--panel-3);display:grid;place-items:center;flex:none}
+.v3.apv .apv-who{display:flex;flex-direction:column;min-width:0;flex:1}
+.v3.apv .apv-title{font-size:12px;color:var(--muted)}
+.v3.apv .apv-verb{font-family:var(--f-display);font-size:19px;line-height:1.25;font-weight:500;letter-spacing:-.01em}
+.v3.apv .apv-verb b{font-weight:600}
+.v3.apv .apv-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.v3.apv .apv-risk{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:5px;padding:1px 7px}
+.v3.apv .r-low.apv-risk{background:var(--ok-soft);color:var(--ok)}
+.v3.apv .r-medium.apv-risk{background:var(--need-soft);color:var(--need)}
+.v3.apv .r-high.apv-risk{background:var(--err);color:#fff}
+.v3.apv .apv-what{display:flex;flex-direction:column;gap:6px;min-width:0}
+.v3.apv .apv-tool{color:var(--fg-2)}
+.v3.apv .apv-cmd{margin:0;font-family:var(--f-mono);font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--fg-2);border-radius:8px;padding:10px 12px;max-height:38vh;overflow:auto}
+.v3.apv .apv-cmd.soft{font-size:11.5px;color:var(--fg-2);border-left-color:var(--line-2)}
+.v3.apv .apv-path{font-size:12.5px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;word-break:break-all}
+.v3.apv .apv-what .diff{max-height:38vh;margin:0}
+.v3.apv .apv-raw summary{cursor:pointer}
+.v3.apv .apv-raw pre{margin:4px 0 0;font-family:var(--f-mono);font-size:11px;white-space:pre-wrap;word-break:break-word;color:var(--fg-2);max-height:24vh;overflow:auto}
+.v3.apv .apv-why{font-size:12px;border-radius:8px;padding:7px 10px;background:var(--need-soft);color:var(--fg)}
+.v3.apv .apv-why.r-high{background:var(--err-soft)}
+.v3.apv .apv-why b{color:var(--need)} .v3.apv .apv-why.r-high b{color:var(--err)}
+.v3.apv .apv-more summary{cursor:pointer;padding:2px 0}
+.v3.apv .apv-more[open] summary{margin-bottom:6px}
+.v3.apv .apv-armed{font-size:12px;color:var(--err);font-weight:500}
+.v3.apv .apv-note{color:var(--muted);background:var(--panel-2);border-radius:7px;padding:6px 10px}
+
+/* actions */
+.v3.apv .apv-acts{display:flex;flex-wrap:wrap;gap:8px}
+.v3.apv .apv-btn{flex:1 1 0;min-width:96px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border-radius:9px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--fg);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.v3.apv .apv-btn:hover{background:var(--panel-3)}
+.v3.apv .apv-btn:disabled{opacity:.45;cursor:default}
+.v3.apv .apv-btn.yes{background:var(--ok);border-color:var(--ok);color:var(--on-ok);flex-grow:1.6}
+.v3.apv .apv-btn.yes:hover{filter:brightness(1.06)}
+.v3.apv .apv-btn.no{color:var(--err);border-color:color-mix(in srgb,var(--err) 45%,var(--line-2))}
+.v3.apv .apv-btn.no:hover{background:var(--err-soft)}
+.v3.apv .apv-btn.armed{background:var(--err);border-color:var(--err);color:#fff}
+.v3.apv .apv-btn .kbd{background:transparent;color:inherit;border-color:currentColor;opacity:.7}
+
+/* questions */
+.v3.apv .apv-q{display:flex;flex-direction:column;gap:8px}
+.v3.apv .apv-qq{font-size:14.5px;font-weight:500;line-height:1.4}
+.v3.apv .apv-opts{display:flex;flex-direction:column;gap:6px}
+.v3.apv .apv-opt{display:flex;gap:10px;align-items:flex-start;text-align:left;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer}
+.v3.apv .apv-opt:hover{border-color:var(--line-2);background:var(--panel-3)}
+.v3.apv .apv-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.v3.apv .apv-opt:disabled{opacity:.5;cursor:default}
+.v3.apv .apv-n{width:20px;height:20px;border-radius:6px;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;color:var(--fg-2);flex:none;margin-top:1px}
+.v3.apv .apv-opt.on .apv-n{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.v3.apv .apv-box{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;margin-top:2px}
+.v3.apv .apv-box.sq{border-radius:4px}
+.v3.apv .apv-opt.on .apv-box{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 3px var(--panel)}
+.v3.apv .apv-ol{display:flex;flex-direction:column;min-width:0}
+.v3.apv .apv-ol b{font-weight:600}
+.v3.apv .apv-ol small{color:var(--muted);font-size:12px}
+.v3.apv .apv-other,.v3.apv .apv-msg{width:100%}
+
+/* plans */
+.v3.apv .apv-plan{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:10px 13px;max-height:46vh;overflow:auto;font-size:13px}
+
+/* the rest of the queue */
+.v3.apv .apv-eb{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:0 2px 6px}
+.v3.apv .apv-queue{display:flex;flex-direction:column}
+.v3.apv .apv-qrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);background:var(--panel);text-align:left;cursor:pointer;margin-top:-1px}
+.v3.apv .apv-qrow:first-of-type{border-radius:9px 9px 0 0;margin-top:0}
+.v3.apv .apv-qrow:last-child{border-radius:0 0 9px 9px}
+.v3.apv .apv-qrow:only-of-type{border-radius:9px}
+.v3.apv .apv-qrow:hover{background:var(--panel-2)}
+.v3.apv .apv-qt{display:flex;flex-direction:column;min-width:0;flex:1}
+
+/* empty */
+.v3.apv .apv-empty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:36px 16px;color:var(--ok)}
+.v3.apv .apv-empty b{font-family:var(--f-display);font-size:21px;font-weight:600;color:var(--fg)}
+
+/* live sessions */
+.v3.apv .apv-live{border-top:1px solid var(--line);padding-top:8px}
+.v3.apv .apv-livehd{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 2px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--fg-2)}
+.v3.apv .apv-livehd .muted{font-weight:400;margin-left:auto}
+.v3.apv .apv-chev{display:inline-block;transition:transform .15s;font-size:15px;line-height:1;width:10px}
+.v3.apv .apv-chev.on{transform:rotate(90deg)}
+.v3.apv .apv-livelist{display:flex;flex-direction:column;margin-top:4px}
+.v3.apv .apv-lrow{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(0,auto) auto auto;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)}
+.v3.apv .apv-lrow:last-child{border-bottom:0}
+.v3.apv .apv-lt{font-size:12.5px}
+.v3.apv .apv-lp{max-width:120px}
+.v3.apv .apv-ls{color:var(--fg-2)}
+.v3.apv .apv-lnone{padding:6px 4px}
+
+/* sent, undo and errors */
+.v3.apv .apv-status{flex:none;display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--line);background:var(--panel);font-size:12.5px;animation:apv-in .18s ease-out}
+.v3.apv .apv-status.err{color:var(--err)}
+.v3.apv .apv-sent{color:var(--ok);font-weight:700}
+
+@media (max-width:460px){
+  .v3.apv .apv-body{padding:10px;gap:12px}
+  .v3.apv .apv-focus{padding:12px}
+  .v3.apv .apv-verb{font-size:17px}
+  .v3.apv .apv-keys{display:none}
+  .v3.apv .apv-lp{display:none}
+  .v3.apv .apv-lrow{grid-template-columns:auto auto minmax(0,1fr) auto auto}
+}
+@media (min-width:900px){
+  .v3.apv .apv-body{padding:28px 20px}
+  .v3.apv .apv-focus{padding:20px 22px}
+  .v3.apv .apv-verb{font-size:23px}
+}
+/* The shared approval card (WsApproval) inside the panel: the panel draws the header, the card the body. */
+.v3.apv .apv-card .wask{background:transparent;border:0;padding:0}
+.v3.apv .apv-card .wask .btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.v3.apv .apv-card .wask .btns .btn{padding:9px 12px;font-size:14px;justify-content:center}
