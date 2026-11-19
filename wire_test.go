@@ -174,7 +174,8 @@ func TestMCPJSONAbsentAndEmptyFile(t *testing.T) {
 		t.Fatal("a file we created must be deleted by unwire")
 	}
 	e.write(".pi/agent/mcp.json", "\n", 0o644)
-	wantAction(t, e.one("pi", "mcp"), "added")
+	wantAction(t, e.one("pi", "mcp"), "removed by user")
+	wantAction(t, e.steps("pi", "mcp", nil, true)[0], "added")
 	e.unwire("pi")
 	if e.read(".pi/agent/mcp.json") != "\n" {
 		t.Fatalf("an empty file must come back as it was: %q", e.read(".pi/agent/mcp.json"))
