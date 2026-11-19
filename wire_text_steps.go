@@ -155,6 +155,8 @@ func (c *wireCtx) textMCPStep(s textMCP) wireResult {
 					c.restartFlag(&res)
 					return res
 				}
+				res.Action, res.Detail = "manual", "the CLI reported success but the entry is not in the file; check it: "+snippet
+				return res
 			}
 		}
 	}

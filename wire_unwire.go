@@ -28,7 +28,8 @@ func (c *wireCtx) unwire(agent string) []wireResult {
 			continue
 		}
 		if e.Action != "added" || e.Removed {
-			continue // adopted entries are never ours to remove, and removed ones are already gone
+			keep = append(keep, e) // adopted rows and tombstones stay, so a later tick neither re-adds nor removes
+			continue
 		}
 		res := wireResult{Agent: e.Agent, Kind: e.Kind, File: e.File, Entries: []string{e.ID}}
 		if err := c.unwireOne(e); err != nil {
@@ -37,6 +38,8 @@ func (c *wireCtx) unwire(agent string) []wireResult {
 		} else {
 			res.Action = "removed"
 			gone = append(gone, e)
+			e.Removed = true
+			keep = append(keep, e)
 		}
 		out = append(out, res)
 	}

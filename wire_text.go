@@ -25,6 +25,22 @@ var (
 	tomlOtherRe  = regexp.MustCompile(`(?m)^[ \t]*(?:\[mcp_servers\.(?:agent-monitor|"agent-monitor")\.|"?agent-monitor"?[ \t]*=|mcp_servers[ \t]*=)`)
 )
 
+// tomlNamed is the plain-text check: our name on an mcp_servers line or as a key, in any quoting.
+func tomlNamed(src string) bool {
+	for _, l := range strings.Split(src, "\n") {
+		t := strings.TrimLeft(l, " \t")
+		if strings.Contains(l, "mcp_servers") && strings.Contains(l, wireName) || tomlOtherRe.MatchString(t) {
+			return true
+		}
+		for _, q := range []string{wireName, `"` + wireName + `"`, "'" + wireName + "'"} {
+			if r := strings.TrimLeft(strings.TrimPrefix(t, q), " \t"); r != t && (strings.HasPrefix(r, "=") || strings.HasPrefix(r, ".")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // tomlEntry reads command and args of our table; ok is false when the shape is not the plain one.
 func tomlEntry(src string) (found bool, cmd string, args []string, ok bool) {
 	loc := tomlHeaderRe.FindStringIndex(src)

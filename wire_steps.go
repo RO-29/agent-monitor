@@ -186,7 +186,7 @@ func (c *wireCtx) adopt(res wireResult, prev *ledgerEntry, id, kind string) wire
 	res.Action = "adopted"
 	if !c.dry {
 		act := "adopted"
-		if prev != nil && prev.Action == "added" {
+		if prev != nil && prev.Action == "added" && !prev.Removed {
 			act = "added"
 		}
 		e := ledgerEntry{Agent: res.Agent, Kind: kind, File: res.File, ID: id, Action: act, Via: "adopt"}
@@ -221,11 +221,23 @@ type hookJSON struct {
 
 var scriptTokenRe = regexp.MustCompile(`\S+`)
 
+func expandHome(p string) string {
+	for _, pre := range []string{"$HOME/", "${HOME}/", "~/"} {
+		if strings.HasPrefix(p, pre) {
+			return filepath.Join(homeDir(), p[len(pre):])
+		}
+	}
+	return p
+}
+
 // hookCmdIs matches the resolved script name under any agent-monitor checkout, never the exact command text.
 func hookCmdIs(cmd, script, own string) bool {
 	for _, t := range scriptTokenRe.FindAllString(cmd, -1) {
-		t = strings.Trim(t, `"'`)
-		if t == own || (filepath.Base(t) == script && strings.Contains(t, "agent-monitor")) {
+		t = expandHome(strings.Trim(t, `"'`))
+		if r, err := filepath.EvalSymlinks(t); err == nil {
+			t = r
+		}
+		if t == own || filepath.Base(t) == script {
 			return true
 		}
 	}
@@ -416,8 +428,11 @@ func (c *wireCtx) adoptHook(res wireResult, prev *ledgerEntry, ev string) {
 	act := "adopted"
 	e := ledgerEntry{Agent: res.Agent, Kind: "hook", File: res.File, ID: ev, Action: act, Via: "adopt"}
 	if prev != nil {
-		e = *prev
-		e.Removed = false
+		if prev.Removed {
+			e.Written = prev.Written
+		} else {
+			e = *prev
+		}
 	}
 	c.setLedger(e)
 }

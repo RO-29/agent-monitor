@@ -35,6 +35,9 @@ func newWireCtx(dry bool, allow func(string) bool) *wireCtx {
 
 func (c *wireCtx) runAll() []wireResult {
 	var out []wireResult
+	if !pathExists(c.bin()) {
+		return []wireResult{{Agent: "*", Action: "skipped: agent-monitor not found at " + c.bin()}}
+	}
 	for _, k := range agentRegistry {
 		if !c.installed(k) {
 			out = append(out, wireResult{Agent: k.ID, Kind: "mcp", Action: "skipped: not installed", Dry: c.dry})

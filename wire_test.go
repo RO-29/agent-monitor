@@ -300,8 +300,10 @@ func TestClaudeHooksDedupeByScriptPath(t *testing.T) {
 	if e.read(".claude/settings.json") != doc {
 		t.Fatalf("bytes not restored:\n%s", e.read(".claude/settings.json"))
 	}
-	if l := loadLedger(); len(l.Entries) != 0 {
-		t.Fatalf("unwire must drop the ledger: %+v", l.Entries)
+	for _, en := range loadLedger().Entries {
+		if en.Action == "added" && !en.Removed {
+			t.Fatalf("unwire must leave only adopted rows and tombstones: %+v", en)
+		}
 	}
 }
 
@@ -462,6 +464,10 @@ func TestCodexTomlNameElsewhereIsManual(t *testing.T) {
 		"mcp_servers = { other = { command = \"x\" } }\n",
 		"[mcp_servers.agent-monitor.env]\nA = \"b\"\n",
 		"[mcp_servers.agent-monitor]\ncommand = [\n",
+		"[mcp_servers.agent-monitor] # mine\ncommand = \"x\"\n",
+		"[mcp_servers.'agent-monitor']\ncommand = \"x\"\n",
+		"mcp_servers.agent-monitor = { command = \"/x\" }\n",
+		"[mcp_servers]\n'agent-monitor' = { command = \"/x\" }\n",
 	} {
 		e.write(".codex/config.toml", doc, 0o644)
 		r := e.one("codex", "mcp")
@@ -799,5 +805,56 @@ func TestJSONScannerSpans(t *testing.T) {
 		if _, err := parseJSONSpans([]byte(bad)); err == nil {
 			t.Fatalf("%q parsed", bad)
 		}
+	}
+}
+
+func TestUnwireIsNotUndoneByTheNextTick(t *testing.T) {
+	e := newWenv(t)
+	e.write(".pi/agent/mcp.json", piFixture, 0o600)
+	wantAction(t, e.one("pi", "mcp"), "added")
+	e.unwire("pi")
+	wantAction(t, e.one("pi", "mcp"), "removed by user")
+	if e.read(".pi/agent/mcp.json") != piFixture {
+		t.Fatal("the next run added the entry back after unwire")
+	}
+}
+
+func TestReaddedByHandAfterTombstoneIsAdopted(t *testing.T) {
+	e := newWenv(t)
+	e.write(".pi/agent/mcp.json", piFixture, 0o600)
+	wantAction(t, e.one("pi", "mcp"), "added")
+	withEntry := e.read(".pi/agent/mcp.json")
+	e.write(".pi/agent/mcp.json", piFixture, 0o600)
+	wantAction(t, e.one("pi", "mcp"), "removed by user")
+	e.write(".pi/agent/mcp.json", withEntry, 0o600)
+	wantAction(t, e.one("pi", "mcp"), "adopted")
+	e.unwire("pi")
+	if e.read(".pi/agent/mcp.json") != withEntry {
+		t.Fatal("unwire removed an entry the user added by hand")
+	}
+}
+
+func TestMissingBinaryWritesNothing(t *testing.T) {
+	e := newWenv(t)
+	e.write(".pi/agent/mcp.json", piFixture, 0o600)
+	if err := os.Remove(filepath.Join(e.inst, "agent-monitor")); err != nil {
+		t.Fatal(err)
+	}
+	r := newWireCtx(false, nil).runAll()
+	if len(r) != 1 || !strings.HasPrefix(r[0].Action, "skipped: agent-monitor not found") {
+		t.Fatalf("results = %+v", r)
+	}
+	if e.read(".pi/agent/mcp.json") != piFixture {
+		t.Fatal("wrote an entry for a missing binary")
+	}
+}
+
+func TestHookCmdIsExpandsHome(t *testing.T) {
+	e := newWenv(t)
+	if !hookCmdIs("$HOME/am/bin/codex-hook.sh", "codex-hook.sh", filepath.Join(e.inst, "bin", "codex-hook.sh")) {
+		t.Fatal("a $HOME path to our script must count as ours")
+	}
+	if hookCmdIs("/usr/bin/other.sh", "codex-hook.sh", filepath.Join(e.inst, "bin", "codex-hook.sh")) {
+		t.Fatal("a foreign script matched")
 	}
 }

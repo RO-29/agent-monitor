@@ -59,7 +59,7 @@ var agentRegistry = []agentKind{
 	}},
 	{ID: "codex", Binaries: []string{"codex"}, Dirs: []string{".codex"}, Wire: []wireStep{
 		textStep(textMCP{agent: "codex", file: ".codex/config.toml", entry: tomlEntry,
-			elsewhere: func(s string) bool { return tomlOtherRe.MatchString(s) }, block: tomlMCPBlock, cliName: "codex", unverified: true}),
+			elsewhere: tomlNamed, block: tomlMCPBlock, cliName: "codex", unverified: true}),
 		hookStep(hookJSON{agent: "codex", file: ".codex/hooks.json", codex: true, script: "codex-hook.sh", fresh: "{\n}\n",
 			events: append([]string{"PermissionRequest"}, claudeEvents[1:]...),
 			elem: bucketElem(func(ev string) int {

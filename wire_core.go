@@ -191,7 +191,7 @@ func (c *wireCtx) modify(path string, mut func(old []byte, exists bool) ([]byte,
 		st1, statErr := os.Stat(real)
 		exists := statErr == nil
 		var old []byte
-		mode := os.FileMode(0o644)
+		mode := os.FileMode(0o600)
 		if exists {
 			var err error
 			if old, err = os.ReadFile(real); err != nil {
