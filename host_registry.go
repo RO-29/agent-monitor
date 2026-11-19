@@ -209,6 +209,9 @@ func (hr *HostRegistry) ForSession(agentID string) *HostInfo {
 
 func (hr *HostRegistry) linkLocked(h *HostInfo, tool Tool, sessionID string) {
 	h.Tool, h.SessionID, h.AgentID = tool, sessionID, string(tool)+":"+sessionID
+	if o, ok := hostOrigins.Load(h.HostID); ok && store != nil {
+		go store.SetOrigin(tool, sessionID, o.(string))
+	}
 	for _, o := range hr.hosts {
 		if o != h && o.SessionID == sessionID {
 			o.SessionID, o.AgentID = "", ""

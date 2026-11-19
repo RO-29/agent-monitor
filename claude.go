@@ -147,6 +147,9 @@ func ensureClaudeTail(s *Store, transcriptPath, sessionID, cwd string) {
 			Tool: ToolClaude, SessionID: sessionID,
 			Cwd: cwd, HasCwd: true,
 		}
+		if ep, _ := j["entrypoint"].(string); ep != "" {
+			in.Entrypoint, in.HasEntrypoint = ep, true
+		}
 		// Sidecar metadata records: title, permission mode. These live on their
 		// own JSONL lines and don't change session state, so handle and return.
 		switch kind {

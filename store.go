@@ -151,6 +151,8 @@ type UpsertInput struct {
 	HasBranch              bool
 	Mode                   string
 	HasMode                bool
+	Entrypoint             string
+	HasEntrypoint          bool
 	StartedAtOverride      int64 // 0 = use existing or now
 	LastActivityAtOverride int64 // 0 = use existing or now (anchored to a file mtime when seeding from disk)
 	IncrementMsg           bool
@@ -300,6 +302,16 @@ func (s *Store) Upsert(in UpsertInput) *Session {
 		next.Mode = prev.Mode
 	}
 	if prev != nil {
+		next.Entrypoint, next.Places, next.Origin = prev.Entrypoint, prev.Places, prev.Origin
+	}
+	if in.HasEntrypoint && in.Entrypoint != "" {
+		next.Entrypoint = in.Entrypoint
+		if n := len(next.Places); n == 0 || next.Places[n-1] != in.Entrypoint {
+			p := append(append([]string(nil), next.Places...), in.Entrypoint)
+			next.Places = p[max(0, len(p)-8):]
+		}
+	}
+	if prev != nil {
 		next.MessageCount = prev.MessageCount
 		next.Tokens = prev.Tokens
 		next.ToolUsage = prev.ToolUsage
@@ -434,5 +446,24 @@ func ClassifyAge(ageMs int64) State {
 		return StateCompleted
 	default:
 		return StateAbandoned
+	}
+}
+
+// SetOrigin records who started a session through agent-monitor; an empty origin changes nothing.
+func (s *Store) SetOrigin(tool Tool, sessionID, origin string) {
+	if origin == "" || sessionID == "" {
+		return
+	}
+	for try := 0; try < 10; try++ { // the host can link before the session's first record reaches the store
+		s.mu.Lock()
+		sess := s.sessions[sid(tool, sessionID)]
+		if sess != nil {
+			sess.Origin = origin
+		}
+		s.mu.Unlock()
+		if sess != nil {
+			return
+		}
+		time.Sleep(time.Second)
 	}
 }

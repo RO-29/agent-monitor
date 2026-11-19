@@ -41,6 +41,12 @@ export interface Session {
   model?: string;
   branch?: string;
   mode?: string;
+  /** Where Claude Code runs now: cli, claude-desktop, sdk-cli. */
+  entrypoint?: string;
+  /** Entrypoints in the order the session used them. */
+  places?: string[];
+  /** Who started it through agent-monitor: "this Mac" or a device name. */
+  origin?: string;
   messageCount: number;
   tokens: TokenUsage;
   toolUsage?: Record<string, number>;

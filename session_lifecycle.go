@@ -108,7 +108,7 @@ func boxDraft(screen string) bool {
 }
 
 // resumeSession starts a hosted terminal that resumes an ended Claude or Codex session.
-func resumeSession(id, prompt string, attachments []string) (*terminalStarted, int, error) {
+func resumeSession(id, prompt string, attachments []string, origin ...string) (*terminalStarted, int, error) {
 	s := store.Get(id)
 	if s == nil {
 		return nil, http.StatusNotFound, errors.New("session not found")
@@ -127,7 +127,7 @@ func resumeSession(id, prompt string, attachments []string) (*terminalStarted, i
 		return nil, http.StatusConflict, errors.New("the session's folder no longer exists")
 	}
 	codeMode := s.Tool == ToolClaude && transcriptCodeMode(s.TranscriptPath)
-	started, err := startTerminal(terminalStart{Agent: string(s.Tool), Cwd: s.Cwd, Prompt: prompt, Attachments: attachments, Resume: s.SessionID, CodeMode: codeMode})
+	started, err := startTerminal(terminalStart{Agent: string(s.Tool), Cwd: s.Cwd, Prompt: prompt, Attachments: attachments, Resume: s.SessionID, CodeMode: codeMode, Origin: firstOf(origin...)})
 	if err != nil {
 		var bad errTerminalBadRequest
 		if errors.As(err, &bad) {
@@ -158,7 +158,7 @@ func registerSessionLifecycleRoutes(mux *http.ServeMux) {
 				return
 			}
 		}
-		started, code, err := resumeSession(r.PathValue("id"), in.Prompt, in.Attachments)
+		started, code, err := resumeSession(r.PathValue("id"), in.Prompt, in.Attachments, requestOrigin(r))
 		if err != nil {
 			writeJSONStatus(w, code, map[string]any{"error": err.Error()})
 			return

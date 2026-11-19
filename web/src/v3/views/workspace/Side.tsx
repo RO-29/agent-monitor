@@ -223,11 +223,50 @@ export function DrivenSide({ detail, onClose }: { detail: ODetail; onClose?: () 
   );
 }
 
-/** Where a watched session runs: its tmux pane, a terminal, or ended. */
+interface SessionPlace {
+  kind: string;
+  label: string;
+  detail?: string;
+  origin?: string;
+  journey: { entry: string; label: string; at: number }[];
+}
+
+/** Where a watched session runs now, who started it, and each place it ran in (GET /api/session/{id}/place). */
 function TermKV({ row }: { row: Row }) {
-  const { owned } = watchedLiveness(row, useLive().connected);
-  const pane = usePane(latestSession(row), owned);
-  return <KV k="Runs in" v={pane.ok ? `tmux pane ${pane.paneId}` : owned ? "a terminal" : "a terminal, ended"} />;
+  const sid = latestSession(row);
+  const [p, setP] = useState<SessionPlace | null>(null);
+  useEffect(() => {
+    if (!sid) return;
+    let live = true;
+    const load = () =>
+      fetch(`/api/session/${encodeURIComponent(sid)}/place`, { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => live && j && setP(j as SessionPlace))
+        .catch(() => {});
+    void load();
+    const t = window.setInterval(load, 10000);
+    return () => ((live = false), window.clearInterval(t));
+  }, [sid]);
+  if (!p) return <KV k="Runs in" v="…" />;
+  return (
+    <>
+      <KV k="Runs in" v={p.detail ? `${p.label} · ${p.detail}` : p.label} />
+      {p.origin && <KV k="Started from" v={p.origin} />}
+      {p.journey.length > 1 && (
+        <div className="wjourney" aria-label="Places this session ran in">
+          <span className="wjourney-k">Journey</span>
+          <ol>
+            {p.journey.map((j, i) => (
+              <li key={i}>
+                <b>{j.label}</b>
+                {j.at > 0 && <span className="muted"> · {new Date(j.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function WatchedSide({ row, feed, onClose, sid, kids: sessionKids, kidsMissing }: { row: Row; feed: WatchedFeed | null; onClose?: () => void; sid?: string; kids?: SessionChildren | null; kidsMissing?: boolean }) {

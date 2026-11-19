@@ -55,6 +55,11 @@ struct Session: Codable, Identifiable, Hashable {
     var model: String?
     var branch: String?
     var mode: String?
+    /// Where Claude Code runs now (cli, claude-desktop, sdk-cli), and the places it used in order.
+    var entrypoint: String?
+    var places: [String]?
+    /// Who started it through agent-monitor: "this Mac" or a device name.
+    var origin: String?
     var messageCount: Int
     var tokens: TokenUsage
     var toolUsage: [String: Int]?
@@ -212,4 +217,24 @@ struct PaneRegistration: Codable, Identifiable, Hashable {
 
     var id: String { agentId }
     var displayName: String { (alias?.isEmpty == false ? alias! : agentId) }
+}
+
+extension Session {
+    /// Where it runs, in a word or two; a session that moved shows its path, for example "Desktop → Terminal".
+    var placeText: String {
+        let word: (String) -> String = { ["claude-desktop": "Desktop", "cli": "Terminal", "sdk-cli": "SDK", "sdk-ts": "SDK", "sdk-py": "SDK"][$0] ?? $0 }
+        let steps = (places ?? []).map(word)
+        if steps.count > 1 { return steps.suffix(3).joined(separator: " → ") }
+        return entrypoint.map(word) ?? ""
+    }
+}
+
+/// GET /api/session/{id}/place: where a session runs now, who started it, and each place it ran in.
+struct SessionPlace: Decodable {
+    struct Step: Decodable, Hashable { var entry: String; var label: String; var at: Int64 }
+    var kind: String
+    var label: String
+    var detail: String?
+    var origin: String?
+    var journey: [Step]
 }

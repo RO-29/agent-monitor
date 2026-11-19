@@ -52,6 +52,9 @@ type Session struct {
 	Model             string         `json:"model,omitempty"`
 	Branch            string         `json:"branch,omitempty"`
 	Mode              string         `json:"mode,omitempty"`
+	Entrypoint        string         `json:"entrypoint,omitempty"` // where Claude Code runs now: cli, claude-desktop, sdk-cli
+	Places            []string       `json:"places,omitempty"`     // entrypoints in the order the session used them
+	Origin            string         `json:"origin,omitempty"`     // who started it through agent-monitor: "this Mac" or a device name
 	MessageCount      int            `json:"messageCount"`
 	Tokens            TokenUsage     `json:"tokens"`
 	ToolUsage         map[string]int `json:"toolUsage,omitempty"`

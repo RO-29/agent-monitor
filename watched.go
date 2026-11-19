@@ -133,6 +133,8 @@ func watchedSessionRoute(w http.ResponseWriter, r *http.Request, path string) bo
 		return true
 	}
 	switch {
+	case strings.HasSuffix(path, "/place"):
+		writeJSON(w, sessionPlace(strings.TrimSuffix(path, "/place")))
 	case strings.HasSuffix(path, "/term"):
 		serveAgentTerm(w, r, strings.TrimSuffix(path, "/term"))
 	case strings.HasSuffix(path, "/pane"):

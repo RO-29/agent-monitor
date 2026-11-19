@@ -247,7 +247,8 @@ struct ThreadRow: View {
             return st == .awaitingInput ? "Waiting for your reply" : "Waiting in the terminal"
         }
         if group == .working, let l = t.liveActivity, !l.isEmpty { return l }
-        return t.repoName
+        let place = t.isDriven ? "Thread" : (t.latestSession.flatMap { store.sessionsByID[$0] }?.placeText ?? "")
+        return place.isEmpty ? t.repoName : "\(place) · \(t.repoName)"
     }
 
     var body: some View {

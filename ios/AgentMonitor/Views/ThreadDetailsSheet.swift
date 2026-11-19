@@ -11,6 +11,7 @@ struct ThreadDetailsSheet: View {
     var onOpenLinked: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @State private var place: SessionPlace?
     @State private var kids: [SessionChild] = []
     @State private var kidsError: String?
     @State private var loaded = false
@@ -94,11 +95,34 @@ struct ThreadDetailsSheet: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sensoryFeedback(.success, trigger: copied)
             .task { await loadKids() }
+            .task { if let sid = sessionID { place = try? await APIClient.shared.place(sid) } }
             .task(id: cwd) { await loadGit() }
         }
     }
 
     @ViewBuilder private var workspace: some View {
+        if let p = place {
+            LabeledContent("Runs in") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(p.label).font(.subheadline)
+                    if let d = p.detail, !d.isEmpty { Text(d).font(.caption).foregroundStyle(Tok.muted) }
+                }
+            }
+            if let o = p.origin, !o.isEmpty { LabeledContent("Started from", value: o) }
+            if p.journey.count > 1 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Journey").font(.caption).foregroundStyle(Tok.muted)
+                    ForEach(Array(p.journey.enumerated()), id: \.offset) { i, j in
+                        HStack(spacing: 6) {
+                            Text("\(i + 1).").font(.caption.monospaced()).foregroundStyle(Tok.muted)
+                            Text(j.label).font(.subheadline)
+                            Spacer()
+                            if j.at > 0 { Text(relativeTime(j.at) + " ago").font(.caption).foregroundStyle(Tok.muted) }
+                        }
+                    }
+                }
+            }
+        }
         if let r = thread?.repoName, !r.isEmpty { LabeledContent("Repo", value: r) }
         if git?.branch?.isEmpty ?? true, let b = session?.branch ?? thread?.ref, !b.isEmpty { mono("Branch", b) }
         if let m = session?.model ?? thread?.model, !m.isEmpty { mono("Model", m) }

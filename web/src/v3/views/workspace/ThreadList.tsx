@@ -65,6 +65,17 @@ function noteOf(r: WRow): { text: string; cls: string } | null {
 }
 const dotCls = (r: WRow) => (r.group === "need" ? "need" : r.group === "working" ? "run" : r.status === "Error" ? "err" : "");
 
+const PLACE: Record<string, string> = { "claude-desktop": "Desktop", cli: "Terminal", "sdk-cli": "SDK", "sdk-ts": "SDK", "sdk-py": "SDK" };
+
+/** Where a thread runs, in a word or two; a session that moved shows its path, for example "Desktop → Terminal". */
+export function placeText(r: { driven?: unknown; watched?: { session?: { entrypoint?: string; places?: string[] } } }): string {
+  if (r.driven) return "Thread";
+  const s = r.watched?.session;
+  const steps = (s?.places || []).map((p) => PLACE[p] || p);
+  if (steps.length > 1) return steps.slice(-3).join(" → ");
+  return PLACE[s?.entrypoint || ""] || "";
+}
+
 export function TermIcon() {
   return (
     <svg className="wtermic" viewBox="0 0 16 16" width="12" height="12" aria-label="Runs in a terminal" role="img">
@@ -108,6 +119,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
           <span className="r2">
             <AgentIcon agent={r.agent} size={14} />
             {r.mode === "watched" && <TermIcon />}
+            {placeText(r) && <span className={`wplace p-${(r.watched?.session?.entrypoint || (r.driven ? "thread" : "")).replace(/[^a-z-]/g, "")}`}>{placeText(r)}</span>}
             {r.pinned && <PinIcon />}
             <span className="trunc">{r.repo || "no project"}</span>
             {r.branch && !note && <span className="trunc br">{r.branch}</span>}

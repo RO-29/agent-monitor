@@ -24,6 +24,7 @@ type terminalStart struct {
 	Attachments    []string `json:"attachments,omitempty"`
 	Resume         string   `json:"resume,omitempty"` // a Claude or Codex session id to resume
 	CodeMode       bool     `json:"-"`                // the resumed Claude session started in Code Mode
+	Origin         string   `json:"-"`                // who asked agent-monitor to start it: "this Mac" or a device name
 }
 
 type terminalStarted struct {
@@ -132,6 +133,9 @@ func startTerminal(in terminalStart) (*terminalStarted, error) {
 	}
 	id := newHostID()
 	name := "am-" + id[:8]
+	if in.Origin != "" {
+		hostOrigins.Store(id, in.Origin)
+	}
 	parts := []string{"AM_HOST_ID_ASSIGN=" + id}
 	if in.CodeMode && in.Agent == "claude" { // a Code Mode session resumes only with Code Mode on
 		parts = append(parts, "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1")
@@ -166,6 +170,7 @@ func serveOrchTerminal(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "args are accepted from this machine only"})
 		return
 	}
+	in.Origin = requestOrigin(r)
 	st, err := startTerminal(in)
 	if err != nil {
 		code := http.StatusInternalServerError

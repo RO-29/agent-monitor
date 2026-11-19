@@ -206,6 +206,10 @@ struct APIClient {
         try await post("/api/talk/\(enc(id))/respond", body: body)
     }
 
+    func place(_ sessionID: String) async throws -> SessionPlace {
+        try await get("/api/session/\(enc(sessionID))/place", as: SessionPlace.self)
+    }
+
     func enc(_ s: String) -> String {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
