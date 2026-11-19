@@ -28,6 +28,7 @@ type CLIQueueItem struct {
 	Kind string `json:"kind"` // user | system | bash
 	// Status of a ! command agent-monitor sent: "waiting" behind a busy turn or "running"; it goes when its result is in the transcript.
 	Status string `json:"status,omitempty"`
+	Live   string `json:"live,omitempty"` // a running ! command's output as the terminal shows it now
 }
 
 // cliBang is a ! command sent from agent-monitor; Claude Code writes it to the transcript only when it ends.
@@ -69,6 +70,44 @@ func noteBang(session, cmd string, queued bool) {
 	now := time.Now().UnixMilli()
 	cliBangs.n++
 	cliBangs.m[session] = append(cliBangs.m[session], cliBang{ID: fmt.Sprintf("bang-%d-%d", now, cliBangs.n), Cmd: strings.TrimSpace(cmd), At: now, Queued: queued})
+}
+
+// bangLive returns the output under a running "! cmd" line on the screen, up to the input box; "" when not shown.
+func bangLive(screen, cmd string) string {
+	key := clipRunes(strings.Join(strings.Fields(cmd), " "), 40)
+	if key == "" {
+		return ""
+	}
+	lines := strings.Split(screen, "\n")
+	at := -1
+	for i, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if strings.HasPrefix(t, "!") && strings.Contains(strings.Join(strings.Fields(t), " "), key) {
+			at = i
+		}
+	}
+	if at < 0 {
+		return ""
+	}
+	var out []string
+	for _, ln := range lines[at+1:] {
+		t := strings.TrimSpace(ln)
+		if isBoxRule(t) || strings.HasPrefix(t, "✻") || strings.HasPrefix(t, "❯") {
+			break
+		}
+		if strings.Contains(t, "to run in background") {
+			continue
+		}
+		t = strings.TrimSpace(strings.TrimPrefix(t, "⎿"))
+		out = append(out, t)
+	}
+	for len(out) > 0 && out[len(out)-1] == "" {
+		out = out[:len(out)-1]
+	}
+	if len(out) > 30 {
+		out = out[len(out)-30:]
+	}
+	return strings.Join(out, "\n")
 }
 
 // forgetBang drops agent-monitor's record of a sent ! command (one whose result never reached the transcript).
@@ -475,6 +514,14 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		}
 	}
 	v.Items = mergeBangs(pendingBangs(ref, sessBusy()), v.Items)
+	for i := range v.Items {
+		if it := &v.Items[i]; it.Kind == "bash" && it.Status == "running" && target != "" {
+			if screen == "" {
+				screen, _ = cliIO.screen(target)
+			}
+			it.Live = bangLive(screen, strings.TrimPrefix(it.Text, "!"))
+		}
+	}
 	users := len(cliUserItems(items))
 	switch {
 	case !v.Reachable:

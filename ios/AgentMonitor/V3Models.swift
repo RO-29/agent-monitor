@@ -336,6 +336,8 @@ struct CLIQueueItem: Codable, Identifiable, Hashable {
     var kind: String
     /// For a ! command agent-monitor sent: "waiting" or "running" until its result is in the transcript.
     var status: String?
+    /// A running ! command's output as the terminal shows it now.
+    var live: String?
 }
 
 struct CLIQueueView: Decodable {

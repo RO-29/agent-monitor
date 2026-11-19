@@ -663,3 +663,15 @@ func TestPanePromptNamedSession(t *testing.T) {
 		t.Fatal("a drawn input box under the text means the menu is not open")
 	}
 }
+
+func TestBangLive(t *testing.T) {
+	scr := "✻ Brewed for 4s\n! bash ~/agent-monitor-v3/bin/vm-build.sh\n  ⎿ ......done.\n    Updated [https://x/agent-build].\n    14:19:20 build 6b6424d\n    … +2 lines (1m 7s)\n    (ctrl+b ctrl+b (twice) to run in background)\n\n" + strings.Repeat("─", 40) + "\n❯ \n"
+	got := bangLive(scr, "bash ~/agent-monitor-v3/bin/vm-build.sh")
+	want := "......done.\nUpdated [https://x/agent-build].\n14:19:20 build 6b6424d\n… +2 lines (1m 7s)"
+	if got != want {
+		t.Fatalf("got %q", got)
+	}
+	if bangLive(scr, "ls -la") != "" {
+		t.Fatal("another command has no output here")
+	}
+}

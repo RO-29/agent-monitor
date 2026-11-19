@@ -22,6 +22,8 @@ export interface CliItem {
   kind: "user" | "system" | "bash";
   /** A ! command agent-monitor sent: "waiting" or "running" until its result is in the transcript. */
   status?: "waiting" | "running";
+  /** A running ! command's output as the terminal shows it now. */
+  live?: string;
 }
 export interface CliView {
   agent: string;
@@ -174,8 +176,16 @@ export function useQueue(threadId: string, session?: string, poll = false, opts:
     const t = window.setInterval(() => void queueApi.load(threadId, session, cliAll), 5000);
     return () => window.clearInterval(t);
   }, [threadId, session, poll, cliAll, bump]);
-  return useSyncExternalStore(
+  const view = useSyncExternalStore(
     (f) => (subs.add(f), () => subs.delete(f)),
     () => views.get(threadId) || EMPTY,
   );
+  // While a ! command runs, its output on the terminal refreshes every 1.5 s.
+  const running = !!view.cli?.items.some((i) => i.kind === "bash" && i.status === "running");
+  useEffect(() => {
+    if (!threadId || !poll || !running) return;
+    const t = window.setInterval(() => void queueApi.load(threadId, session, cliAll), 1500);
+    return () => window.clearInterval(t);
+  }, [threadId, session, poll, cliAll, running]);
+  return view;
 }

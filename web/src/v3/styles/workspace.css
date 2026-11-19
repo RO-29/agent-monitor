@@ -834,3 +834,4 @@
 .v3 .ws .wjump-b{position:absolute;right:18px;bottom:10px;display:flex;flex-direction:column;gap:6px}
 .v3 .ws .wjump-b .btn{width:34px;height:34px;padding:0;border-radius:50%;box-shadow:0 2px 8px color-mix(in srgb,var(--fg) 14%,transparent);background:var(--panel)}
 .v3 .ws .werr .werr-n{font-weight:600;font-family:var(--f-mono);white-space:nowrap}
+.v3 .wq-live{margin:6px 0 0;padding:6px 8px;max-height:12em;overflow:auto;white-space:pre-wrap;word-break:break-word;font:11.5px/1.45 var(--f-mono);color:var(--fg-2);background:var(--panel);border:1px solid var(--line);border-radius:6px}

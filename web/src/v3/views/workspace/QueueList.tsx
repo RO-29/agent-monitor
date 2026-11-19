@@ -225,6 +225,7 @@ export const QueueList = forwardRef<QueueListHandle, Props>(function QueueList({
                         <span className="wq-src">{bash ? "in the terminal" : `in ${cli.name}`}</span>
                       </div>
                       <div className="wq-t">{it.text || "(no text, for example an image)"}</div>
+                      {bash && it.live && <pre className="wq-live">{it.live}</pre>}
                     </div>
                     {bash && (
                       <div className="wq-a">

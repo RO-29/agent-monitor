@@ -326,6 +326,7 @@ struct Composer: View {
                 }
             }
             ForEach(Array(qi.prefix(3).enumerated()), id: \.element.id) { i, it in
+              VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     queueLabel(it, qi[..<i].filter { $0.kind != "bash" }.count)
                         .fixedSize()
@@ -345,6 +346,12 @@ struct Composer: View {
                         .accessibilityLabel("Remove")
                     }
                 }
+                if let live = it.live, !live.isEmpty {
+                    Text(live).font(Typo.mono(11.5)).foregroundStyle(Tok.fg2)
+                        .lineLimit(8).frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+              }
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(Tok.panel3, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Tok.run.opacity(0.35), lineWidth: 1))
@@ -446,7 +453,9 @@ struct Composer: View {
             if n % 3 == 0 { pane = try? await APIClient.shared.watchedPane(sid) }
             await loadQueue(sid)
             n += 1
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            // A running ! command shows its terminal output, so it refreshes faster.
+            let live = queue?.items?.contains { $0.kind == "bash" && $0.status == "running" } ?? false
+            try? await Task.sleep(nanoseconds: live ? 1_500_000_000 : 5_000_000_000)
         }
     }
 }
