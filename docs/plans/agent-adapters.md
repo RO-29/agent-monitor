@@ -1,7 +1,7 @@
 # Plan: every agent, every surface
 
 Branch `feat/agent-adapters` in worktree `~/agent-monitor-adapters`. Base: `main` at 3ba0ee0.
-Revision 2: changed after the Fable review (13 required changes, all applied below).
+Revision 3: changed after two Fable reviews (13 plus 4 required changes, all applied below).
 
 ## Goal
 
@@ -23,7 +23,8 @@ is phase 8, built only after the user agrees.
   Phase 1 extends that script: `--test` also runs `cargo test` in `rust/am-helper`, and prints the full
   failing output, not only the last line.
 - Commit and push before each build. Privacy scan on every staged diff, now as `bin/privacy-scan.sh`
-  (added in phase 1, the same grep as before, exit 1 on a hit).
+  (added in phase 1, the same grep as before, exit 1 on a hit). It is checked once against a known bad
+  input before it counts as a gate.
 - No new Go dependency. JSON edits splice bytes; TOML and YAML edits only append (see writer rules).
 - Code comments: one or two lines.
 - Nothing writes to an app bundle, `state.vscdb`, or a VS Code extension folder. No debug port, no signal to
@@ -43,10 +44,12 @@ is phase 8, built only after the user agrees.
 5. **JSON keeps bytes.** No map round trip. The writer finds the target object with a token scanner and
    splices the new member in, so key order, escapes and formatting of the rest of the file stay byte for
    byte. If the scanner cannot place it, report `manual: <snippet>`. `~/.claude.json` (live sessions rewrite
-   it) is written with `claude mcp add --scope user` when the `claude` binary exists, else skipped.
+   it) is written with `~/.local/bin/claude mcp add --scope user` (resolved path, never a shell function or
+   PATH lookup), else skipped. `mcp add`/`mcp remove` flags are checked against `--help` on rohit-mac first.
 6. **TOML and YAML append only.** Without a parser, the writer cannot detect a parse error, a quoted header
    or an inline table. Rule: append a new block only when our server name appears nowhere in the file
-   (plain substring check), else `manual: <snippet>`. Codex MCP entries prefer `codex mcp add`.
+   (plain substring check), else `manual: <snippet>`. Codex MCP entries prefer `~/.local/bin/codex mcp add`.
+   CLI writes follow the same backup, ledger and before/after checks as direct writes.
 7. **Codex hooks.** `hooks.json` entries are appended, never reordered or rewritten. The writer never
    touches `trusted_hash` in `config.toml`. A new hook is reported `needs trust in Codex` until Codex
    records a hash for it.
@@ -57,18 +60,23 @@ is phase 8, built only after the user agrees.
    old installers are listed in `/api/agents/wiring` but not deleted.
 10. **Atomic write.** Temp file in the same directory, fsync, mode kept, rename. Before the rename compare
     mtime and size with the read; if the file changed, retry once, then `skipped: changed during write`.
-11. **Ledger** at `stateDir()/wiring.json` (`~/.agent-monitor/wiring.json`). `agent-monitor unwire` removes
-    exactly the ledger's entries (splice out) and nothing else.
+11. **Ledger** at `stateDir()/wiring.json` (`~/.agent-monitor/wiring.json`). Each entry records `added` or
+    `adopted`. `agent-monitor unwire` removes only `added` entries, never `adopted` ones: JSON by splice,
+    Claude and Codex by `mcp remove`, a TOML or YAML block only when its bytes still match what we wrote,
+    else `manual: remove <snippet>`.
 12. **Paths.** Hook and MCP commands use `installDir` (setting, default `~/agent-monitor`), never
     `os.Executable()`. Wiring runs only in the daemon whose binary sits in `installDir`, so a test daemon on
     rohit-mac (`~/am-build`) never rewrites live entries. Old installers return errors instead of `os.Exit`.
 
 ## First run
 
-`autoWire` has three states: `ask` (default), `on`, `off`. In `ask`, the daemon runs `wireAll(dry=true)` at
-start and shows the planned changes as one card in the web app and the phone ("agent-monitor wants to add
-its MCP server to pi, opencode, Hermes ... Allow?"). One tap sets `on`; after that, new installs are wired
-with no question. This is the one confirmation; the global rule forbids silent persistent changes.
+`autoWire` is recorded per kind of write: `mcp` (an MCP server entry), `hook` (a hook entry that runs our
+script), `extension` (a code file the agent loads, such as the pi extension). Each kind is `ask` (default),
+`on` or `off`. For each kind in `ask`, the daemon runs `wireAll(dry=true)` and shows one card in the web app
+and the phone that lists the exact files and entries of that kind. One tap sets that kind to `on`; a new
+kind asks again. Later installs of an approved kind are wired with no question. The confirm route needs the
+admin level (`access.go`), so a phone at the control level cannot approve it. The global rule forbids silent
+persistent changes, so this card is the one step.
 
 ## Phase 1: agent registry and wiring
 
@@ -110,9 +118,12 @@ Fixtures copy the shapes of the real files on this Mac with values replaced.
 pi has no approval prompt of its own (`docs/security.md:3`): every tool runs unless an extension blocks it.
 
 - The daemon writes `~/.pi/agent/extensions/agent-monitor.ts` only after the first-run confirmation.
-- Hold policy: a call holds for an answer only when an agent-monitor rule says `hold` or `deny` for it, or
-  for `bash` commands that match the existing "risky command" list. Held calls fail closed: no answer in
-  the timeout means `{block: true, reason: "no answer from agent-monitor"}`. Other calls run at once.
+- Policy lives in the daemon (rules and `classifyRisk`, `approvals_risk.go:140`), so the extension asks the
+  daemon for each call (`POST`, short timeout). The daemon answers `run`, `deny` (a deny rule: block at
+  once) or `held` (a hold rule or a risky bash command: a card opens, the extension waits for the answer).
+- Daemon down or no answer to the first request: the call runs, which is pi's own behaviour. Only a call
+  the daemon accepted as `held` fails closed: no answer in the timeout means
+  `{block: true, reason: "no answer from agent-monitor"}`.
 - Inbound messages: long-poll the daemon from `session_start`, stop in `session_shutdown`; deliver with
   `pi.sendUserMessage(text, {deliverAs: "steer"})`.
 - Auth: none. Loopback calls are trusted by `localCaller` (`orch_git_api.go:246`), the same as the hooks.
@@ -128,14 +139,16 @@ Second clients are by design (`registerClient`, `client-discovery`), but a clien
 1. Write `docs/codex-ipc.md` from the installed extension (`out/extension.js` and
    `webview/assets/app-initial-*.js` for the follower handshake), with the extension version and each
    method's version (`thread-stream-state-changed` is 13).
-2. Client rules: never create or unlink the socket; answer every `client-discovery-request` with
+2. Client rules: never create or unlink the socket; at least 60 s between connects (each connect broadcasts
+   `client-status-changed`); answer every `client-discovery-request` with
    `canHandle: false` at once; one connection, reconnect with backoff; connect while the socket exists and
    disconnect after 10 minutes with no thread events.
 3. Read: follow `thread-stream-state-changed` snapshots and patches; honour `targetClientIds`.
 4. Send and answer (`thread-follower-start-turn`, `-command-approval-decision`, `-file-approval-decision`,
    `-permissions-request-approval-response`): enabled only when every pinned version matches; else
    read-only with a note on the place.
-5. First live test: read-only, watching the extension's log for errors, before any write method is enabled.
+5. First live test: `initialize`, discovery answers and reading only. It sends no follower handshake and no
+   other broadcast. The extension's log is watched for errors before any write method is enabled.
 
 ## Phase 4: opencode
 
