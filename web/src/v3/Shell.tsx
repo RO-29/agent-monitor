@@ -136,6 +136,15 @@ export default function V3Shell() {
   const [theme, toggleTheme] = useTheme();
   const [notifyOn, setNotify] = useBoolPref(KEYS.notify, true);
   const toasts = useToasts();
+  // Escape closes the newest toast first.
+  useEffect(() => {
+    if (!toasts.length) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) dismissToast(toasts[toasts.length - 1].id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toasts]);
   const [pal, setPal] = useState<{ q?: string; scope?: string } | null>(null);
   const [pane, setPane] = useState<Session | null>(null);
   const [help, setHelp] = useState(false);
@@ -361,6 +370,9 @@ export default function V3Shell() {
           <div className="toasts">
             {toasts.map((t) => (
               <div key={t.id} className={`toast ${t.kind === "alert" ? "alert" : ""} ${t.output ? "has-out" : ""}`} onClick={() => (t.onClick ? (t.onClick(), dismissToast(t.id)) : dismissToast(t.id))} role="status">
+                <button className="toast-x" aria-label="Close" title="Close (Esc)" onClick={(e) => (e.stopPropagation(), dismissToast(t.id))}>
+                  ×
+                </button>
                 <b>{t.title}</b>
                 {t.body && <div className="fg2 xs">{t.body}</div>}
                 {t.output && (
