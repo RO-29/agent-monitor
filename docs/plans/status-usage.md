@@ -1,6 +1,7 @@
 # Plan: status line in the thread screen, clear usage, text selection
 
 Branch `feat/status-usage` in worktree `~/agent-monitor-status`, base `main` at 7501283.
+Revision 2: changed after the Fable review (10 required changes applied).
 
 ## Requests (from the user, 2026-11-20)
 
@@ -18,62 +19,78 @@ Branch `feat/status-usage` in worktree `~/agent-monitor-status`, base `main` at 
 
 ## Part A: status line (daemon, web, iOS)
 
-- New `paneStatusLine(tool, screen string) []string` beside `cliInputBox` (cli_queue.go):
-  - Claude Code: the non-empty lines after the closing rule of the input box, ANSI removed, at most 4
-    lines, each clipped to 200 runes.
-  - Codex: the non-empty lines below the `›` composer row.
-  - Empty when a prompt or a slash panel is open (no input box found), so stale text never shows.
-- Served in two places, from one capture: the pane-view response (`main.go:507`) gets `statusLine`, and
-  the cli-queue view (`GET /api/session/:id/cli-queue`, which both thread screens already poll every 2 s)
-  gets `statusLine`. The cli-queue view already captures the screen, so this adds no tmux call.
-- Host-registry sessions (am-helper) use the same function on the host screen.
-- Web `WatchedChat.tsx`: one muted monospaced row (wraps on narrow screens) directly above the composer,
-  shown whenever `statusLine` is non-empty. It replaces the model-only label at line 480 when present.
-- iOS `ThreadComposer.swift`: the same row above the text field, `.font(.caption.monospaced())`,
-  secondary colour, `lineLimit(4)`.
-- Tests: Claude screen with a 3-line footer, Codex footer, prompt open gives empty, slash panel gives
-  empty, ANSI and clip.
+- New `paneStatusLine(tool, screen string) []string` (plain capture, ANSI removed, at most 4 lines of 200
+  runes). Fixtures from real screens in `testdata/screens/` (session ids replaced).
+  - Claude Code: find the rule pair that holds the `❯` (or `!`) line, by index (new helper returning the
+    indexes; `cliInputBox` keeps its text API). Take the non-empty lines after the closing rule and stop at
+    the next `isBoxRule` line (panels below draw rules). When no `❯` pair exists, return nothing (no fallback
+    pair). When the lines below the box are a slash or `@` suggestion list (first non-empty line starts with
+    `/` or `@` after trimming, or two or more lines of the `  /name  description` shape), return nothing.
+  - Codex: from the bottom up, take the contiguous non-empty lines; stop at a blank line or at the line
+    starting with `›`. This skips the continuation lines of a multi-line draft (they sit above a blank line,
+    see `codex-draft.txt`). Return nothing when `panePromptOpen` is true.
+  - Other agents: nothing in this part.
+- Transport: the thread screens poll different routes. Web polls `GET /api/queue/{thread}` every 5 s when
+  owned (`queue.go:706`, `web/src/v3/api/queue.ts:188`); iOS polls the cli-queue view every 5 s
+  (`ThreadComposer.swift:506`). Add `statusLine` to the cli-queue view struct and copy it into the
+  `/api/queue/{thread}` response; keep it when `errCLINotSupported` drops the CLI view (Codex), by computing
+  it in a separate step that only needs the pane target.
+- Cost: one plain `capture-pane` per poll per open thread (5 s), reused when the view already captured the
+  plain screen. `typedScreen` (dim removed) is not used, because it drops the dim footer.
+- Host-registry sessions use the tmux capture when a TmuxPane exists, else the host screen (which can lose
+  rows: then the line is simply missing).
+- Web `WatchedChat.tsx`: a muted monospaced block above the composer, shown when `statusLine` is non-empty;
+  it replaces the model-only label at line 480 when present.
+- iOS `ThreadComposer.swift`: the same, `.font(.caption.monospaced())`, secondary colour, `lineLimit(4)`.
+- Tests: Claude idle, Claude with a panel rule below, Claude slash suggestions, Claude prompt open, Codex
+  idle, Codex multi-line draft, Codex prompt open, ANSI and clip.
 
 ## Part B: usage page
 
-- Claude (`usage_agents.go`, `usage_limits.go:619` already opens `~/.claude.json`): decode
-  `cachedUsageUtilization {fetchedAtMs, accountUuid, utilization}`. Use it only when `accountUuid`
-  equals `oauthAccount.accountUuid`.
-  - `limits[]` rows become windows: `session` (Current session), `weekly_all` (Current week, all models),
-    `weekly_scoped` with `scope.model.display_name` (Current week, Fable). Keep `resets_at`.
-  - `spend` (`used`, `limit`, minor units with `exponent`) becomes `credits` with `spentUsd`, `limitUsd`,
-    `percent`, `resetsAt` when present, `capReached` from `extra_usage.spend_limit_reached`.
-  - The reading age (`fetchedAtMs`) is shown; older than 6 hours is marked stale. The status-line copy
-    (dietclaude) stays as the fallback and for the history chart.
-- Codex (no credential): read `rate_limit_reached_type` and `spend_control_reached` from the newest rollout
-  `token_count.rate_limits`. `workspace_member_usage_limit_reached` shows "Workspace spend cap reached (set
-  by the workspace owner)"; the other enum values get their own text. Plan `business` with no windows says
-  "Business plan: limits are set by the workspace owner".
-- Codex amounts (`account/rateLimits/read` on a Codex app-server) are NOT in this plan: the call runs with
-  the user's Codex login. It is a separate item that needs the user's yes.
-- Web `components/Usage.tsx` and `views/settings/Limits.tsx`, iOS `UsageView.swift`: one card per agent:
-  plan name, each window as a bar with its label and reset time, a credits bar "<spent> of <limit> spent,
-  resets Dec 1", a red line when a cap is reached, and the reading age.
-- Tests: fixture of `cachedUsageUtilization` (values replaced), account mismatch ignored, stale flag,
-  Codex enum values.
+- Claude: decode `cachedUsageUtilization {fetchedAtMs, accountUuid, utilization}` in the same read of
+  `~/.claude.json` that `claudePlanName` does (`usage_agents.go:50-72`, mtime cache plus 10 min recheck;
+  `get()` caches 30 s). Use it only when `accountUuid` equals `oauthAccount.accountUuid`; never return the
+  account id.
+  - `limits[]` rows with `is_active` true become windows: `session`, `weekly_all`, `weekly_scoped` with the
+    label "Week (<scope.model.display_name>)". Window keys are open strings from now on.
+  - `spend` with `enabled` true becomes `credits`: `spent`, `limit` as numbers from `amount_minor` and
+    `exponent`, the `currency` code, `percent`, and `capReached` from `extra_usage.spend_limit_reached`.
+    No reset date (the source has none).
+  - Reading age from `fetchedAtMs`; marked stale after 1 hour. The status-line copy (dietclaude) stays as
+    the fallback and for the history chart.
+- Codex (no credential): decode `rate_limit_reached_type` (string) and `spend_control_reached` (raw JSON,
+  type unknown) from the newest rollout `token_count.rate_limits`, with the reading time.
+  `workspace_member_usage_limit_reached` shows "Workspace spend cap reached (set by the workspace owner)";
+  `workspace_owner_usage_limit_reached`, `workspace_owner_credits_depleted`,
+  `workspace_member_credits_depleted` and `rate_limit_reached` get their own text. Plan `business` with no
+  windows says "Business plan: limits are set by the workspace owner".
+- Codex amounts (`account/rateLimits/read`) are not in this plan: they need the user's yes.
+- Clients that assume two windows change too: `web/src/v3/api/usage.ts:9,25` (key union becomes string),
+  `Usage.tsx:18` (`SHORT` map gets entries for the new keys and a fallback), `UsageMini` (`Usage.tsx:85`,
+  used by `ThreadList.tsx:14`), `usage_limits.go:713` labels, iOS `V3Models.swift:485` and
+  `UsageView.swift:101,136` (chip label per key; `ForEach` stays keyed by `key`, now unique).
+- Each agent card: plan name, each window as a bar with label and reset time, a credits bar "<spent> of
+  <limit> <currency> spent", a red line when a cap is reached, and the reading age.
+- Tests: a `cachedUsageUtilization` fixture with invented values, account mismatch ignored, inactive row
+  and disabled spend ignored, stale flag, the Codex enum values and a non-null `spend_control_reached`.
 
 ## Part C: pi detection
 
-- One helper `agentBinDirs()` used by `usage_agents.go:15`, `agent_registry.go:128`, and
-  `orch_agents.go:150`: the existing dirs plus `~/.nvm/versions/node/<default>/bin` (from
-  `~/.nvm/alias/default`, else the newest version). Test with a temp HOME.
+- One helper `agentBinDirs()` used by `usage_agents.go:15`, `agent_registry.go:128` and
+  `orch_agents.go:149`: the existing dirs plus the nvm default bin dir. Resolve `~/.nvm/alias/default`
+  through alias chains (`lts/*`, `22`, `node`) against `~/.nvm/versions/node/*`, comparing versions
+  numerically; with no alias, the newest version.
+- A binary found in such a dir runs with that dir first on the child `PATH` (`binaryVersion`,
+  `orch_acp.go:416` ACP start), because pi starts with `#!/usr/bin/env node`.
+- Tests with a temp HOME: alias to a version, alias chain, no alias, PATH of the child.
 
 ## Part D: text selection on iOS
 
-- New `SelectableText: UIViewRepresentable` (non-editable, selectable `UITextView`, no scrolling, sizes to
-  its content, dynamic type, link detection off) for plain text, and an attributed variant for `Prose`
-  markdown (render the markdown to `AttributedString`, then `NSAttributedString`).
-- Use it for the user bubble (`ThreadChatView.swift:697`) and assistant prose (`Components.swift:436`).
-  Tool output and code blocks keep `Text` plus a "Select text" context-menu item that opens a sheet with
-  `SelectableText` (long output in a sheet is easier to select on a phone).
-- The existing context menus stay; a long press on selectable text starts selection, so the menu moves to
-  a small "…" button on each message.
-- Web and the Mac app already allow partial selection (checked: no `user-select: none` on messages).
+- Keep `Text`. Add "Select Text" to `CopyMenuItems` (`CopyKit.swift:170`). It opens a sheet with a
+  non-editable, selectable `UITextView` (`SelectableText: UIViewRepresentable`) holding the plain text of
+  that message or block. `CopyButton` and the existing context menus show the item, so every message and
+  tool output gets it with no layout change.
+- Web and the Mac app already allow partial selection (no `user-select: none` on messages).
 
 ## Order and gates
 
