@@ -166,7 +166,56 @@ enum Share {
     }
 }
 
-/// Copy, Copy as Markdown, Copy for Slack and Share for one piece of markdown text.
+/// A non-editable UITextView, so part of a message can be selected with the system handles.
+struct SelectableText: UIViewRepresentable {
+    let text: String
+    var mono = false
+
+    func makeUIView(context: Context) -> UITextView {
+        let v = UITextView()
+        v.isEditable = false
+        v.isSelectable = true
+        v.alwaysBounceVertical = true
+        v.backgroundColor = .clear
+        v.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        v.adjustsFontForContentSizeCategory = true
+        v.font = mono ? UIFont.monospacedSystemFont(ofSize: 15, weight: .regular) : UIFont.preferredFont(forTextStyle: .body)
+        v.text = text
+        return v
+    }
+
+    func updateUIView(_ v: UITextView, context: Context) {
+        if v.text != text { v.text = text }
+    }
+}
+
+private struct SelectTextSheet: View {
+    let text: String
+    let mono: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            SelectableText(text: text, mono: mono)
+                .navigationTitle("Select Text")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+enum SelectText {
+    /// Presents the plain text of one message or block in a sheet whose text can be selected in part.
+    @MainActor static func present(_ text: String, mono: Bool = false) {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+              var top = scene.windows.first(where: \.isKeyWindow)?.rootViewController else { return }
+        while let p = top.presentedViewController { top = p }
+        top.present(UIHostingController(rootView: SelectTextSheet(text: text, mono: mono)), animated: true)
+    }
+}
+
+/// Copy, Select Text, Copy as Markdown, Copy for Slack and Share for one piece of markdown text.
 struct CopyMenuItems: View {
     let markdown: String
     var label = "Copy"
@@ -174,6 +223,7 @@ struct CopyMenuItems: View {
 
     var body: some View {
         Button { copyToPasteboard(isCode ? markdown : SlackFormat.plain(markdown)) } label: { Label(label, systemImage: "doc.on.doc") }
+        Button { SelectText.present(isCode ? markdown : SlackFormat.plain(markdown), mono: isCode) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
         if !isCode {
             Button { copyToPasteboard(markdown, label: "Markdown copied") } label: { Label("Copy as Markdown", systemImage: "number") }
         }
