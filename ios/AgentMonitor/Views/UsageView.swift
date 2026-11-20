@@ -115,7 +115,13 @@ private struct AgentUsageRow: View {
                             .font(.footnote)
                         }
                     }
+                    if let sp = spend { creditsBar(sp) }
                     if let c = credits { Text(c).font(.footnote).foregroundStyle(Tok.fg2) }
+                    if let al = a.alert, !al.isEmpty { Text(al).font(.footnote.weight(.medium)).foregroundStyle(Tok.err) }
+                    if let at = a.measuredAt, at > 0 {
+                        Text((a.stale == true ? "Old reading, " : "Reading ") + ago(at))
+                            .font(.caption2).foregroundStyle(Tok.muted)
+                    }
                     if let n = a.note, !n.isEmpty { Text(n).font(.caption).foregroundStyle(Tok.muted) }
                 }
                 .padding(.leading, 23)
@@ -133,7 +139,7 @@ private struct AgentUsageRow: View {
             HStack(spacing: 8) {
                 ForEach(a.windows.filter { $0.usedPercent != nil }, id: \.key) { w in
                     let p = w.usedPercent ?? 0
-                    Text("\(w.key == "5h" ? "5h" : "wk") \(Int(p))%")
+                    Text("\(shortName(w)) \(Int(p))%")
                         .foregroundStyle(p >= 90 ? Tok.err : p >= 70 ? Tok.need : Tok.fg2)
                 }
             }
@@ -170,13 +176,48 @@ private struct AgentUsageRow: View {
     }
 
     private func windowName(_ key: String) -> String { key == "5h" ? "5 hours" : "Week" }
+    private func windowTitle(_ w: UsageWindow) -> String { w.key == "5h" || w.key == "weekly" ? windowName(w.key) : w.label }
+    private func shortName(_ w: UsageWindow) -> String {
+        switch w.key {
+        case "5h": return "5h"
+        case "weekly": return "wk"
+        default: return w.label.replacingOccurrences(of: "Week (", with: "").replacingOccurrences(of: ")", with: "")
+        }
+    }
+
+    /// credits with spent and limit: a spend limit in major units of its currency.
+    private var spend: (spent: Double, limit: Double, currency: String, percent: Double, reached: Bool)? {
+        guard case .object(let o)? = a.credits, case .number(let sp)? = o["spent"], case .number(let li)? = o["limit"] else { return nil }
+        var cur = "USD"
+        if case .string(let c)? = o["currency"], !c.isEmpty { cur = c }
+        var pct = li > 0 ? sp / li * 100 : 0
+        if case .number(let p)? = o["percent"] { pct = p }
+        var reached = false
+        if case .bool(true)? = o["capReached"] { reached = true }
+        return (sp, li, cur, pct, reached)
+    }
+
+    private func creditsBar(_ c: (spent: Double, limit: Double, currency: String, percent: Double, reached: Bool)) -> some View {
+        let tint = c.reached || c.percent >= 90 ? Tok.err : c.percent >= 70 ? Tok.need : Tok.ok
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Usage credits").foregroundStyle(Tok.fg2)
+                Spacer()
+                Text("\(Int(c.percent))%").monospacedDigit().foregroundStyle(Tok.fg)
+            }
+            .font(.footnote)
+            ProgressView(value: min(max(c.percent, 0), 100), total: 100).tint(tint)
+            Text(String(format: "%.2f of %.2f %@ spent", c.spent, c.limit, c.currency)).font(.caption2).foregroundStyle(Tok.muted)
+        }
+        .accessibilityElement(children: .combine)
+    }
 
     private func meter(_ w: UsageWindow) -> some View {
         let p = w.usedPercent ?? 0
         let tint = p >= 90 ? Tok.err : p >= 70 ? Tok.need : Tok.ok
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(windowName(w.key)).foregroundStyle(Tok.fg2)
+                Text(windowTitle(w)).foregroundStyle(Tok.fg2)
                 Spacer()
                 Text(w.usedPercent.map { "\(Int($0))%" } ?? "-").monospacedDigit().foregroundStyle(Tok.fg)
             }
@@ -207,6 +248,13 @@ private struct AgentUsageRow: View {
                 }
             }
         }
+    }
+
+    private func ago(_ at: Int64) -> String {
+        let mins = max(0, Int((Date().timeIntervalSince1970 - Double(at) / 1000) / 60))
+        if mins < 60 { return "\(mins) m ago" }
+        let h = mins / 60
+        return h < 48 ? "\(h) h ago" : "\(h / 24) d ago"
     }
 
     private func resetIn(_ at: Int64) -> String {

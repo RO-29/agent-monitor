@@ -485,6 +485,12 @@ struct AgentUsage: Decodable, Hashable {
     var local: [UsageLocal]?
     var models: [ModelUsage]?
     var credits: JSONValue?
+    /// A reached cap, shown as a red line.
+    var alert: String?
+    /// The plan reading is older than one hour.
+    var stale: Bool?
+    /// When the plan reading was taken, ms.
+    var measuredAt: Int64?
     var hasReading: Bool { windows.contains { $0.usedPercent != nil } }
     var hasLocal: Bool { (local ?? []).contains { $0.tokens.total + $0.tokens.cacheRead + $0.tokens.cacheCreate > 0 } }
     var hasModels: Bool { !(models ?? []).isEmpty }
@@ -495,7 +501,7 @@ struct AgentUsage: Decodable, Hashable {
         self.windows = windows; self.local = local; self.models = models; self.credits = credits
     }
 
-    private enum K: String, CodingKey { case agent, plan, note, installed, windows, local, models, credits }
+    private enum K: String, CodingKey { case agent, plan, note, installed, windows, local, models, credits, alert, stale, measuredAt }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
         agent = try c.decode(String.self, forKey: .agent)
@@ -506,6 +512,9 @@ struct AgentUsage: Decodable, Hashable {
         local = (try? c.decodeIfPresent([Lossy<UsageLocal>].self, forKey: .local))?.compactMap(\.value)
         models = (try? c.decodeIfPresent([Lossy<ModelUsage>].self, forKey: .models))?.compactMap(\.value)
         credits = try? c.decodeIfPresent(JSONValue.self, forKey: .credits)
+        alert = try? c.decodeIfPresent(String.self, forKey: .alert)
+        stale = try? c.decodeIfPresent(Bool.self, forKey: .stale)
+        measuredAt = try? c.decodeIfPresent(Int64.self, forKey: .measuredAt)
     }
 }
 

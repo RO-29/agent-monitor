@@ -67,6 +67,8 @@ type agentUsage struct {
 	LocalSource string        `json:"localSource"`
 	Models      []usageModel  `json:"models"`
 	Credits     *usageCredits `json:"credits,omitempty"`
+	Alert       string        `json:"alert,omitempty"` // a reached cap, shown as a red line
+	Stale       bool          `json:"stale,omitempty"` // the plan reading is older than usageStaleAfter
 }
 
 // usageModel is one model's local totals in one window ("5h" or "weekly").
@@ -90,6 +92,12 @@ type usageCredits struct {
 	Unlimited  *bool           `json:"unlimited,omitempty"`
 	Balance    json.RawMessage `json:"balance,omitempty"` // number or string, as recorded
 	SpendUSD   *float64        `json:"spendUsd,omitempty"`
+	// Set for a spend limit: Spent and Limit in major units of Currency.
+	Spent      *float64 `json:"spent,omitempty"`
+	Limit      *float64 `json:"limit,omitempty"`
+	Currency   string   `json:"currency,omitempty"`
+	Percent    *float64 `json:"percent,omitempty"`
+	CapReached bool     `json:"capReached,omitempty"`
 }
 
 type usageLimitsResp struct {
@@ -141,6 +149,14 @@ type usageFile struct {
 	latest    [2]codexLatest // codex: newest reading per window, 5h then weekly
 	credits   *codexCredits
 	creditsAt int64
+	flags     *codexFlags // codex: newest limit flags and their time (not saved with the scan state)
+	flagsAt   int64
+}
+
+// codexFlags are the rate_limits fields that say a cap was reached.
+type codexFlags struct {
+	Reached string
+	Spend   bool
 }
 
 // codexCredits is the rate_limits.credits object of a Codex token_count event.
@@ -224,6 +240,9 @@ func (s *usageScanner) scan() {
 		}
 		if f.creditsAt < keep {
 			f.credits, f.creditsAt = nil, 0
+		}
+		if f.flagsAt < keep {
+			f.flags, f.flagsAt = nil, 0
 		}
 		for i := range f.latest {
 			if f.latest[i].at < keep {
@@ -419,10 +438,12 @@ func (s *usageScanner) codexLine(f *usageFile, line []byte) {
 				} `json:"last_token_usage"`
 			} `json:"info"`
 			RateLimits *struct {
-				Primary   *codexWin     `json:"primary"`
-				Secondary *codexWin     `json:"secondary"`
-				PlanType  string        `json:"plan_type"`
-				Credits   *codexCredits `json:"credits"`
+				Primary   *codexWin       `json:"primary"`
+				Secondary *codexWin       `json:"secondary"`
+				PlanType  string          `json:"plan_type"`
+				Credits   *codexCredits   `json:"credits"`
+				Reached   *string         `json:"rate_limit_reached_type"`
+				Spend     json.RawMessage `json:"spend_control_reached"`
 			} `json:"rate_limits"`
 		} `json:"payload"`
 	}
@@ -447,6 +468,13 @@ func (s *usageScanner) codexLine(f *usageFile, line []byte) {
 		}
 		if rl.Credits != nil && at >= f.creditsAt {
 			f.credits, f.creditsAt = rl.Credits, at
+		}
+		if at >= f.flagsAt {
+			fl := &codexFlags{Spend: rawTruthy(rl.Spend)}
+			if rl.Reached != nil {
+				fl.Reached = *rl.Reached
+			}
+			f.flags, f.flagsAt = fl, at
 		}
 	}
 	// Totals repeat when Codex re-emits an event, so count only the growth of total_token_usage.
@@ -795,8 +823,44 @@ func (u *usageLimits) claudeUsage(now time.Time) agentUsage {
 		pct := u.monotonic("claude/"+spec.key, rl.UsedPercentage, resets)
 		a.Windows = append(a.Windows, u.window("claude", spec.key, spec.min, pct, resets, measured, now))
 	}
+	u.applyClaudeUtilization(&a, now)
 	a.Local, a.Models = u.local(u.claude.modelTotals, a.Windows, now, true)
 	return a
+}
+
+// rawTruthy is true for a JSON value other than null, false, 0, "" or an empty object or list.
+func rawTruthy(b json.RawMessage) bool {
+	switch string(bytes.TrimSpace(b)) {
+	case "", "null", "false", "0", `""`, "{}", "[]":
+		return false
+	}
+	return true
+}
+
+// codexAlert is the red line for a cap that a rollout reading says was reached.
+func codexAlert(f *codexFlags) string {
+	if f == nil {
+		return ""
+	}
+	switch f.Reached {
+	case "workspace_member_usage_limit_reached":
+		return "Workspace spend cap reached (set by the workspace owner)."
+	case "workspace_owner_usage_limit_reached":
+		return "Workspace spend cap reached. Raise it in the workspace settings."
+	case "workspace_owner_credits_depleted":
+		return "Workspace credits are used up. Add credits in the workspace settings."
+	case "workspace_member_credits_depleted":
+		return "Workspace credits are used up. Ask the workspace owner to add credits."
+	case "rate_limit_reached":
+		return "Rate limit reached. Usage resumes when the window resets."
+	}
+	if f.Reached != "" {
+		return "Limit reached: " + f.Reached + "."
+	}
+	if f.Spend {
+		return "Workspace spend cap reached."
+	}
+	return ""
 }
 
 func codexWinKey(w *codexWin, primary bool) string {
@@ -832,8 +896,12 @@ func (u *usageLimits) codexUsage(now time.Time) agentUsage {
 		}
 	}
 	got := map[string]codexLatest{}
-	var planAt, creditsAt int64
+	var planAt, creditsAt, flagsAt int64
+	var flags *codexFlags
 	for _, f := range u.codex.files {
+		if f.flags != nil && f.flagsAt >= flagsAt {
+			flags, flagsAt = f.flags, f.flagsAt
+		}
 		if f.plan != "" && f.planAt >= planAt {
 			a.Plan, planAt = f.plan, f.planAt
 		}
@@ -871,12 +939,17 @@ func (u *usageLimits) codexUsage(now time.Time) agentUsage {
 		}
 		a.Windows = append(a.Windows, u.window("codex", spec.key, m, l.w.UsedPercent, codexResetMs(l.w, l.at), l.at, now))
 	}
+	a.Alert = codexAlert(flags)
 	if len(got) == 0 {
-		a.Note = "No plan reading. Recent Codex rollouts report rate_limits with no primary or secondary window"
-		if a.Plan != "" {
-			a.Note += " (plan " + a.Plan + ")"
+		if strings.Contains(strings.ToLower(a.Plan), "business") {
+			a.Note = "Business plan: limits are set by the workspace owner."
+		} else {
+			a.Note = "No plan reading. Recent Codex rollouts report rate_limits with no primary or secondary window"
+			if a.Plan != "" {
+				a.Note += " (plan " + a.Plan + ")"
+			}
+			a.Note += "."
 		}
-		a.Note += "."
 	}
 	a.Local, a.Models = u.local(u.codex.modelTotals, a.Windows, now, true)
 	return a

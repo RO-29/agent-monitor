@@ -6,7 +6,8 @@ export interface UsagePoint {
   pct: number;
 }
 export interface UsageWindow {
-  key: "5h" | "weekly";
+  /** "5h", "weekly", "weekly_scoped" (label "Week (Model)") or another key the daemon adds. */
+  key: string;
   label: string;
   windowMinutes: number;
   usedPercent: number | null;
@@ -42,7 +43,10 @@ export interface ModelUsage {
   messages: number;
 }
 // Daemon shape: {source, measuredAt?, hasCredits?, unlimited?, balance?: number|string, spendUsd?}.
-export type UsageCredits = number | { source?: string; measuredAt?: number; hasCredits?: boolean; unlimited?: boolean; balance?: number | string | null; spendUsd?: number };
+// Spend limit shape: spent and limit in major units of currency, percent 0 to 100.
+export type UsageCredits =
+  | number
+  | { source?: string; measuredAt?: number; hasCredits?: boolean; unlimited?: boolean; balance?: number | string | null; spendUsd?: number; spent?: number; limit?: number; currency?: string; percent?: number; capReached?: boolean };
 export type AgentId = "claude" | "codex" | "opencode" | "cursor" | "pi";
 export interface AgentUsage {
   agent: AgentId | string;
@@ -57,6 +61,10 @@ export interface AgentUsage {
   localSource: string;
   models?: ModelUsage[];
   credits?: UsageCredits;
+  /** A reached cap, shown as a red line. */
+  alert?: string;
+  /** The plan reading is older than one hour. */
+  stale?: boolean;
 }
 export interface UsageLimits {
   generatedAt: number;

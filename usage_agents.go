@@ -36,46 +36,63 @@ func (u *usageLimits) installed(names ...string) bool {
 	return false
 }
 
-// cachedPlan holds a plan name read from a config file, keyed by its mtime.
+// cachedPlan holds the plan name and usage reading decoded from a config file, keyed by its mtime.
 type cachedPlan struct {
 	mod    time.Time
 	at     time.Time
 	plan   string
+	usage  *claudeCachedUsage
 	loaded bool
 }
 
 const claudePlanRecheck = 10 * time.Minute
 
-// claudePlanName decodes only oauthAccount plan fields of ~/.claude.json; nothing else is kept or logged.
+// claudePlanName returns the plan name from the ~/.claude.json read in claudeConfig.
 func (u *usageLimits) claudePlanName(now time.Time) string {
+	u.claudeConfig(now)
+	return u.claudePlan.plan
+}
+
+// claudeConfig decodes only the oauthAccount plan fields and cachedUsageUtilization of ~/.claude.json; nothing else is kept or logged.
+// The file is read at most every claudePlanRecheck, so the usage reading can lag the file by that long.
+func (u *usageLimits) claudeConfig(now time.Time) {
 	c := &u.claudePlan
 	if c.loaded && now.Sub(c.at) < claudePlanRecheck {
-		return c.plan
+		return
 	}
 	c.at, c.loaded = now, true
 	st, err := os.Stat(u.claudeCfg)
 	if err != nil {
-		c.plan, c.mod = "", time.Time{}
-		return ""
+		c.plan, c.usage, c.mod = "", nil, time.Time{}
+		return
 	}
 	if st.ModTime().Equal(c.mod) {
-		return c.plan
+		return
 	}
 	c.mod = st.ModTime()
 	var cfg struct {
 		OauthAccount *struct {
+			AccountUUID       string `json:"accountUuid"`
 			OrganizationType  string `json:"organizationType"`
 			UserRateLimitTier string `json:"userRateLimitTier"`
 			BillingType       string `json:"billingType"`
 		} `json:"oauthAccount"`
+		Cached *struct {
+			FetchedAtMs int64           `json:"fetchedAtMs"`
+			AccountUUID string          `json:"accountUuid"`
+			Utilization json.RawMessage `json:"utilization"`
+		} `json:"cachedUsageUtilization"`
 	}
 	b, err := os.ReadFile(u.claudeCfg)
 	if err != nil || json.Unmarshal(b, &cfg) != nil || cfg.OauthAccount == nil {
-		c.plan = ""
-		return ""
+		c.plan, c.usage = "", nil
+		return
 	}
 	c.plan = claudePlanLabel(cfg.OauthAccount.OrganizationType, cfg.OauthAccount.UserRateLimitTier)
-	return c.plan
+	c.usage = nil
+	if k := cfg.Cached; k != nil && k.AccountUUID != "" && k.AccountUUID == cfg.OauthAccount.AccountUUID {
+		c.usage = parseClaudeUtilization(k.FetchedAtMs, k.Utilization)
+	}
 }
 
 // claudePlanLabel turns ("claude_team", "default_claude_max_5x") into "team (max_5x)".

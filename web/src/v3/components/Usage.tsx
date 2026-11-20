@@ -15,7 +15,7 @@ const shortOf = (a: AgentUsage) => SHORT_NAME[a.agent] || nameOf(a);
 const rank = (a: AgentUsage) => (ORDER.indexOf(a.agent) + 1 || 99);
 const byOrder = (x: AgentUsage, y: AgentUsage) => rank(x) - rank(y) || x.agent.localeCompare(y.agent);
 const isInstalled = (a: AgentUsage) => a.installed !== false;
-const SHORT = { "5h": "5 h", weekly: "Week" } as const;
+const SHORT: Record<string, string> = { "5h": "5 h", weekly: "Week" };
 
 function useNow(ms: number) {
   const [now, setNow] = useState(Date.now());
@@ -40,7 +40,7 @@ function ageText(at: number, now: number): string {
 export function UsageMeter({ w, now, compact, at }: { w: UsageWindow; now: number; compact?: boolean; at?: number }) {
   const p = w.usedPercent;
   const lvl = usageLevel(p);
-  const label = compact ? SHORT[w.key] : w.label;
+  const label = compact ? SHORT[w.key] || w.label : w.label;
   const right =
     p != null ? pctText(p) : w.expired && w.lastPercent != null ? `reset, was ${pctText(w.lastPercent)}` : "no reading";
   const age = p != null && at && now - at > STALE_MS ? `read ${ageText(at, now)}` : "";
@@ -242,8 +242,38 @@ function ModelTable({ models, agent }: { models: ModelUsage[]; agent: string }) 
   );
 }
 
+const isSpend = (c: UsageCredits): c is Exclude<UsageCredits, number> & { spent: number; limit: number } => typeof c !== "number" && c.spent != null && c.limit != null;
+
+function money(n: number, cur?: string): string {
+  try {
+    return n.toLocaleString(undefined, { style: "currency", currency: cur || "USD" });
+  } catch {
+    return `${n.toLocaleString()} ${cur || ""}`.trim();
+  }
+}
+
+/** Credits as a bar: "<spent> of <limit> <currency> spent". */
+function CreditsBar({ c }: { c: Exclude<UsageCredits, number> & { spent: number; limit: number } }) {
+  const p = c.percent ?? (c.limit > 0 ? (c.spent / c.limit) * 100 : 0);
+  const lvl = c.capReached ? "over" : usageLevel(p);
+  const cur = c.currency || "USD";
+  return (
+    <div className={`umt ${lvl}`}>
+      <div className="umt-h">
+        <span>Usage credits</span>
+        <span className="mono">{pctText(p)}</span>
+      </div>
+      <div className="umt-t" role="progressbar" aria-label="Usage credits spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p)}>
+        <i style={{ width: `${Math.min(100, p)}%` }} />
+      </div>
+      <div className="umt-r">{`${money(c.spent, cur)} of ${money(c.limit, cur)} ${cur} spent`}</div>
+    </div>
+  );
+}
+
 function creditsText(c: UsageCredits): string {
   if (typeof c === "number") return `${c.toLocaleString()} credits`;
+  if (isSpend(c)) return "";
   if (c.unlimited) return "Credits: unlimited";
   if (c.balance != null && c.balance !== "") return `Credits: ${typeof c.balance === "number" ? c.balance.toLocaleString() : c.balance}`;
   if (c.spendUsd != null) return `${fmtUsd(c.spendUsd)} spent`;
@@ -263,15 +293,25 @@ function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
       </div>
     );
   const credits = a.credits != null ? creditsText(a.credits) : "";
+  const spend = a.credits != null && isSpend(a.credits) ? a.credits : null;
   return (
     <div className="ibox ucard">
       <h3>
         {nameOf(a)}
         {a.plan && <span className="chip t">{a.plan}</span>}
         {credits && <span className="chip">{credits}</span>}
+        {a.stale && <span className="pill p-mute">old reading</span>}
         <span className="muted">{a.measuredAt ? `reading ${fmtAgo(a.measuredAt)}` : "no reading"}</span>
       </h3>
+      {a.alert && <p className="sx-warn">{a.alert}</p>}
       {a.note && <p className="sx-p">{a.note}</p>}
+      {spend && (
+        <div className="ucard-w">
+          <div className="ucard-wi">
+            <CreditsBar c={spend} />
+          </div>
+        </div>
+      )}
       {a.windows.length > 0 && (
         <>
           <div className="ucard-w">
