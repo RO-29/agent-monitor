@@ -55,6 +55,7 @@ struct Composer: View {
     private var bashMode: Bool { bashCapable && bangTyped }
     /// The text Clear removed, kept 5 s for Undo.
     @State private var clearedText: String?
+    @State private var slashPanel: SlashPanel?
     @State private var skillCmds: [(String, String)] = []
     /// While the box holds "/word" with no space: the agent's built-in commands and skills that match.
     private var slashHits: [(String, String)] {
@@ -226,6 +227,22 @@ struct Composer: View {
         .sensoryFeedback(.selection, trigger: bashMode)
         .task(id: bashMode) { if bashMode { await loadHistory() } else if histBash { histIdx = -1 } }
         .task(id: focused) { if focused { await loadPrompts() } }
+        .sheet(item: $slashPanel) { p in
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if p.menu { Text("A menu is open in the terminal. Answer it there.").font(.callout).foregroundStyle(.secondary) }
+                        Text(p.text).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                }
+                .navigationTitle(p.command)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { slashPanel = nil } } }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showPrompts) {
             PromptHistorySheet(session: sessionID) { picked in
                 text = picked
@@ -421,8 +438,11 @@ struct Composer: View {
                 try await APIClient.shared.drivenSend(d, text: body, attachments: ids)
                 status = nil
             } else if let sid = sessionID {
-                let queued = try await APIClient.shared.cliSend(sid, text: body, attachments: ids)
-                status = queued ? "\(cliName) is busy and queued the message." : nil
+                let sent = try await APIClient.shared.cliSendFull(sid, text: body, attachments: ids)
+                status = sent.queued ? "\(cliName) is busy and queued the message." : nil
+                if !sent.panel.isEmpty {
+                    slashPanel = SlashPanel(command: String(body.split(separator: " ").first ?? ""), text: sent.panel, menu: sent.menu)
+                }
                 await loadQueue(sid)
             }
             // Keep text typed while the send was in flight.
@@ -703,4 +723,12 @@ func agentSlashCommands(_ agent: String) -> [(String, String)] {
     default:
         return []
     }
+}
+
+/// The screen a Claude slash command drew in the terminal; it never reaches the transcript.
+struct SlashPanel: Identifiable {
+    let id = UUID()
+    let command: String
+    let text: String
+    let menu: Bool
 }

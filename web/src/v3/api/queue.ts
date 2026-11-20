@@ -150,8 +150,12 @@ export const queueApi = {
 export const cliApi = {
   /** Types the message into the CLI; a 409 means the terminal cannot take it now. Answers whether the CLI queued it. */
   async send(session: string, text: string, attachments?: string[]) {
-    const r = await req<{ queued?: boolean }>("POST", `/api/session/${enc(session)}/cli-queue/send`, attachments?.length ? { text, attachments } : { text });
-    return !!r.queued;
+    return (await cliApi.sendFull(session, text, attachments)).queued;
+  },
+  /** As send, plus the panel a Claude slash command drew (/usage); menu means it waits for an answer in the terminal. */
+  async sendFull(session: string, text: string, attachments?: string[]) {
+    const r = await req<{ queued?: boolean; panel?: string; menu?: boolean }>("POST", `/api/session/${enc(session)}/cli-queue/send`, attachments?.length ? { text, attachments } : { text });
+    return { queued: !!r.queued, panel: r.panel || "", menu: !!r.menu };
   },
   /** Deletes the text in the terminal's input box; refused while a prompt is open. */
   async clearDraft(threadId: string, session: string) {

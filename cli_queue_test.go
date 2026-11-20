@@ -773,3 +773,43 @@ func TestCLIClearDraftRepeatsUntilEmpty(t *testing.T) {
 		t.Fatalf("rounds %d, keys %v", ends, f.sent)
 	}
 }
+
+const scrUsagePanel = "▎ Using Opus 5.5\n▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\n  Settings  Status   Config   Usage\n\n  Current session\n  ██▌   5% used\n  Total code changes:  0 lines   ↓\n"
+
+const scrModelMenu = "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\n  Select model\n  ❯ 2.  Opus 5.5 ✔\n    3.  Fable 5.2\n  s to use this session only · Enter to save · Esc to cancel\n"
+
+// A slash command's panel never reaches the transcript: its text comes back and an info panel is closed.
+func TestCLISendSlashPanelIsReadAndClosed(t *testing.T) {
+	id, f := setupCLITest(t)
+	prev := cliSlashWait
+	t.Cleanup(func() { cliSlashWait = prev })
+	cliSlashWait = 400 * time.Millisecond
+	f.sess = &Session{Tool: ToolClaude, State: StateAwaitingInput, RecentEvents: []RecentEvent{{Kind: "Stop"}}}
+	f.screens = []string{scrIdle, scrIdle, scrUsagePanel}
+	code, out := cliPost(id, "send", `{"text":"/usage"}`)
+	panel, _ := out["panel"].(string)
+	if code != 200 || !strings.Contains(panel, "Current session") || strings.Contains(panel, "Using Opus") || strings.Contains(panel, "↓") || out["menu"] != false {
+		t.Fatalf("usage: %d %v", code, out)
+	}
+	if n := len(f.sent); n == 0 || f.sent[n-1][0] != "Escape" {
+		t.Fatalf("the info panel must be closed: %v", f.sent)
+	}
+
+	f.typed, f.sent, f.n = nil, nil, 0
+	f.screens = []string{scrIdle, scrIdle, scrModelMenu}
+	code, out = cliPost(id, "send", `{"text":"/model"}`)
+	if panel, _ = out["panel"].(string); code != 200 || !strings.Contains(panel, "Select model") || out["menu"] != true {
+		t.Fatalf("model: %d %v", code, out)
+	}
+	for _, k := range f.sent {
+		if k[0] == "Escape" {
+			t.Fatalf("a menu must stay open: %v", f.sent)
+		}
+	}
+
+	f.typed, f.sent, f.n = nil, nil, 0
+	f.screens = []string{scrIdle}
+	if code, out = cliPost(id, "send", `{"text":"/compact"}`); code != 200 || out["panel"] != nil || len(f.sent) != 0 {
+		t.Fatalf("no panel: %d %v keys %v", code, out, f.sent)
+	}
+}

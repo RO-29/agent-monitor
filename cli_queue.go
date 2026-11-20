@@ -800,13 +800,20 @@ func cliAction(id, action, itemID string) (*cliActionResult, error) {
 	return res, nil
 }
 
+// cliSent: Panel holds the screen of a Claude slash command that drew a panel; Menu means it waits for an answer.
+type cliSent struct {
+	Queued bool
+	Panel  string
+	Menu   bool
+}
+
 // cliSend types a message into the CLI as if typed: a busy CLI queues it itself.
-func cliSend(id, text string, attachments ...string) (bool, error) {
+func cliSend(id, text string, attachments ...string) (cliSent, error) {
 	if strings.TrimSpace(text) == "" && len(attachments) == 0 {
-		return false, orchBadRequest("text is required")
+		return cliSent{}, orchBadRequest("text is required")
 	}
 	if len(text) > queueMaxText {
-		return false, orchBadRequest("text is longer than 64 KB")
+		return cliSent{}, orchBadRequest("text is longer than 64 KB")
 	}
 	ref := resolveWatched(id)
 	sessID := id
@@ -819,34 +826,34 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 	}
 	bang := strings.HasPrefix(text, "!") && (tool == ToolClaude || tool == ToolCodex)
 	if bang && strings.TrimSpace(text[1:]) == "" {
-		return false, orchBadRequest("a ! command needs a command after the !")
+		return cliSent{}, orchBadRequest("a ! command needs a command after the !")
 	}
 	if bang && len(attachments) > 0 {
-		return false, orchBadRequest("a ! command cannot carry attachments")
+		return cliSent{}, orchBadRequest("a ! command cannot carry attachments")
 	}
 	if len(attachments) > 0 {
 		if orchMgr == nil {
-			return false, orchBadRequest("this daemon keeps no uploads")
+			return cliSent{}, orchBadRequest("this daemon keeps no uploads")
 		}
 		ups, err := orchMgr.resolveUploads(attachments)
 		if err != nil {
-			return false, err
+			return cliSent{}, err
 		}
 		// Claude Code reads an @path as an attached file; Codex gets the bare path.
 		text = withFilePaths(text, ups)
 	}
 	target := cliIO.target(sessID)
 	if target == "" {
-		return false, orchConflict("agent-monitor cannot reach this terminal")
+		return cliSent{}, orchConflict("agent-monitor cannot reach this terminal")
 	}
 	defer cliLock(sessID)()
 	screen, err := cliIO.screen(target)
 	if err != nil {
-		return false, &orchHTTPError{http.StatusBadGateway, err.Error()}
+		return cliSent{}, &orchHTTPError{http.StatusBadGateway, err.Error()}
 	}
 	ph := watchedPhaseOf(cliIO.session(sessID), true, screen)
 	if ph == "prompt" {
-		return false, orchConflict("a question or permission prompt is open in the terminal")
+		return cliSent{}, orchConflict("a question or permission prompt is open in the terminal")
 	}
 	text = strings.TrimRight(text, " \t\r\n")
 	// An empty bash prompt ("!" alone) is a mode, not text: a ! command uses it, a message leaves it first.
@@ -856,11 +863,11 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 			inBash = true
 		} else {
 			if err := cliIO.keys(target, []string{"BSpace"}); err != nil {
-				return false, err
+				return cliSent{}, err
 			}
 			time.Sleep(cliBangPause)
 			if screen, err = cliIO.screen(target); err != nil {
-				return false, &orchHTTPError{http.StatusBadGateway, err.Error()}
+				return cliSent{}, &orchHTTPError{http.StatusBadGateway, err.Error()}
 			}
 		}
 	}
@@ -873,33 +880,33 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 				break
 			}
 			if time.Now().After(end) {
-				return false, orchConflict("the terminal input box has text in it; send it or clear it there first")
+				return cliSent{}, orchConflict("the terminal input box has text in it; send it or clear it there first")
 			}
 		}
 		if err != nil {
-			return false, &orchHTTPError{http.StatusBadGateway, err.Error()}
+			return cliSent{}, &orchHTTPError{http.StatusBadGateway, err.Error()}
 		}
 	}
 	if bang && tool == ToolClaude {
 		if !inBash {
 			if err := cliEnterBash(target); err != nil {
-				return false, err
+				return cliSent{}, err
 			}
 		}
 		if err := cliIO.text(target, strings.TrimLeft(text[1:], " "), true); err != nil {
-			return false, err
+			return cliSent{}, err
 		}
 	} else if tool == ToolCursor || tool == ToolCursorAgent {
 		// Cursor's box takes text and an Enter that arrive together as one paste: pause before Enter.
 		if err := cliIO.text(target, text, false); err != nil {
-			return false, err
+			return cliSent{}, err
 		}
 		time.Sleep(cliBangPause * 2)
 		if err := cliIO.keys(target, []string{"Enter"}); err != nil {
-			return false, err
+			return cliSent{}, err
 		}
 	} else if err := typeBang(func(t string, enter bool) error { return cliIO.text(target, t, enter) }, text, bang); err != nil {
-		return false, err
+		return cliSent{}, err
 	}
 	if bang {
 		noteBang(sessID, strings.TrimLeft(text[1:], " "), ph == "busy")
@@ -910,7 +917,57 @@ func cliSend(id, text string, attachments ...string) (bool, error) {
 	if queueMgr != nil && ph == "busy" {
 		queueMgr.NoteBusy(sessID)
 	}
-	return ph == "busy", nil
+	out := cliSent{Queued: ph == "busy"}
+	if tool == ToolClaude && !bang && strings.HasPrefix(text, "/") {
+		out.Panel, out.Menu = cliSlashPanel(target)
+	}
+	return out, nil
+}
+
+var cliSlashWait = 1500 * time.Millisecond
+
+// cliSlashPanel reads a panel a slash command drew over the box (/usage, /model): its text never reaches the
+// transcript, and an info panel swallows the next keys, so it is closed; a menu stays open for an answer.
+func cliSlashPanel(target string) (string, bool) {
+	var scr string
+	for end := time.Now().Add(cliSlashWait); ; {
+		time.Sleep(cliBangPause)
+		s, err := cliIO.screen(target)
+		if err != nil {
+			return "", false
+		}
+		if scr = s; !strings.Contains(cliInputBox(s), "❯") || time.Now().After(end) {
+			break
+		}
+	}
+	if strings.Contains(cliInputBox(scr), "❯") {
+		return "", false
+	}
+	text := panelText(scr)
+	low := strings.ToLower(scr)
+	if strings.Contains(low, "esc to cancel") || strings.Contains(low, "enter to ") {
+		return text, true
+	}
+	_ = cliIO.keys(target, []string{"Escape"})
+	return text, false
+}
+
+// panelText keeps the lines below the panel's top border (a row of ▔), without blank lines.
+func panelText(scr string) string {
+	lines := strings.Split(scr, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Count(lines[i], "▔") >= 20 {
+			lines = lines[i+1:]
+			break
+		}
+	}
+	var out []string
+	for _, l := range lines {
+		if l = strings.TrimRight(strings.TrimSuffix(strings.TrimRight(l, " "), "↓"), " "); strings.TrimSpace(l) != "" {
+			out = append(out, l)
+		}
+	}
+	return clipString(strings.Join(out, "\n"), orchOutputCap)
 }
 
 // cliEnterBash types "!" and checks that Claude Code shows exactly its "!" prompt; a lost key is typed once more.
@@ -1124,12 +1181,16 @@ func serveCLIQueue(w http.ResponseWriter, r *http.Request, path string) bool {
 		}
 	}
 	if action == "send" {
-		queued, err := cliSend(id, body.Text, body.Attachments...)
+		sent, err := cliSend(id, body.Text, body.Attachments...)
 		if err != nil {
 			orchWriteErr(w, err)
 			return true
 		}
-		writeJSON(w, map[string]any{"ok": true, "queued": queued})
+		res := map[string]any{"ok": true, "queued": sent.Queued}
+		if sent.Panel != "" {
+			res["panel"], res["menu"] = sent.Panel, sent.Menu
+		}
+		writeJSON(w, res)
 		return true
 	}
 	if action == "clear-draft" {

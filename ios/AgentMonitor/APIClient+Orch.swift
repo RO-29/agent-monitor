@@ -82,11 +82,19 @@ extension APIClient {
 
     /// Types the message into the CLI with optional upload ids; answers whether the busy CLI queued it.
     func cliSend(_ sessionID: String, text: String, attachments: [String]) async throws -> Bool {
-        struct R: Decodable { var queued: Bool? }
+        try await cliSendFull(sessionID, text: text, attachments: attachments).queued
+    }
+
+    struct CLISent { var queued: Bool; var panel: String; var menu: Bool }
+
+    /// As cliSend, plus the panel a Claude slash command drew (/usage); menu means it waits in the terminal.
+    func cliSendFull(_ sessionID: String, text: String, attachments: [String]) async throws -> CLISent {
+        struct R: Decodable { var queued: Bool?; var panel: String?; var menu: Bool? }
         var body: [String: Any] = ["text": text]
         if !attachments.isEmpty { body["attachments"] = attachments }
         let data = try await post("/api/session/\(enc(sessionID))/cli-queue/send", body: body)
-        return (try? JSONDecoder().decode(R.self, from: data))?.queued ?? false
+        let r = try? JSONDecoder().decode(R.self, from: data)
+        return CLISent(queued: r?.queued ?? false, panel: r?.panel ?? "", menu: r?.menu ?? false)
     }
 
     func subagentItems(_ sessionID: String, agentID: String, after: Int64?) async throws -> WatchedItems {

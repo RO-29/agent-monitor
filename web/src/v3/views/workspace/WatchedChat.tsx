@@ -239,7 +239,8 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
     try {
       if (mode === "tmux") {
         try {
-          await cliApi.send(sid, body, ids);
+          const r = await cliApi.sendFull(sid, body, ids);
+          if (r.panel) showToast(body.split(/\s/)[0], r.menu ? "A menu is open in the terminal. Answer it there." : undefined, { output: r.panel });
         } catch (e) {
           const st = (e as { status?: number }).status;
           // Files need the direct route: the fallbacks below type only text.
