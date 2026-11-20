@@ -81,6 +81,8 @@ final class AppStore {
     var threads: [V3Thread] = [] { didSet { recomputeNeedThreads() } }
     var threadOf: [String: String] = [:] { didSet { recomputeNeedThreads() } }
     var threadsError: String?
+    /// True after the first thread list load that succeeded; before it, an empty list means "not loaded yet".
+    var threadsLoaded = false
 
     // Notification centre (/api/notify), newest first.
     var alerts: [AlertItem] = []
@@ -512,6 +514,7 @@ final class AppStore {
             if DebugRoute.sample { threads.insert(DebugRoute.sampleThread, at: 0) }
             #endif
             threadsError = nil
+            threadsLoaded = true
             if let p = pendingOpen, workspacePath.first.map({ $0 == p || $0 == resolveThreadID(p) }) == true {
                 let rid = resolveThreadID(p)
                 if thread(rid) != nil {

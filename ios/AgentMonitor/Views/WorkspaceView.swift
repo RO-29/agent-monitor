@@ -49,6 +49,29 @@ struct WorkspaceView: View {
                         ForEach(settled.prefix(100)) { t in row(t, .settled) }
                     }
                 }
+                // In the list, not an overlay, so it never covers the Usage section.
+                if !searching && store.threads.isEmpty && store.threadsError == nil && store.approvals.isEmpty {
+                    Section {
+                        if store.threadsLoaded {
+                            ContentUnavailableView {
+                                Label("No threads yet", systemImage: "bubble.left.and.text.bubble.right")
+                            } description: {
+                                Text("Agent sessions on the Mac appear here. Start one with the compose button.")
+                            } actions: {
+                                Button("New Thread") { store.newThread() }.buttonStyle(.borderedProminent)
+                            }
+                        } else {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("Loading threads").font(.footnote).foregroundStyle(Tok.muted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        }
+                    }
+                    .listRowBackground(Tok.bg)
+                    .listRowSeparator(.hidden)
+                }
                 if !searching {
                     FoldSection("Usage", key: "home.usage") {
                         UsageStrip()
@@ -61,15 +84,7 @@ struct WorkspaceView: View {
             .scrollContentBackground(.hidden)
             .background(Tok.bg)
             .overlay {
-                if store.threads.isEmpty && store.threadsError == nil && store.approvals.isEmpty {
-                    ContentUnavailableView {
-                        Label("No threads yet", systemImage: "bubble.left.and.text.bubble.right")
-                    } description: {
-                        Text("Agent sessions on the Mac appear here. Start one with the compose button.")
-                    } actions: {
-                        Button("New Thread") { store.newThread() }.buttonStyle(.borderedProminent)
-                    }
-                } else if !query.isEmpty && noMatches {
+                if !query.isEmpty && noMatches {
                     ContentUnavailableView.search(text: query)
                 }
             }
