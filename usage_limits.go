@@ -823,7 +823,7 @@ func (u *usageLimits) claudeUsage(now time.Time) agentUsage {
 		min       int
 	}{{"five_hour", "5h", 300}, {"seven_day", "weekly", 10080}} {
 		rl := st.RateLimits[spec.name]
-		resets := int64(rl.ResetsAt * 1000)
+		resets := roundMinuteMs(int64(rl.ResetsAt * 1000))
 		pct := u.monotonic("claude/"+spec.key, rl.UsedPercentage, resets)
 		a.Windows = append(a.Windows, u.window("claude", spec.key, spec.min, pct, resets, measured, now))
 	}
@@ -955,7 +955,7 @@ func (u *usageLimits) codexUsage(now time.Time) agentUsage {
 			a.Note += "."
 		}
 	}
-	u.applyCodexAmounts(&a, now)
+	u.applyCodexAmounts(&a, now, flagsAt, creditsAt)
 	a.Local, a.Models = u.local(u.codex.modelTotals, a.Windows, now, true)
 	return a
 }

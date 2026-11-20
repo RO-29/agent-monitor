@@ -140,10 +140,18 @@ export default function V3Shell() {
   useEffect(() => {
     if (!toasts.length) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) dismissToast(toasts[toasts.length - 1].id);
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input,textarea,select,[contenteditable],.xterm")) return;
+      if (document.querySelector('[role="dialog"],[role="menu"],[role="listbox"],[popover]:popover-open')) return;
+      const newest = [...toasts].reverse().find((x) => x.kind !== "alert");
+      if (!newest) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dismissToast(newest.id);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [toasts]);
   const [pal, setPal] = useState<{ q?: string; scope?: string } | null>(null);
   const [pane, setPane] = useState<Session | null>(null);

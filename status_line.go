@@ -12,7 +12,7 @@ const (
 
 var (
 	reStatusANSI  = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]|\x1b\\][^\x07]*\x07")
-	reSlashChoice = regexp.MustCompile(`^\s*(❯\s*)?/\S+\s{2,}\S`)
+	reSlashChoice = regexp.MustCompile(`^\s*(❯\s*)?(/\S+\s{2,}\S|@\S+\s*$)`)
 )
 
 // paneStatusLine returns the footer an agent's terminal draws under its input box: model, context, mode.
@@ -54,7 +54,7 @@ func claudeStatusLine(screen string) []string {
 			below = append(below, t)
 		}
 	}
-	if len(below) == 0 || strings.HasPrefix(below[0], "/") || strings.HasPrefix(below[0], "@") {
+	if len(below) == 0 {
 		return nil
 	}
 	choices := 0

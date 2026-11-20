@@ -68,9 +68,10 @@ func (u *usageLimits) applyClaudeUtilization(a *agentUsage, now time.Time) {
 	if c == nil || c.FetchedAtMs <= 0 {
 		return
 	}
-	a.MeasuredAt = c.FetchedAtMs
+	stMeasured := a.MeasuredAt
+	a.MeasuredAt = max(a.MeasuredAt, c.FetchedAtMs)
 	a.Source = "Claude Code cached usage (~/.claude.json)"
-	a.Stale = now.Sub(time.UnixMilli(c.FetchedAtMs)) > usageStaleAfter
+	a.Stale = now.Sub(time.UnixMilli(a.MeasuredAt)) > usageStaleAfter
 	a.Note = ""
 	scoped := 0
 	for _, r := range c.Limits {
@@ -80,7 +81,7 @@ func (u *usageLimits) applyClaudeUtilization(a *agentUsage, now time.Time) {
 		t, err := time.Parse(time.RFC3339, r.ResetsAt)
 		resets := int64(0)
 		if err == nil {
-			resets = t.UnixMilli()
+			resets = roundMinuteMs(t.UnixMilli())
 		}
 		switch r.Kind {
 		case "session", "weekly_all":
@@ -88,11 +89,12 @@ func (u *usageLimits) applyClaudeUtilization(a *agentUsage, now time.Time) {
 			if r.Kind == "weekly_all" {
 				key, mins = "weekly", 10080
 			}
-			pct := u.monotonic("claude/"+key, r.Percent, resets)
-			w := u.window("claude", key, mins, pct, resets, c.FetchedAtMs, now)
 			for i := range a.Windows {
-				if a.Windows[i].Key == key {
-					a.Windows[i] = w
+				// The cache wins only when newer than the statusLine copy, or when the copy lacks the window.
+				old := a.Windows[i]
+				if old.Key == key && (c.FetchedAtMs > stMeasured || (old.UsedPercent == nil && old.LastPercent == nil)) {
+					pct := u.monotonic("claude/"+key, r.Percent, resets)
+					a.Windows[i] = u.window("claude", key, mins, pct, resets, c.FetchedAtMs, now)
 				}
 			}
 		case "weekly_scoped":
@@ -124,3 +126,6 @@ func (u *usageLimits) applyClaudeUtilization(a *agentUsage, now time.Time) {
 		}
 	}
 }
+
+// roundMinuteMs rounds a reset time to the minute, so the statusLine copy and the cache share one window identity.
+func roundMinuteMs(ms int64) int64 { return (ms + 30_000) / 60_000 * 60_000 }

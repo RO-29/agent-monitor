@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +16,10 @@ import (
 const (
 	codexRPCEvery   = 10 * time.Minute
 	codexRPCTimeout = 15 * time.Second
+	codexRPCExpire  = 30 * time.Minute
 )
+
+var codexReapCap = 5 * time.Second
 
 type codexRateWin struct {
 	UsedPercent        float64 `json:"usedPercent"`
@@ -61,10 +65,7 @@ func codexRateRead(ctx context.Context) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		conn.kill()
-		<-conn.done
-	}()
+	defer conn.reap(codexReapCap)
 	if _, err := conn.call(ctx, "initialize", map[string]any{
 		"clientInfo":   map[string]any{"name": "agent-monitor", "title": "agent-monitor", "version": "0.1.0"},
 		"capabilities": map[string]any{"experimentalApi": false},
@@ -178,11 +179,11 @@ func rawFloat(b json.RawMessage) (float64, bool) {
 		return 0, false
 	}
 	f, err := strconv.ParseFloat(t, 64)
-	return f, err == nil
+	return f, err == nil && !math.IsNaN(f) && !math.IsInf(f, 0)
 }
 
 // applyCodexAmounts overlays the app-server answer on the rollout-based Codex usage; an error only sets the note.
-func (u *usageLimits) applyCodexAmounts(a *agentUsage, now time.Time) {
+func (u *usageLimits) applyCodexAmounts(a *agentUsage, now time.Time, flagsAt, creditsAt int64) {
 	s := &u.codexRPC
 	s.mu.Lock()
 	res, errText := s.res, s.err
@@ -190,7 +191,7 @@ func (u *usageLimits) applyCodexAmounts(a *agentUsage, now time.Time) {
 	if errText != "" {
 		a.Note = errText
 	}
-	if res == nil {
+	if res == nil || now.UnixMilli()-res.At > codexRPCExpire.Milliseconds() {
 		return
 	}
 	sn := res.Snap
@@ -228,17 +229,21 @@ func (u *usageLimits) applyCodexAmounts(a *agentUsage, now time.Time) {
 	if il := sn.IndividualLimit; il != nil {
 		used, ok1 := rawFloat(il.Used)
 		limit, ok2 := rawFloat(il.Limit)
-		if ok1 && ok2 {
+		if ok1 && ok2 && res.At > creditsAt {
 			pct := 0.0
 			if il.RemainingPercent != nil {
 				pct = 100 - *il.RemainingPercent
 			} else if limit > 0 {
 				pct = used / limit * 100
 			}
+			pct = math.Max(0, math.Min(100, pct))
 			c := &usageCredits{Source: "Codex app-server account/rateLimits/read", MeasuredAt: res.At, Spent: &used, Limit: &limit, Percent: &pct}
 			c.CapReached = sn.SpendReached != nil && *sn.SpendReached
 			a.Credits = c
 		}
+	}
+	if res.At <= flagsAt {
+		return
 	}
 	fl := &codexFlags{Spend: sn.SpendReached != nil && *sn.SpendReached}
 	if sn.ReachedType != nil {

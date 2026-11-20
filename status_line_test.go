@@ -43,9 +43,9 @@ func TestStatusLineClaudeSlashSuggestions(t *testing.T) {
 	if got := paneStatusLine(ToolClaude, below); got != nil {
 		t.Fatalf("suggestions below the box: %q", got)
 	}
-	one := box + "/usage\n"
-	if got := paneStatusLine(ToolClaude, one); got != nil {
-		t.Fatalf("slash first line: %q", got)
+	at := box + "  @src/a.go\n  @src/b.go\n"
+	if got := paneStatusLine(ToolClaude, at); got != nil {
+		t.Fatalf("@ suggestions below the box: %q", got)
 	}
 }
 
@@ -90,5 +90,29 @@ func TestStatusLineANSIAndClip(t *testing.T) {
 	}
 	if paneStatusLine(ToolCursor, scr) != nil {
 		t.Fatal("other agents get nothing")
+	}
+}
+
+func TestStatusLineFooterStartingWithPath(t *testing.T) {
+	scr := "x\n" + cliRule + "\n❯ \n" + cliRule + "\n  /Users/x/repo  main\n  Opus 5.5 │ repo\n"
+	wantStatus(t, paneStatusLine(ToolClaude, scr), "/Users/x/repo", 2)
+}
+
+func TestClaudeBoxRulesDraftWithRuleLine(t *testing.T) {
+	top := strings.Repeat("─", 60)
+	draft := strings.Repeat("─", 30)
+	scr := "out\n" + top + "\n❯ first\n  " + draft + "\n  more text\n" + top + "\n  Opus 5.5 │ repo\n"
+	if box := cliInputBox(scr); !strings.Contains(box, "more text") {
+		t.Fatalf("box cut at the draft rule: %q", box)
+	}
+	wantStatus(t, paneStatusLine(ToolClaude, scr), "Opus 5.5", 1)
+}
+
+func TestStatusLineSurvivesEarlyReturns(t *testing.T) {
+	_, f := setupCLITest(t)
+	f.tgt, f.screens = "%1", []string{screenFixture(t, "claude-idle.txt")}
+	v, _, _ := cliQueueView("claude:missing-session", false)
+	if v == nil || len(v.StatusLine) != 3 {
+		t.Fatalf("status line lost on an early return: %+v", v)
 	}
 }

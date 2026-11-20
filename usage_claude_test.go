@@ -108,3 +108,27 @@ func TestUsageCodexFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageClaudeStatusLineNewerThanCache(t *testing.T) {
+	home := usageHome(t)
+	reset := usageNow.Add(48 * time.Hour)
+	st := fmt.Sprintf(`{"updated_at": %d, "rate_limits": {"seven_day": {"used_percentage": 77, "resets_at": %d.4}}}`,
+		usageNow.Add(-time.Minute).Unix(), reset.Unix())
+	if err := os.WriteFile(filepath.Join(home, ".dietclaude", "state.json"), []byte(st), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := claudeCfgJSON("acct-1", "acct-1", usageNow.Add(-10*time.Minute), true)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := newUsageLimits(home, "", func() time.Time { return usageNow }).get().Agents[0]
+	if w := findWin(a, "weekly"); w.UsedPercent == nil || *w.UsedPercent != 77 {
+		t.Fatalf("a newer statusLine reading must win: %+v", w)
+	}
+	if findWin(a, "weekly_scoped").UsedPercent == nil || a.Credits == nil {
+		t.Fatalf("scoped window and credits still come from the cache: %+v", a)
+	}
+	if roundMinuteMs(90_000) != 120_000 || roundMinuteMs(89_999) != 60_000 {
+		t.Fatal("reset rounding")
+	}
+}

@@ -575,23 +575,31 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		return v, "", nil
 	}
 	if ref.Tool != ToolClaude || !ref.Resolved || ref.Path == "" {
-		v.Reachable = cliIO.target(firstOf(ref.ID, id)) != "" // Cursor and others take sends with no queue view
+		t := cliIO.target(firstOf(ref.ID, id))
+		v.Reachable = t != "" // Cursor and others take sends with no queue view
+		if t != "" {
+			scr, _ := cliIO.screen(t)
+			v.StatusLine = paneStatusLine(ref.Tool, scr)
+		}
 		return v, "", errCLINotSupported
 	}
 	v.Supported = true
+	target := cliIO.target(ref.ID)
+	v.Reachable = target != ""
+	screen := ""
+	if target != "" {
+		screen, _ = cliIO.screen(target)
+		v.StatusLine = paneStatusLine(ToolClaude, screen)
+	}
 	items, err := cliQueueOf(ref.Path)
 	if err != nil {
 		return v, "", err
 	}
-	target := cliIO.target(ref.ID)
-	v.Reachable = target != ""
-	screen := ""
 	if len(items) > 0 {
 		// Claude Code never keeps a queue while it waits at its prompt: what is left is from an earlier process.
 		s := cliIO.session(ref.ID)
 		idle := s != nil && (s.State == StateCompleted || s.State == StateAbandoned || s.State == StateIdle || s.State == StateAwaitingInput)
 		if target != "" {
-			screen, _ = cliIO.screen(target)
 			if screen != "" {
 				noHint := !strings.Contains(strings.ToLower(screen), cliHint)
 				idle = (watchedPhaseOf(s, true, screen) == "ready" && noHint) || (noHint && cliBoxEmpty(screen))
@@ -623,10 +631,6 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 	}
 	if target != "" {
 		v.Draft = cliDraft(target)
-		if screen == "" {
-			screen, _ = cliIO.screen(target)
-		}
-		v.StatusLine = paneStatusLine(ToolClaude, screen)
 	}
 	users := len(cliUserItems(items))
 	switch {
@@ -664,9 +668,24 @@ func claudeBoxRules(lines []string) (int, int) {
 			rules = append(rules, i)
 		}
 	}
+	// The closing rule has the opening rule's width; a rule-like line typed into a draft does not.
+	width := func(i int) int { return len([]rune(strings.TrimSpace(lines[i]))) }
 	for i := len(rules) - 2; i >= 0; i-- {
-		a, b := rules[i], rules[i+1]
-		if l := strings.TrimSpace(lines[a+1]); b > a+1 && (strings.HasPrefix(l, "❯") || strings.HasPrefix(l, "!")) {
+		a := rules[i]
+		if l := strings.TrimSpace(lines[a+1]); !(strings.HasPrefix(l, "❯") || strings.HasPrefix(l, "!")) {
+			continue
+		}
+		b := -1
+		for _, r := range rules[i+1:] {
+			if b < 0 {
+				b = r
+			}
+			if width(r) == width(a) {
+				b = r
+				break
+			}
+		}
+		if b > a+1 {
 			return a, b
 		}
 	}

@@ -46,6 +46,7 @@ var (
 type codexConn struct {
 	cmd     *exec.Cmd
 	stdin   io.WriteCloser
+	stdoutR io.Closer
 	wmu     sync.Mutex
 	nextID  atomic.Int64
 	pmu     sync.Mutex
@@ -119,7 +120,7 @@ func startRPCConn(cmd *exec.Cmd, h codexHandlers, name string, rpc2 bool) (*code
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	c.stdin = stdin
+	c.stdin, c.stdoutR = stdin, stdout
 	go func() {
 		r := bufio.NewReaderSize(stdout, 1<<20)
 		for {
@@ -272,6 +273,22 @@ func killProc(stdin io.Closer, wmu *sync.Mutex, cmd *exec.Cmd, done <-chan struc
 		case <-time.After(term):
 		}
 		_ = syscall.Kill(-p.Pid, syscall.SIGKILL)
+	}
+}
+
+// reap stops the process without trusting stdout to reach EOF: a grandchild that escaped the process group
+// can hold the pipe open. After capD it closes our end, so the reader and Wait finish (Wait has WaitDelay).
+func (c *codexConn) reap(capD time.Duration) {
+	go c.kill()
+	select {
+	case <-c.done:
+		return
+	case <-time.After(capD):
+	}
+	_ = c.stdoutR.Close()
+	select {
+	case <-c.done:
+	case <-time.After(3 * time.Second):
 	}
 }
 

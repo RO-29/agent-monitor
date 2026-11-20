@@ -6,9 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -19,6 +22,10 @@ func TestFakeCodexAppServer(t *testing.T) {
 	if mode == "" {
 		t.Skip("helper process")
 	}
+	if mode == "sleep" {
+		time.Sleep(25 * time.Second)
+		os.Exit(0)
+	}
 	in := bufio.NewScanner(os.Stdin)
 	for in.Scan() {
 		var m rpcMsg
@@ -26,11 +33,18 @@ func TestFakeCodexAppServer(t *testing.T) {
 			continue
 		}
 		var res string
+		if mode == "escape" && m.Method == "initialize" {
+			gc := exec.Command(os.Args[0], "-test.run=^TestFakeCodexAppServer$")
+			gc.Env = append(os.Environ(), "FAKE_CODEX_APP_SERVER=sleep")
+			gc.Stdout = os.Stdout
+			gc.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+			_ = gc.Start()
+		}
 		switch m.Method {
 		case "initialize":
 			res = `{"userAgent":"fake"}`
 		case "account/rateLimits/read":
-			if mode == "hang" {
+			if mode == "hang" || mode == "escape" {
 				time.Sleep(time.Hour)
 			}
 			if mode == "error" {
@@ -148,10 +162,53 @@ func TestCodexAmountsLenientAndKeyPaths(t *testing.T) {
 	capped := `{"rateLimits":{"rateLimitReachedType":"workspace_member_usage_limit_reached","spendControlReached":true}}`
 	r2, _ := parseCodexAmounts(json.RawMessage(capped), 1)
 	u := newUsageLimits(usageHome(t), "", func() time.Time { return usageNow })
+	r2.At = usageNow.UnixMilli()
 	u.codexRPC.res = r2
 	a := agentUsage{}
-	u.applyCodexAmounts(&a, usageNow)
+	u.applyCodexAmounts(&a, usageNow, 0, 0)
 	if a.Alert != "Workspace spend cap reached (set by the workspace owner)." {
 		t.Fatalf("alert %q", a.Alert)
+	}
+}
+
+func TestCodexAmountsEscapedGrandchildDoesNotBlock(t *testing.T) {
+	fakeCodexBin(t, "escape")
+	prev := codexReapCap
+	codexReapCap = time.Second
+	defer func() { codexReapCap = prev }()
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := codexRateRead(ctx)
+	if err == nil || time.Since(start) > 12*time.Second {
+		t.Fatalf("err %v after %v", err, time.Since(start))
+	}
+}
+
+func TestCodexAmountsStaleAndNewer(t *testing.T) {
+	res, _ := parseCodexAmounts(json.RawMessage(`{"rateLimits":{"rateLimitReachedType":"rate_limit_reached","spendControlReached":true}}`), usageNow.UnixMilli()-1000)
+	u := newUsageLimits(usageHome(t), "", func() time.Time { return usageNow })
+	u.codexRPC.res = res
+	a := agentUsage{Alert: "rollout alert"}
+	u.applyCodexAmounts(&a, usageNow, usageNow.UnixMilli(), 0)
+	if a.Alert != "rollout alert" {
+		t.Fatalf("an older answer must not override newer rollout flags: %q", a.Alert)
+	}
+	res.At = usageNow.UnixMilli() - (31 * time.Minute).Milliseconds()
+	b := agentUsage{}
+	u.applyCodexAmounts(&b, usageNow, 0, 0)
+	if b.Alert != "" {
+		t.Fatalf("an answer older than 30 minutes must drop: %q", b.Alert)
+	}
+}
+
+func TestRawFloatRejectsNaNAndInf(t *testing.T) {
+	for _, in := range []string{`"NaN"`, `"Inf"`, `"-Inf"`, `"+Infinity"`} {
+		if _, ok := rawFloat(json.RawMessage(in)); ok {
+			t.Fatalf("%s accepted", in)
+		}
+	}
+	if f, ok := rawFloat(json.RawMessage(`"12.50"`)); !ok || math.Abs(f-12.5) > 1e-9 {
+		t.Fatal("plain number")
 	}
 }
