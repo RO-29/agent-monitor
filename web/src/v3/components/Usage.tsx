@@ -282,6 +282,17 @@ function creditsText(c: UsageCredits): string {
   return "";
 }
 
+/** One line for the thread status area: "Credits $12.40 of $50.00 (25%)", empty when no reading. */
+export function creditsLine(a?: AgentUsage): string {
+  if (!a?.credits) return "";
+  const c = a.credits;
+  if (isSpend(c)) {
+    const p = c.percent ?? (c.limit > 0 ? (c.spent / c.limit) * 100 : 0);
+    return `Credits ${money(c.spent, c.currency)} of ${money(c.limit, c.currency)} (${pctText(p)})${c.capReached ? ", cap reached" : ""}`;
+  }
+  return creditsText(c);
+}
+
 function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
   if (!isInstalled(a))
     return (

@@ -56,6 +56,8 @@ struct Composer: View {
     /// The text Clear removed, kept 5 s for Undo.
     @State private var clearedText: String?
     @State private var slashPanel: SlashPanel?
+    /// This agent's usage credits, shown under the status line.
+    @State private var credits: String?
     @State private var skillCmds: [(String, String)] = []
     /// While the box holds "/word" with no space: the agent's built-in commands and skills that match.
     private var slashHits: [(String, String)] {
@@ -68,9 +70,10 @@ struct Composer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let sl = queue?.statusLine, !sl.isEmpty, reachable {
+            let sl = (reachable ? queue?.statusLine ?? [] : []) + (credits.map { [$0] } ?? [])
+            if !sl.isEmpty {
                 Text(sl.joined(separator: "\n")).font(.caption.monospaced()).foregroundStyle(.secondary)
-                    .lineLimit(4).frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(5).frame(maxWidth: .infinity, alignment: .leading)
             }
             if let d = queue?.draft, !d.isEmpty, reachable {
                 VStack(alignment: .leading, spacing: 6) {
@@ -503,6 +506,9 @@ struct Composer: View {
         var n = 0
         while !Task.isCancelled {
             if n % 3 == 0 { pane = try? await APIClient.shared.watchedPane(sid) }
+            if n % 12 == 0, let u = try? await APIClient.shared.usageLimits() {
+                credits = u.agents?.first { $0.agent == agentKey(agent) }?.creditsLine
+            }
             await loadQueue(sid)
             n += 1
             // A running ! command shows its terminal output, so it refreshes faster.

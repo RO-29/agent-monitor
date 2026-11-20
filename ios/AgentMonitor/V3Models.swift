@@ -683,3 +683,24 @@ struct NeedsYouResponse: Decodable {
         count = try c.decodeIfPresent(Int.self, forKey: .count)
     }
 }
+
+extension AgentUsage {
+    /// One line for the thread status area, e.g. "Credits 12.40 of 50.00 USD (25%)"; nil with no reading.
+    var creditsLine: String? {
+        guard case .object(let o)? = credits else { return nil }
+        if case .number(let sp)? = o["spent"], case .number(let li)? = o["limit"] {
+            var cur = ""
+            if case .string(let c)? = o["currency"], !c.isEmpty { cur = " " + c }
+            var pct = li > 0 ? sp / li * 100 : 0
+            if case .number(let p)? = o["percent"] { pct = p }
+            let capped: Bool = { if case .bool(true)? = o["capReached"] { return true }; return false }()
+            return String(format: "Credits %.2f of %.2f%@ (%d%%)", sp, li, cur, Int(pct)) + (capped ? ", cap reached" : "")
+        }
+        if case .bool(true)? = o["unlimited"] { return "Credits: unlimited" }
+        switch o["balance"] {
+        case .number(let n)?: return "Credits: " + String(format: n == n.rounded() ? "%.0f" : "%.2f", n)
+        case .string(let b)? where !b.isEmpty: return "Credits: \(b)"
+        default: return nil
+        }
+    }
+}

@@ -40,6 +40,8 @@ import { LinkedChip, LinkedPage, sessionLinks, type LinkedEntry } from "./linked
 import { NewThreadBtn } from "./NewThread";
 import { useCmdHistory } from "./bash";
 import { useDocTitle } from "../../../lib/title";
+import { useUsageLimits } from "../../api/usage";
+import { creditsLine } from "../../components/Usage";
 
 export const latestSession = (row: Row) => row.thread?.sessions[row.thread.sessions.length - 1] || row.session?.id || "";
 
@@ -224,6 +226,8 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const cliName = row.agent === "claude" ? "Claude Code" : row.agent === "codex" ? "Codex" : agentName(row.agent);
   const [cliAll, setCliAll] = useState(false);
   const q = useQueue(row.id, sid, owned, { cliAll, bump: session?.cliQueued || 0 });
+  const usage = useUsageLimits(60_000);
+  const credits = creditsLine(usage.data?.agents.find((a) => a.agent === row.agent));
   const qref = useRef<QueueListHandle>(null);
   // A reachable terminal gets the message at once, as if typed: a busy CLI queues it itself.
   const busyNow = running || session?.state === "awaiting-permission";
@@ -459,7 +463,11 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         onEdit={(body) => setText((cur) => (cur.trim() ? `${cur}\n${body}` : body))}
         cli={row.agent === "claude" && owned ? { session: sid, name: cliName, showAll: cliAll, onShowAll: setCliAll } : undefined}
       />
-      {!!q.statusLine?.length && <pre className="wstatus" aria-label="Agent status line">{q.statusLine.join("\n")}</pre>}
+      {(!!q.statusLine?.length || !!credits) && (
+        <pre className="wstatus" aria-label="Agent status line">
+          {[...(q.statusLine || []), ...(credits ? [credits] : [])].join("\n")}
+        </pre>
+      )}
       <Composer
         value={text}
         onChange={setText}
