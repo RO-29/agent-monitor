@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"bufio"
 	"context"
 	"encoding/json"
@@ -30,13 +31,15 @@ func TestFakeCodexAppServer(t *testing.T) {
 			res = `{"userAgent":"fake"}`
 		case "account/rateLimits/read":
 			if mode == "hang" {
-				select {}
+				time.Sleep(time.Hour)
 			}
 			if mode == "error" {
 				os.Stdout.WriteString(`{"id":` + string(m.ID) + `,"error":{"code":-32000,"message":"not signed in"}}` + "\n")
 				continue
 			}
-			res = fakeRateLimitsJSON
+			var b bytes.Buffer
+			_ = json.Compact(&b, []byte(fakeRateLimitsJSON))
+			res = b.String()
 		}
 		os.Stdout.WriteString(`{"id":` + string(m.ID) + `,"result":` + res + "}\n")
 	}
