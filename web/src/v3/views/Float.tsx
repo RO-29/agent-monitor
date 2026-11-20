@@ -358,9 +358,10 @@ function DrivenOpen({ row }: { row: WRow }) {
 function WatchedOpen({ row }: { row: WRow }) {
   const w = row.watched!;
   const lv = useLive();
-  const { owned } = watchedLiveness(w, lv.connected);
   const sid = latestSession(w);
-  const pane = usePane(sid, owned);
+  // A live registered pane owns the session even after an hour idle marks it completed.
+  const pane = usePane(sid, !!sid);
+  const owned = watchedLiveness(w, lv.connected).owned || pane.ok;
   const ss = w.session?.state;
   const tq = useTermQuestion(sid, owned && w.agent === "claude" && !w.approvals.length && (ss === "awaiting-permission" || ss === "awaiting-input"));
   const last = w.session?.lastMessage || (w.thread ? outcomeOf(w.thread) : "") || activity(w);

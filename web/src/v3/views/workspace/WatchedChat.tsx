@@ -175,8 +175,11 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const t = row.thread;
   const sid = latestSession(row);
   const session: Session | undefined = row.session || lv.sessions.get(sid);
-  const { owned, running } = watchedLiveness(row, lv.connected);
-  const pane = usePane(sid, owned);
+  const live = watchedLiveness(row, lv.connected);
+  const running = live.running;
+  // A live registered pane owns the session even after an hour idle marks it completed.
+  const pane = usePane(sid, !!sid);
+  const owned = live.owned || pane.ok;
   const asks = useMemo(() => (approvalsByThread(v).get(row.id) || []).filter((a) => a.state === "pending").map(askFromApproval), [v, row.id]);
   const now = useTick(running);
   const [more, setMore] = useState(false);
