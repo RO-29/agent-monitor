@@ -847,3 +847,5 @@
 .v3 .ws .wjourney ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px;font-size:12.5px}
 
 .v3 .ws .wstatus{margin:0 0 4px;padding:2px 10px;font:11px/1.35 var(--f-mono);color:var(--muted);white-space:pre;overflow:hidden;text-overflow:ellipsis}
+/* Same column as the composer; text lines up with the textarea. */
+.v3 .ws .wchat > .wstatus{box-sizing:border-box;width:calc(100% - 56px);max-width:760px;align-self:center;margin:6px 0 -2px;padding:0 15px;line-height:1.25;flex:none}
