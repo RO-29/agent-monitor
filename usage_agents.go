@@ -13,10 +13,10 @@ import (
 
 // defaultBinDirs are install dirs checked when PATH (often minimal under launchd) misses a binary.
 func defaultBinDirs(home string) []string {
-	return []string{"/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
+	return agentBinDirs(home, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
 		filepath.Join(home, ".local", "bin"), filepath.Join(home, ".npm-global", "bin"), filepath.Join(home, ".bun", "bin"),
 		filepath.Join(home, ".volta", "bin"), filepath.Join(home, ".opencode", "bin"), filepath.Join(home, ".claude", "local"),
-		filepath.Join(home, ".cargo", "bin"), filepath.Join(home, "go", "bin")}
+		filepath.Join(home, ".cargo", "bin"), filepath.Join(home, "go", "bin"))
 }
 
 // installed reports whether any of names is an executable on PATH or in a known install dir.

@@ -156,7 +156,7 @@ func resolveBinary(cmd string) string {
 	if p, err := exec.LookPath(cmd); err == nil {
 		return p
 	}
-	for _, dir := range []string{filepath.Join(homeDir(), ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin"} {
+	for _, dir := range agentBinDirs(homeDir(), filepath.Join(homeDir(), ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin") {
 		if p := filepath.Join(dir, cmd); pathExists(p) {
 			return p
 		}
@@ -169,6 +169,7 @@ func binaryVersion(path string) string {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, "--version")
 	cmd.Stdin = nil
+	cmd.Env = binPathEnv(os.Environ(), path)
 	out, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -237,5 +238,7 @@ func acpCommandFor(a acpAgent) (*exec.Cmd, error) {
 	if path == "" {
 		return nil, fmt.Errorf("%s is not installed (%s not found)", a.Name, a.Command)
 	}
-	return exec.Command(path, a.Args...), nil
+	cmd := exec.Command(path, a.Args...)
+	cmd.Env = binPathEnv(os.Environ(), path)
+	return cmd, nil
 }

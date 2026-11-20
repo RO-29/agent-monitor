@@ -145,6 +145,9 @@ type fakeCLITerm struct {
 
 func (f *fakeCLITerm) target(string) string { return f.tgt }
 func (f *fakeCLITerm) screen(string) (string, error) {
+	if len(f.screens) == 0 {
+		return "", nil
+	}
 	s := dropANSI(f.screens[min(f.n, len(f.screens)-1)])
 	f.n++
 	return s, nil

@@ -134,7 +134,7 @@ func (c *wireCtx) installed(k agentKind) bool {
 		if _, err := exec.LookPath(b); err == nil {
 			return true
 		}
-		for _, d := range append(append([]string{}, wireSysBinDirs...), prefixAll(c.home, binDirs)...) {
+		for _, d := range agentBinDirs(c.home, append(append([]string{}, wireSysBinDirs...), prefixAll(c.home, binDirs)...)...) {
 			if st, err := os.Stat(filepath.Join(d, b)); err == nil && !st.IsDir() {
 				return true
 			}
