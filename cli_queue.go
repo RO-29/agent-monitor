@@ -565,6 +565,9 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		v.Note = "Codex does not record its queued messages, so they show only in its terminal."
 		v.Reachable = cliIO.target(ref.ID) != ""
 		v.Items = append(v.Items, pendingBangs(ref, sessBusy())...)
+		if usageLimitsSvc != nil {
+			usageLimitsSvc.kickCodexAmounts()
+		}
 		if t := cliIO.target(ref.ID); t != "" {
 			scr, _ := cliIO.screen(t)
 			v.StatusLine = paneStatusLine(ToolCodex, scr)

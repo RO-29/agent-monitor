@@ -195,6 +195,9 @@ func setupCLITest(t *testing.T, lines ...string) (string, *fakeCLITerm) {
 		store, cliIO, cliPause, queueMgr, cliBoxSettle = prevStore, prevIO, prevPause, prevQ, prevSettle
 	})
 	cliBoxSettle = 400 * time.Millisecond
+	prevSvc := usageLimitsSvc
+	usageLimitsSvc = nil // a Codex view must never start a real app-server in tests
+	t.Cleanup(func() { usageLimitsSvc = prevSvc })
 	prevDim := cliSeesDim
 	t.Cleanup(func() { cliSeesDim = prevDim })
 	cliSeesDim = func(string) bool { return true }

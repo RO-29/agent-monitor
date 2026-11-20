@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"hash/fnv"
 	"io"
@@ -646,6 +647,8 @@ type usageLimits struct {
 	cursorDB    string
 	claudeCfg   string // ~/.claude.json: only oauthAccount plan fields are decoded
 	claudePlan  cachedPlan
+	codexRPC    codexRPCState
+	codexRead   func(context.Context) (json.RawMessage, error)
 	home        string
 	binDirs     []string
 	lookPath    func(string) (string, error)
@@ -696,6 +699,7 @@ func newUsageLimits(home, histPath string, now func() time.Time) *usageLimits {
 		home:        home,
 		binDirs:     defaultBinDirs(home),
 		lookPath:    exec.LookPath,
+		codexRead:   codexRateRead,
 		hist:        loadUsageHistory(histPath),
 		now:         now,
 		statePath:   usageStatePath(histPath),
@@ -951,6 +955,7 @@ func (u *usageLimits) codexUsage(now time.Time) agentUsage {
 			a.Note += "."
 		}
 	}
+	u.applyCodexAmounts(&a, now)
 	a.Local, a.Models = u.local(u.codex.modelTotals, a.Windows, now, true)
 	return a
 }
@@ -970,6 +975,7 @@ func registerUsageRoutes(mux *http.ServeMux) {
 	go usageLimitsSvc.get() // the first transcript scan takes seconds
 	onShutdown(usageLimitsSvc.shutdown)
 	mux.HandleFunc("GET /api/usage/limits", func(w http.ResponseWriter, r *http.Request) {
+		usageLimitsSvc.kickCodexAmounts()
 		writeJSON(w, usageLimitsSvc.get())
 	})
 }

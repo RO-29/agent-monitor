@@ -188,7 +188,7 @@ private struct AgentUsageRow: View {
     /// credits with spent and limit: a spend limit in major units of its currency.
     private var spend: (spent: Double, limit: Double, currency: String, percent: Double, reached: Bool)? {
         guard case .object(let o)? = a.credits, case .number(let sp)? = o["spent"], case .number(let li)? = o["limit"] else { return nil }
-        var cur = "USD"
+        var cur = ""
         if case .string(let c)? = o["currency"], !c.isEmpty { cur = c }
         var pct = li > 0 ? sp / li * 100 : 0
         if case .number(let p)? = o["percent"] { pct = p }
@@ -207,7 +207,7 @@ private struct AgentUsageRow: View {
             }
             .font(.footnote)
             ProgressView(value: min(max(c.percent, 0), 100), total: 100).tint(tint)
-            Text(String(format: "%.2f of %.2f %@ spent", c.spent, c.limit, c.currency)).font(.caption2).foregroundStyle(Tok.muted)
+            Text(String(format: "%.2f of %.2f%@ spent", c.spent, c.limit, c.currency.isEmpty ? "" : " " + c.currency)).font(.caption2).foregroundStyle(Tok.muted)
         }
         .accessibilityElement(children: .combine)
     }

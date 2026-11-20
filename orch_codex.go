@@ -362,13 +362,18 @@ func codexBinary() string {
 	return "codex"
 }
 
+// newCodexAppServerCmd builds the codex app-server process; every launch uses this one.
+func newCodexAppServerCmd(extra ...string) *exec.Cmd {
+	return exec.Command(codexBinary(), append([]string{"app-server"}, extra...)...)
+}
+
 func newOrchManager(store *OrchStore, approvals *ApprovalStore) *OrchManager {
 	m := &OrchManager{
 		store: store, approvals: approvals, rpcTimeout: 120 * time.Second,
 		drivers: map[string]orchDriver{}, natives: map[string]string{}, procEnd: map[string]int64{}, spendStopped: map[string]bool{},
 		reportHeld: map[string]bool{}, spendGranted: map[string]bool{},
 		command: func(th *OThread, extra []string) *exec.Cmd {
-			return exec.Command(codexBinary(), append([]string{"app-server"}, extra...)...)
+			return newCodexAppServerCmd(extra...)
 		},
 		claude:  defaultClaudeConfig(),
 		watched: lookupWatched,

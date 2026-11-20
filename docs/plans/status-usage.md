@@ -64,7 +64,7 @@ Revision 2: changed after the Fable review (10 required changes applied).
   `workspace_owner_usage_limit_reached`, `workspace_owner_credits_depleted`,
   `workspace_member_credits_depleted` and `rate_limit_reached` get their own text. Plan `business` with no
   windows says "Business plan: limits are set by the workspace owner".
-- Codex amounts (`account/rateLimits/read`) are not in this plan: they need the user's yes.
+- Codex amounts: see Part E.
 - Clients that assume two windows change too: `web/src/v3/api/usage.ts:9,25` (key union becomes string),
   `Usage.tsx:18` (`SHORT` map gets entries for the new keys and a fallback), `UsageMini` (`Usage.tsx:85`,
   used by `ThreadList.tsx:14`), `usage_limits.go:713` labels, iOS `V3Models.swift:485` and
@@ -91,6 +91,23 @@ Revision 2: changed after the Fable review (10 required changes applied).
   that message or block. `CopyButton` and the existing context menus show the item, so every message and
   tool output gets it with no layout change.
 - Web and the Mac app already allow partial selection (no `user-select: none` on messages).
+
+## Part E: Codex amounts (user approved 2026-11-20)
+
+- Confirmed with `codex app-server generate-json-schema` (no network): request `account/rateLimits/read`, params
+  `{}` (optional `excludeResetCreditDetails`, `supportsLunaReserve`); response `rateLimits` (required),
+  `rateLimitsByLimitId`, `rateLimitResetCredits`, `ordinaryUsageAllowed`. A snapshot has `primary`/`secondary`
+  `{usedPercent, windowDurationMins, resetsAt}`, `individualLimit {limit, used, remainingPercent, resetsAt}`
+  (limit and used are decimal strings), `spendControlReached`, `rateLimitReachedType`, `planType`, `credits`.
+- The daemon starts `codex app-server` (same launch code as driven threads, `newCodexAppServerCmd`), runs
+  `initialize`, `initialized`, `account/rateLimits/read`, then stops it. Codex uses its own login: agent-monitor
+  reads no token or auth file.
+- Lazy and cached: at most every 10 minutes, only when Codex is installed and someone opens the usage page or a
+  Codex thread. The read runs in the background (15 s timeout); the next poll shows it.
+- The `codex` bucket maps to windows (when present), a credits bar (`individualLimit`: used of limit, percent
+  from `remainingPercent`) and the cap alert. An error keeps the rollout flags and shows the error as the note.
+  The field names of the answer are logged once, never values.
+- Tests use a fake app-server (this test binary as `codex`); the real one is never called.
 
 ## Order and gates
 

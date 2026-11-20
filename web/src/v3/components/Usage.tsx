@@ -245,10 +245,11 @@ function ModelTable({ models, agent }: { models: ModelUsage[]; agent: string }) 
 const isSpend = (c: UsageCredits): c is Exclude<UsageCredits, number> & { spent: number; limit: number } => typeof c !== "number" && c.spent != null && c.limit != null;
 
 function money(n: number, cur?: string): string {
+  if (!cur) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   try {
-    return n.toLocaleString(undefined, { style: "currency", currency: cur || "USD" });
+    return n.toLocaleString(undefined, { style: "currency", currency: cur });
   } catch {
-    return `${n.toLocaleString()} ${cur || ""}`.trim();
+    return `${n.toLocaleString()} ${cur}`;
   }
 }
 
@@ -256,7 +257,7 @@ function money(n: number, cur?: string): string {
 function CreditsBar({ c }: { c: Exclude<UsageCredits, number> & { spent: number; limit: number } }) {
   const p = c.percent ?? (c.limit > 0 ? (c.spent / c.limit) * 100 : 0);
   const lvl = c.capReached ? "over" : usageLevel(p);
-  const cur = c.currency || "USD";
+  const cur = c.currency || "";
   return (
     <div className={`umt ${lvl}`}>
       <div className="umt-h">
@@ -266,7 +267,7 @@ function CreditsBar({ c }: { c: Exclude<UsageCredits, number> & { spent: number;
       <div className="umt-t" role="progressbar" aria-label="Usage credits spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p)}>
         <i style={{ width: `${Math.min(100, p)}%` }} />
       </div>
-      <div className="umt-r">{`${money(c.spent, cur)} of ${money(c.limit, cur)} ${cur} spent`}</div>
+      <div className="umt-r">{`${money(c.spent, cur)} of ${money(c.limit, cur)}${cur ? ` ${cur}` : ""} spent`}</div>
     </div>
   );
 }
