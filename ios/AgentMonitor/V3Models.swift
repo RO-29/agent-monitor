@@ -351,6 +351,8 @@ struct CLIQueueView: Decodable {
     var removeWhy: String?
     /// Text typed in the terminal's input box and not sent yet.
     var draft: String?
+    /// The agent terminal's footer (model, context, mode).
+    var statusLine: [String]?
 }
 
 // MARK: - Terminal question (a question or plan shown in the Claude Code pane)

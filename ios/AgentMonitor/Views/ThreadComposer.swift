@@ -68,6 +68,10 @@ struct Composer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let sl = queue?.statusLine, !sl.isEmpty, reachable {
+                Text(sl.joined(separator: "\n")).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    .lineLimit(4).frame(maxWidth: .infinity, alignment: .leading)
+            }
             if let d = queue?.draft, !d.isEmpty, reachable {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("IN THE TERMINAL BOX").font(Typo.ui(10.5, .semibold)).tracking(0.5).foregroundStyle(Tok.muted)

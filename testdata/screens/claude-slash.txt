@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.329
+▝▜██████▀  Opus 5.5 · Claude Team
+ ▝▝   ▝▝   /Users/user
+
+⚠ Code Mode (experimental) is on · this session can be resumed only with Code Mode on
+
+▎ Using Opus 5.5 (from .claude/settings.json) · /model
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ❯ /usage                                             Show session cost, plan usage, and activity stats
+    /usage-credits                                     Configure usage credits or request them from your admin when you hit a limit
+    /statusline                                        Set up the status line
+    /gsd:pause-work                                    Create context handoff when pausing work mid-phase (user)
+    /gsd:discuss-phase                                 Gather phase context through adaptive questioning before planning (user)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /us
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 │ agent-monitor-status
+  🥤 ▌█████████░▐ 42% ↻ 1h 10m · 7d 9%
+  ⏵⏵ auto mode on (shift+tab to cycle)

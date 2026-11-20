@@ -490,6 +490,8 @@ type CLIQueueView struct {
 	RemoveWhy string `json:"removeWhy,omitempty"`
 	// Draft is text typed in the terminal's input box and not sent yet (not the placeholder or hint).
 	Draft string `json:"draft,omitempty"`
+	// StatusLine is the agent terminal's own footer (model, context, mode), read from the pane.
+	StatusLine []string `json:"statusLine,omitempty"`
 }
 
 // cliTerm reads and types into a session's terminal, host first; tests swap it.
@@ -563,6 +565,10 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		v.Note = "Codex does not record its queued messages, so they show only in its terminal."
 		v.Reachable = cliIO.target(ref.ID) != ""
 		v.Items = append(v.Items, pendingBangs(ref, sessBusy())...)
+		if t := cliIO.target(ref.ID); t != "" {
+			scr, _ := cliIO.screen(t)
+			v.StatusLine = paneStatusLine(ToolCodex, scr)
+		}
 		return v, "", nil
 	}
 	if ref.Tool != ToolClaude || !ref.Resolved || ref.Path == "" {
@@ -614,6 +620,10 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 	}
 	if target != "" {
 		v.Draft = cliDraft(target)
+		if screen == "" {
+			screen, _ = cliIO.screen(target)
+		}
+		v.StatusLine = paneStatusLine(ToolClaude, screen)
 	}
 	users := len(cliUserItems(items))
 	switch {
@@ -642,21 +652,34 @@ func isBoxRule(t string) bool {
 	return strings.Count(t, "─")+strings.Count(t, "━") >= 20
 }
 
-// cliInputBox returns the lines between the last two horizontal rules: Claude Code's input box.
-func cliInputBox(screen string) string {
-	lines := strings.Split(strings.TrimRight(screen, "\n"), "\n")
+// claudeBoxRules returns the line indexes of the rule pair that holds the ❯ or ! prompt line, or -1, -1.
+// Panels below the box (subagents, todos) can draw rules too.
+func claudeBoxRules(lines []string) (int, int) {
 	var rules []int
 	for i, ln := range lines {
-		t := strings.TrimSpace(ln)
-		if isBoxRule(t) {
+		if isBoxRule(strings.TrimSpace(ln)) {
 			rules = append(rules, i)
 		}
 	}
-	// Panels below the box (subagents, todos) can draw rules too: use the pair that holds the ❯ prompt.
 	for i := len(rules) - 2; i >= 0; i-- {
 		a, b := rules[i], rules[i+1]
 		if l := strings.TrimSpace(lines[a+1]); b > a+1 && (strings.HasPrefix(l, "❯") || strings.HasPrefix(l, "!")) {
-			return strings.Join(lines[a+1:b], "\n")
+			return a, b
+		}
+	}
+	return -1, -1
+}
+
+// cliInputBox returns the lines between the last two horizontal rules: Claude Code's input box.
+func cliInputBox(screen string) string {
+	lines := strings.Split(strings.TrimRight(screen, "\n"), "\n")
+	if a, b := claudeBoxRules(lines); a >= 0 {
+		return strings.Join(lines[a+1:b], "\n")
+	}
+	var rules []int
+	for i, ln := range lines {
+		if isBoxRule(strings.TrimSpace(ln)) {
+			rules = append(rules, i)
 		}
 	}
 	if len(rules) < 2 {

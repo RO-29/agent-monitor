@@ -42,6 +42,8 @@ export interface QView {
   paused?: "terminal" | string;
   terminal?: string[];
   cli?: CliView;
+  /** The agent terminal's footer (model, context, mode), read from its pane. */
+  statusLine?: string[];
   status: "loading" | "ok" | "missing" | "error";
 }
 
@@ -99,8 +101,8 @@ export const queueApi = {
       const qs = new URLSearchParams();
       if (session) qs.set("session", session);
       if (cliAll) qs.set("cliAll", "1");
-      const r = await req<{ items?: QItem[]; paused?: string; terminal?: string[]; cli?: CliView }>("GET", `/api/queue/${enc(threadId)}${qs.toString() ? `?${qs}` : ""}`);
-      set(threadId, { items: r.items || [], paused: r.paused, terminal: r.terminal, cli: r.cli, status: "ok" });
+      const r = await req<{ items?: QItem[]; paused?: string; terminal?: string[]; cli?: CliView; statusLine?: string[] }>("GET", `/api/queue/${enc(threadId)}${qs.toString() ? `?${qs}` : ""}`);
+      set(threadId, { items: r.items || [], paused: r.paused, terminal: r.terminal, cli: r.cli, statusLine: r.statusLine, status: "ok" });
     } catch (e) {
       const st = (e as { status?: number }).status;
       set(threadId, { status: st === 404 || st === 405 ? "missing" : "error" });

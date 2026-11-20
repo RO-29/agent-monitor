@@ -456,6 +456,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         onEdit={(body) => setText((cur) => (cur.trim() ? `${cur}\n${body}` : body))}
         cli={row.agent === "claude" && owned ? { session: sid, name: cliName, showAll: cliAll, onShowAll: setCliAll } : undefined}
       />
+      {!!q.statusLine?.length && <pre className="wstatus" aria-label="Agent status line">{q.statusLine.join("\n")}</pre>}
       <Composer
         value={text}
         onChange={setText}
@@ -477,7 +478,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           <span className="wchip">
             <span className={`wag ${row.agent === "codex" ? "cx" : row.agent === "claude" ? "cl" : ""}`} />
             {agentName(row.agent)}
-            {t?.model ? ` · ${modelShort(t.model)}` : ""}
+            {t?.model && !q.statusLine?.length ? ` · ${modelShort(t.model)}` : ""}
           </span>
           <ResumeChip tool={session?.tool || row.agent} sessionId={session?.sessionId || sid.slice(sid.indexOf(":") + 1)} cwd={session?.cwd || row.cwd} />
           <span className="sp" />

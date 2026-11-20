@@ -845,3 +845,5 @@
 .v3 .ws .wjourney{display:flex;flex-direction:column;gap:4px;padding:4px 0}
 .v3 .ws .wjourney-k{font-size:12px;color:var(--muted)}
 .v3 .ws .wjourney ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+
+.v3 .ws .wstatus{margin:0 0 4px;padding:2px 10px;font:11px/1.35 var(--f-mono);color:var(--muted);white-space:pre;overflow:hidden;text-overflow:ellipsis}

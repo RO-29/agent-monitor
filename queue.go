@@ -36,6 +36,8 @@ type QueueView struct {
 	Terminal []string `json:"terminal,omitempty"`
 	// CLI is the agent CLI's own queue, from its transcript (Claude Code).
 	CLI *CLIQueueView `json:"cli,omitempty"`
+	// StatusLine is the agent terminal's footer, read from the pane (Claude Code and Codex).
+	StatusLine []string `json:"statusLine,omitempty"`
 }
 
 const (
@@ -714,7 +716,11 @@ func (m *OrchManager) queueRoutes(mux *http.ServeMux) {
 			if session == "" {
 				session = thread
 			}
-			if cv, _, err := cliQueueView(session, r.URL.Query().Get("cliAll") == "1"); err == nil {
+			cv, _, err := cliQueueView(session, r.URL.Query().Get("cliAll") == "1")
+			if cv != nil {
+				v.StatusLine = cv.StatusLine
+			}
+			if err == nil {
 				v.CLI = cv
 				if cv.Supported {
 					v.Terminal = nil
