@@ -75,7 +75,8 @@ func (u *usageLimits) applyClaudeUtilization(a *agentUsage, now time.Time) {
 	a.Note = ""
 	scoped := 0
 	for _, r := range c.Limits {
-		if !r.Active || r.Percent == nil {
+		// is_active marks the binding limit only; /usage shows every row.
+		if r.Percent == nil {
 			continue
 		}
 		t, err := time.Parse(time.RFC3339, r.ResetsAt)

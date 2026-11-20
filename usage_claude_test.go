@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -42,16 +43,16 @@ func TestUsageClaudeCachedUtilization(t *testing.T) {
 	if w := findWin(a, "weekly"); w.UsedPercent == nil || *w.UsedPercent != 41 {
 		t.Fatalf("weekly_all %+v", w)
 	}
-	if w := findWin(a, "5h"); w.UsedPercent != nil {
-		t.Fatalf("inactive session row must not become a window: %+v", w)
+	if w := findWin(a, "5h"); w.UsedPercent == nil || *w.UsedPercent != 33 {
+		t.Fatalf("a session row with is_active false is still a window: %+v", w)
 	}
 	var scoped []usageWindow
 	for _, w := range a.Windows {
-		if w.Key == "weekly_scoped" {
+		if strings.HasPrefix(w.Key, "weekly_scoped") {
 			scoped = append(scoped, w)
 		}
 	}
-	if len(scoped) != 1 || scoped[0].Label != "Week (Fable)" || *scoped[0].UsedPercent != 12 {
+	if len(scoped) != 2 || scoped[0].Label != "Week (Fable)" || *scoped[0].UsedPercent != 12 || scoped[1].Label != "Week (Other)" {
 		t.Fatalf("scoped windows %+v", scoped)
 	}
 	c := a.Credits
