@@ -289,6 +289,8 @@ struct WItem: Codable, Identifiable, Hashable {
     var endedAt: Int64?
     var `repeat`: Int?
     var attachments: [OAttachment]?
+    /// A tool call that a Code Mode script made: the script item's id.
+    var parentId: String?
 
     var failed: Bool { status == "failed" || (exitCode ?? 0) != 0 }
 }

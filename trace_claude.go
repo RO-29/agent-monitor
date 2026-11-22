@@ -140,6 +140,27 @@ type claudeFileState struct {
 	last       int64          // newest timestamp seen in the file
 	seen       int64          // file size at the last parse
 	mod        time.Time      // file mtime at the last parse
+	replByEval map[string]int // Code Mode eval id → REPL span index
+	replCur    int            // REPL span index + 1 whose inner calls come next; 0 = none
+	replInner  map[string]bool
+}
+
+// replTraceEvents ends the REPL spans whose repl-eval events this text delivers.
+func (p *claudeTraceParser) replTraceEvents(fs *claudeFileState, text string) {
+	for _, ev := range parseReplEvents(text) {
+		idx, ok := fs.replByEval[ev.eval]
+		if !ok || idx >= len(p.tr.Spans) {
+			continue
+		}
+		sp := &p.tr.Spans[idx]
+		if ev.at > sp.Ts {
+			sp.Dur = ev.at - sp.Ts
+		}
+		if ev.status != "settled" {
+			sp.Err = true
+		}
+		fs.replCur = idx + 1
+	}
 }
 
 type agentRef struct {
@@ -444,6 +465,17 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 				continue
 			}
 			att, _ := j["attachment"].(map[string]any)
+			if t, _ := att["type"].(string); t == "poll_events" {
+				env, _ := att["envelopes"].([]any)
+				var b strings.Builder
+				for _, e := range env {
+					if es, ok := e.(string); ok {
+						b.WriteString(es + "\n")
+					}
+				}
+				p.replTraceEvents(fs, b.String())
+				continue
+			}
 			hn, _ := att["hookName"].(string)
 			switch {
 			case strings.HasPrefix(hn, "SessionStart:clear"):
@@ -610,6 +642,14 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 				} else if t := p.turn(); t != nil {
 					sp.Parent = t.ID
 				}
+				if v, _ := j["isVirtual"].(bool); v && strings.HasPrefix(id, "repl_") && fs.replCur > 0 && fs.replCur <= len(tr.Spans) {
+					rs := tr.Spans[fs.replCur-1]
+					sp.Parent, sp.Depth, sp.Ts = rs.ID, rs.Depth+1, rs.Ts
+					if fs.replInner == nil {
+						fs.replInner = map[string]bool{}
+					}
+					fs.replInner[id] = true
+				}
 				if fam == "agent" {
 					sp.Kind = "agent"
 				}
@@ -655,7 +695,7 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 					continue
 				}
 				sp := &tr.Spans[idx]
-				if ts > sp.Ts {
+				if ts > sp.Ts && !fs.replInner[id] && sp.Name != "REPL" {
 					sp.Dur = ts - sp.Ts
 				}
 				if e, _ := pm["is_error"].(bool); e {
@@ -667,6 +707,25 @@ func (p *claudeTraceParser) parseFile(path, parentID string, depth int) bool {
 					sp.Err = true
 				}
 				tr.setIOResult(sp, clipString(res, 20000))
+				if sp.Name == "REPL" {
+					raw, _ := json.Marshal(j["toolUseResult"])
+					eval, async := replDispatch(raw)
+					if eval != "" {
+						if fs.replByEval == nil {
+							fs.replByEval = map[string]int{}
+						}
+						fs.replByEval[eval] = idx
+					}
+					if !async {
+						fs.replCur = idx + 1
+						if ts > sp.Ts {
+							sp.Dur = ts - sp.Ts
+						}
+					}
+				}
+				if strings.Contains(res, `kind="repl-eval"`) {
+					p.replTraceEvents(fs, res)
+				}
 				if !isChild {
 					p.lastAct = ts
 				}

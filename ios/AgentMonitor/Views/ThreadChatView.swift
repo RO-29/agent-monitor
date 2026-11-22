@@ -16,6 +16,8 @@ struct ThreadChatView: View {
     @State private var items: [String: WItem] = [:]
     /// Turns of the CLI session a driven thread continued, before the thread existed.
     @State private var prior: [String: WItem] = [:]
+    /// Code Mode scripts whose tool calls are shown.
+    @State private var openScripts: Set<String> = []
     @State private var priorSID: String?
     @State private var cursor: Int64 = 0
     @State private var earlier: Int64?
@@ -66,6 +68,51 @@ struct ThreadChatView: View {
         (prior.isEmpty ? Array(items.values) : Array(items.values) + prior.values.filter { items[$0.id] == nil })
             .sorted { $0.startedAt == $1.startedAt ? $0.id < $1.id : $0.startedAt < $1.startedAt }
     }
+    /// Top rows and the tool calls of each Code Mode script, keyed by the script item's id.
+    private var scriptTree: (top: [WItem], kids: [String: [WItem]]) {
+        let all = sorted
+        let ids = Set(all.map(\.id))
+        var top: [WItem] = []
+        var kids: [String: [WItem]] = [:]
+        for it in all {
+            if let p = it.parentId, ids.contains(p) { kids[p, default: []].append(it) } else { top.append(it) }
+        }
+        return (top, kids)
+    }
+    /// "Script ran N tool calls": tap to show the calls, indented under the script.
+    @ViewBuilder private func scriptCalls(_ id: String, _ kids: [WItem]) -> some View {
+        let open = openScripts.contains(id) || kids.contains { $0.status == "started" }
+        let failed = kids.filter(\.failed).count
+        Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                if openScripts.contains(id) { openScripts.remove(id) } else { openScripts.insert(id) }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: open ? "chevron.down" : "chevron.right").font(.caption2)
+                Text("Script ran \(kids.count) \(kids.count == 1 ? "tool call" : "tool calls")" + (failed > 0 ? " · \(failed) failed" : ""))
+                    .font(.footnote)
+            }
+            .foregroundStyle(failed > 0 ? Tok.err : Tok.muted)
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 12)
+        if open {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(kids) { k in
+                    ChatItemView(item: k, expanded: expanded.contains(k.id), agent: agent, selecting: false, selected: false) {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            if expanded.contains(k.id) { expanded.remove(k.id) } else { expanded.insert(k.id) }
+                        }
+                    } onSelect: {}
+                }
+            }
+            .padding(.leading, 12)
+            .overlay(alignment: .leading) { Rectangle().fill(Tok.line).frame(width: 1) }
+            .padding(.leading, 6)
+        }
+    }
+
     private var linked: LinkedAgents {
         .build(store: store, thread: thread, sessionID: drivenID == nil ? sessionID : nil, kids: kids,
                drivenChildren: driven?.children ?? [], drivenParent: driven?.parentId)
@@ -365,14 +412,18 @@ struct ThreadChatView: View {
                         }
                         .frame(maxWidth: .infinity).padding(.top, 60)
                     }
-                    ForEach(sorted) { it in
-                        ChatItemView(item: it, expanded: expanded.contains(it.id), agent: agent,
-                                     selecting: selecting, selected: selected.contains(it.id)) {
-                            withAnimation(.snappy(duration: 0.2)) {
-                                if expanded.contains(it.id) { expanded.remove(it.id) } else { expanded.insert(it.id) }
+                    let tree = scriptTree
+                    ForEach(tree.top) { it in
+                        VStack(alignment: .leading, spacing: 4) {
+                            ChatItemView(item: it, expanded: expanded.contains(it.id), agent: agent,
+                                         selecting: selecting, selected: selected.contains(it.id)) {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    if expanded.contains(it.id) { expanded.remove(it.id) } else { expanded.insert(it.id) }
+                                }
+                            } onSelect: {
+                                if selected.contains(it.id) { selected.remove(it.id) } else { selected.insert(it.id) }
                             }
-                        } onSelect: {
-                            if selected.contains(it.id) { selected.remove(it.id) } else { selected.insert(it.id) }
+                            if let kids = tree.kids[it.id] { scriptCalls(it.id, kids) }
                         }
                         .id(it.id)
                         .padding(.top, it.kind == "user" && it.id != sorted.first?.id ? 12 : 0)

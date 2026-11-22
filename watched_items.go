@@ -85,6 +85,7 @@ type wParser struct {
 	dup     map[string]int64 // agent/reasoning text key -> ts, for codex's doubled records
 	prevTot *TokenUsage
 	lastCmp int64
+	repl    replLinks
 }
 
 type wSession struct {
@@ -814,6 +815,22 @@ func (p *wParser) complete(off int64, wi *wItem, status string, endTs int64, out
 	wi.mod = off
 }
 
+// replEvents completes the Code Mode scripts whose repl-eval events this text delivers.
+func (p *wParser) replEvents(off int64, text string) {
+	for _, ev := range parseReplEvents(text) {
+		wi := p.repl.byEval[ev.eval]
+		if wi == nil {
+			continue
+		}
+		status := "completed"
+		if ev.status != "settled" {
+			status = "failed"
+		}
+		p.complete(off, wi, status, ev.at, ev.result, nil)
+		p.repl.cur = wi
+	}
+}
+
 // ── claude ──
 
 // claudeErrorItem turns an error record into a thread item: hook failures, Stop hook errors, API error
@@ -837,22 +854,25 @@ func claudeErrorItem(j *wClaudeLine, ts int64) *OItem {
 }
 
 type wClaudeLine struct {
-	Type             string   `json:"type"`
-	Subtype          string   `json:"subtype"`
-	Timestamp        string   `json:"timestamp"`
-	Cwd              string   `json:"cwd"`
-	Content          string   `json:"content"`
-	IsMeta           bool     `json:"isMeta"`
-	IsSidechain      bool     `json:"isSidechain"`
-	IsCompactSummary bool     `json:"isCompactSummary"`
-	Level            string   `json:"level"`
-	IsAPIError       bool     `json:"isApiErrorMessage"`
-	HookErrors       []string `json:"hookErrors"`
+	Type             string          `json:"type"`
+	Subtype          string          `json:"subtype"`
+	Timestamp        string          `json:"timestamp"`
+	Cwd              string          `json:"cwd"`
+	Content          string          `json:"content"`
+	IsMeta           bool            `json:"isMeta"`
+	IsSidechain      bool            `json:"isSidechain"`
+	IsCompactSummary bool            `json:"isCompactSummary"`
+	Level            string          `json:"level"`
+	IsAPIError       bool            `json:"isApiErrorMessage"`
+	IsVirtual        bool            `json:"isVirtual"`
+	HookErrors       []string        `json:"hookErrors"`
+	ToolUseResult    json.RawMessage `json:"toolUseResult"`
 	Attachment       *struct {
-		Type     string `json:"type"`
-		HookName string `json:"hookName"`
-		Stderr   string `json:"stderr"`
-		Content  string `json:"content"`
+		Type      string   `json:"type"`
+		Envelopes []string `json:"envelopes"`
+		HookName  string   `json:"hookName"`
+		Stderr    string   `json:"stderr"`
+		Content   string   `json:"content"`
 	} `json:"attachment"`
 	Message *struct {
 		ID         string          `json:"id"`
@@ -924,6 +944,10 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 		p.startTurn(off, ts, claudePromptText(text))
 		return
 	}
+	if j.Type == "attachment" && j.Attachment != nil && j.Attachment.Type == "poll_events" {
+		p.replEvents(off, strings.Join(j.Attachment.Envelopes, "\n"))
+		return
+	}
 	switch j.Type {
 	case "system":
 		switch j.Subtype {
@@ -974,6 +998,12 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 				}
 				delete(p.pending, part.ToolUseID)
 				res := claudeResultText(part.Content)
+				if strings.Contains(res, `kind="repl-eval"`) {
+					defer p.replEvents(off, res)
+				}
+				if wi.it.Command == "REPL" && p.repl.dispatched(wi, j.ToolUseResult) {
+					continue // the script runs on; its repl-eval event completes the item
+				}
 				status := "completed"
 				if part.IsError {
 					status = "failed"
@@ -1021,6 +1051,9 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 			}
 			it := claudeToolItem(part.Name, part.Input, p.cwd)
 			it.ID, it.Status, it.StartedAt = p.thread+"/"+part.ID, "started", ts
+			if j.IsVirtual && strings.HasPrefix(part.ID, "repl_") && p.repl.cur != nil {
+				it.ParentID = p.repl.cur.it.ID
+			}
 			if wi := p.add(off, i, it); wi != nil {
 				p.pending[part.ID] = wi
 			}

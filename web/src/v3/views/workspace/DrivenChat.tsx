@@ -460,6 +460,46 @@ function CmdGroup({ items }: { items: OItem[] }) {
   );
 }
 
+/** Splits a Code Mode script's tool calls from the list: they show inside their script's row. */
+function scriptTree(items: OItem[]): { top: OItem[]; kids: Map<string, OItem[]> } {
+  const ids = new Set(items.map((i) => i.id));
+  const kids = new Map<string, OItem[]>();
+  const top: OItem[] = [];
+  for (const i of items) {
+    if (i.parentId && ids.has(i.parentId)) kids.set(i.parentId, [...(kids.get(i.parentId) || []), i]);
+    else top.push(i);
+  }
+  return { top, kids };
+}
+
+function ScriptGroup({ it, kids }: { it: OItem; kids: OItem[] }) {
+  const hl = useContext(HitCtx);
+  const running = it.status === "started" || kids.some((k) => k.status === "started");
+  const failed = kids.filter((k) => k.status === "failed" || (k.exitCode !== undefined && k.exitCode !== 0)).length;
+  const [open, setOpen] = useState<boolean | null>(null);
+  const shown = open ?? (running || (!!hl && kids.some((k) => k.id === hl)));
+  return (
+    <div className="wcmdg wscript">
+      <ItemRow it={it} />
+      <button className="wih wcmdg-h" onClick={() => setOpen(!shown)} aria-expanded={shown}>
+        <span className={`wic ${running ? "run wpulse" : failed ? "err" : "ok"}`}>{running ? "●" : failed ? "✗" : "✓"}</span>
+        <span className="trunc">
+          Script ran {kids.length} {kids.length === 1 ? "tool call" : "tool calls"}
+          {failed > 0 && <span className="muted"> · {failed} failed</span>}
+        </span>
+        <span className="wchev">{shown ? "▾" : "▸"}</span>
+      </button>
+      {shown && (
+        <div className="wcmdg-b">
+          {kids.map((k) => (
+            <ItemRow key={k.id} it={k} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun; items: OItem[]; now: number; after?: React.ReactNode; diff?: DiffNav | null; onDiff?: (d: DiffNav) => void }) {
   const running = run?.status === "running" || items.some((i) => i.status === "started" && !i.bg);
   const users = items.filter((i) => i.kind === "user" && (i.text || i.attachments?.length));
@@ -478,6 +518,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const finalAt = final ? items.indexOf(final) : -1;
   const bangsBefore = finalAt >= 0 ? bangs.filter((b) => items.indexOf(b) < finalAt) : [];
   const bangsAfter = finalAt >= 0 ? bangs.filter((b) => items.indexOf(b) > finalAt) : bangs;
+  const { top, kids } = scriptTree(work);
   const [open, setOpen] = useState<boolean | null>(null);
   const hl = useContext(HitCtx);
   const sel = useSelectCtx();
@@ -535,7 +576,9 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
           </div>
           {expanded && (
             <div className="wsteps">
-              {groupCmds(work).map((g) => (Array.isArray(g) ? <CmdGroup key={g[0].id} items={g} /> : <ItemRow key={g.id} it={g} />))}
+              {groupCmds(top).map((g) =>
+                Array.isArray(g) ? <CmdGroup key={g[0].id} items={g} /> : kids.has(g.id) ? <ScriptGroup key={g.id} it={g} kids={kids.get(g.id)!} /> : <ItemRow key={g.id} it={g} />,
+              )}
             </div>
           )}
         </div>

@@ -126,6 +126,7 @@ export interface OItem {
   repeat?: number; // an error seen this many times; endedAt is the last time
   attachments?: OAttachment[]; // phase 7, on user items
   childId?: string; // phase 7, review items
+  parentId?: string; // a tool call a Code Mode script made: the script item's id
   by?: "user"; // a ! shell command or a slash command the user ran in the agent CLI
   bg?: boolean; // a ! command moved to the background; output fills from its task file
 }

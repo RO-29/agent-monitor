@@ -147,6 +147,8 @@ type OItem struct {
 	// Attachments are the images of a user item; ChildID links a review item to its child thread.
 	Attachments []OAttachment `json:"attachments,omitempty"`
 	ChildID     string        `json:"childId,omitempty"`
+	// ParentID links a tool call that a Code Mode script made to the script's item.
+	ParentID string `json:"parentId,omitempty"`
 	// By is "user" for a shell command the user ran with ! in the agent CLI.
 	By string `json:"by,omitempty"`
 	// Bg marks a ! command Claude Code moved to the background; its output fills from the task file.

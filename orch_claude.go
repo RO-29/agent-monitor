@@ -1099,6 +1099,8 @@ func claudeToolItem(name string, in map[string]any, cwd string) *OItem {
 	case name == "TodoWrite":
 		b, _ := json.Marshal(in)
 		it.Kind, it.Command, it.Text = "plan", "", string(b)
+	case name == "REPL": // a Code Mode script; its tool calls link to this item by ParentID
+		it.Text = firstOf(claudeStr(in, "description"), firstLine(claudeStr(in, "code")))
 	case name == "Task" || name == "Agent":
 		it.Text = claudeStr(in, "description", "prompt")
 	case name == "AskUserQuestion":
