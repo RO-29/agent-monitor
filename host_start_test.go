@@ -43,7 +43,9 @@ func TestTerminalFlagsAllowList(t *testing.T) {
 // stubTerminalStart records tmux starts instead of running tmux.
 func stubTerminalStart(t *testing.T) func() []string {
 	prevNew, prevExe, prevType, prevWatch := tmuxNewSessionFn, agentMonitorExe, typeWhenReadyFn, watchStartMenuFn
-	t.Cleanup(func() { tmuxNewSessionFn, agentMonitorExe, typeWhenReadyFn, watchStartMenuFn = prevNew, prevExe, prevType, prevWatch })
+	t.Cleanup(func() {
+		tmuxNewSessionFn, agentMonitorExe, typeWhenReadyFn, watchStartMenuFn = prevNew, prevExe, prevType, prevWatch
+	})
 	typeWhenReadyFn = func(string, string) error { return nil }
 	watchStartMenuFn = func(string) {}
 	agentMonitorExe = func() (string, error) { return "/x/agent-monitor", nil }
