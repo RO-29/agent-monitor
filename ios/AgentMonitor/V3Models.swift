@@ -630,6 +630,7 @@ struct OHostPrompt: Decodable, Equatable {
     var kind: String
     var agent: String
     var folder: String?
+    var title: String?
     var text: String
     var options: [Option]
 }

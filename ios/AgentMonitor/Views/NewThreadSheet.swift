@@ -290,8 +290,10 @@ struct NewThreadSheet: View {
 
     private func trustCard(_ p: OHostPrompt) -> some View {
         let folder = ((p.folder ?? cwd) as NSString).lastPathComponent
+        let trust = p.kind == "trust"
         return VStack(alignment: .leading, spacing: 10) {
-            Label("\(agentName(p.agent)) asks whether you trust \(folder)", systemImage: "lock.shield")
+            Label(trust ? "\(agentName(p.agent)) asks whether you trust \(folder)" : "\(agentName(p.agent)): \(p.title ?? "a question before it starts")",
+                  systemImage: trust ? "lock.shield" : "questionmark.circle")
                 .font(.headline).foregroundStyle(Tok.fg)
             if let f = p.folder {
                 Text(f).font(.caption.monospaced()).foregroundStyle(Tok.muted).lineLimit(1).truncationMode(.head)
@@ -310,7 +312,7 @@ struct NewThreadSheet: View {
                         Button { Task { await answer(o.id) } } label: {
                             Text(o.label).multilineTextAlignment(.center)
                         }
-                        .buttonStyle(.am(o.id == "trust" ? .allow : .deny, big: true, full: true))
+                        .buttonStyle(.am(o.id == "deny" || (trust && o.id != "trust") ? .deny : .allow, big: true, full: true))
                     }
                 }
             }
@@ -397,11 +399,14 @@ struct NewThreadSheet: View {
         }
     }
 
-    /// Waits for the host to report the linked session, then opens it. A trust prompt on screen pauses the 40 s limit.
+    /// Waits for the host to report the linked session, then opens it. After 40 s it says "Still starting" but
+    /// keeps checking (up to 30 min), so a first-run menu that shows late still gets its card.
     private func follow(_ hostID: String) async {
         self.hostID = hostID
+        let begin = Date()
         var t0 = Date()
-        while Date().timeIntervalSince(t0) < 40, !Task.isCancelled, !declined {
+        var slow = false
+        while !Task.isCancelled, !declined, Date().timeIntervalSince(begin) < 1800 {
             if let h = try? await APIClient.shared.hostInfo(hostID) {
                 if let aid = h.agentId, !aid.isEmpty {
                     dismiss()
@@ -413,11 +418,13 @@ struct NewThreadSheet: View {
                 if let tail = h.screenTail { screenTail = tail }
                 if h.prompt != nil || answering { t0 = Date() }
             }
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if !slow, Date().timeIntervalSince(t0) >= 40 {
+                slow = true
+                starting = "Still starting. The thread appears in Threads when the agent links its session."
+            }
+            try? await Task.sleep(nanoseconds: slow ? 2_000_000_000 : 1_000_000_000)
         }
-        hostPrompt = nil
-        if declined { return }
-        starting = "Still starting. The thread appears in Threads when the agent links its session."
+        if !declined { hostPrompt = nil }
     }
 }
 

@@ -139,6 +139,23 @@ function TrustCard({ st, prompt }: { st: TermStartState; prompt: OHostPrompt }) 
       setBusy(false);
     }
   };
+  if (prompt.kind !== "trust")
+    return (
+      <div className="wtrust" role="group" aria-label="Question before start">
+        <b>
+          {agentLabel(prompt.agent || st.agent)}: {prompt.title || "a question before it starts"}
+        </b>
+        {prompt.text && <span className="wtstart-n">{shortExplanation(prompt.text)}</span>}
+        {err && <span className="wtrust-e">{err}</span>}
+        <div className="wtrust-b" style={{ flexWrap: "wrap" }}>
+          {prompt.options.map((o) => (
+            <button key={o.id} className={`btn sm ${o.id === "deny" ? "ghost" : "pri"}`} disabled={busy} onClick={() => send(o.id)} title={o.label}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   return (
     <div className="wtrust" role="group" aria-label="Folder trust">
       <b>

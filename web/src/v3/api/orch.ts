@@ -217,8 +217,9 @@ export interface OHostInfo {
 }
 /** A first-run dialog the agent shows before it starts, such as the folder trust check. */
 export interface OHostPrompt {
-  kind: "trust" | string;
+  kind: "trust" | "mcp" | "menu" | string;
   agent: string;
+  title?: string;
   folder?: string;
   text: string;
   options: { id: string; label: string }[];

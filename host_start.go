@@ -36,6 +36,9 @@ type terminalStarted struct {
 // typeWhenReadyFn types the first prompt once the host is up; tests swap it.
 var typeWhenReadyFn = typeWhenReady
 
+// watchStartMenuFn alerts about a first-run menu when no first prompt waits; tests swap it.
+var watchStartMenuFn = watchStartMenu
+
 var terminalResumePattern = regexp.MustCompile(`^[0-9a-fA-F-]{36}$`)
 
 var terminalModelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,99}$`)
@@ -147,7 +150,9 @@ func startTerminal(in terminalStart) (*terminalStarted, error) {
 	if err := tmuxNewSessionFn(name, cwd, strings.Join(parts, " ")); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(in.Prompt) != "" {
+	if strings.TrimSpace(in.Prompt) == "" {
+		go watchStartMenuFn(id)
+	} else {
 		go func() {
 			if err := typeWhenReadyFn(id, in.Prompt); err != nil {
 				log.Printf("terminal %s: first prompt not sent: %v", id, err)

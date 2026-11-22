@@ -606,19 +606,89 @@ var (
 	hostTypedWithin   = 5 * time.Second
 	hostReadyPoll     = 250 * time.Millisecond
 	hostReadyQuietFor = 800 * time.Millisecond
+	// A first-run menu holds the first prompt this long at most; the alert goes out after the short delay.
+	hostMenuMaxWait     = 30 * time.Minute
+	hostMenuNotifyAfter = 10 * time.Second
 )
+
+func minTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
+}
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
+// startMenuOn is the first-run menu on an unlinked host's screen, nil when none shows.
+func startMenuOn(h *HostInfo) *hostPrompt {
+	if h == nil || h.AgentID != "" || recentlyAnswered(h.HostID) {
+		return nil
+	}
+	v, err := cachedHostView(h)
+	if err != nil || !v.fresh() {
+		return nil
+	}
+	return detectStartPrompt(v.screen, hostAgentName(h))
+}
+
+// startMenuWatch notifies once when a first-run menu waits for an answer, and says while one shows.
+type startMenuWatch struct {
+	hostID   string
+	since    time.Time
+	notified bool
+}
+
+func (w *startMenuWatch) showing(h *HostInfo) bool {
+	p := startMenuOn(h)
+	if p == nil {
+		w.since = time.Time{}
+		return false
+	}
+	if w.since.IsZero() {
+		w.since = time.Now()
+	}
+	if !w.notified && time.Since(w.since) >= hostMenuNotifyAfter {
+		w.notified = true
+		title := firstOf(p.Title, p.Text)
+		orchMgr.notify(notifyEvent{Kind: "needs-you", Title: firstOf(hostAgentName(h), "The agent") + " asks a question before it starts",
+			Body: clipString(title, 160) + ". Answer it on the new thread screen or in its terminal."})
+	}
+	return true
+}
+
+// watchStartMenu notifies about a first-run menu on a host that has no first prompt to type.
+func watchStartMenu(hostID string) {
+	w := &startMenuWatch{hostID: hostID}
+	for end := time.Now().Add(hostMenuMaxWait); time.Now().Before(end); time.Sleep(hostReadyPoll * 4) {
+		var h *HostInfo
+		if hostRegistry != nil {
+			h = hostRegistry.Get(hostID)
+		}
+		if h != nil && h.AgentID != "" {
+			return
+		}
+		w.showing(h)
+	}
+}
+
 // typeWhenReady waits for the host to register and its output to go quiet, then submits the prompt.
+// A first-run menu on screen extends the wait (up to hostMenuMaxWait), so the prompt waits for the answer.
 func typeWhenReady(hostID, prompt string) error {
-	deadline := time.Now().Add(hostReadyTimeout)
+	start := time.Now()
+	deadline := start.Add(hostReadyTimeout)
+	w := &startMenuWatch{hostID: hostID}
 	for time.Now().Before(deadline) {
 		var h *HostInfo
 		if hostRegistry != nil {
 			h = hostRegistry.Get(hostID)
+		}
+		if h != nil && w.showing(h) {
+			deadline = minTime(time.Now().Add(hostReadyTimeout), start.Add(hostMenuMaxWait))
+			time.Sleep(hostReadyPoll)
+			continue
 		}
 		if h != nil {
 			if p, err := hostCall(h, hostRequest{Op: "ping"}); err == nil && p.OutBytes > 0 && time.Duration(p.IdleMs)*time.Millisecond >= hostReadyQuietFor {

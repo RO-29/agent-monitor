@@ -17,6 +17,7 @@ type hostPrompt struct {
 	Kind    string             `json:"kind"`
 	Agent   string             `json:"agent"`
 	Folder  string             `json:"folder,omitempty"`
+	Title   string             `json:"title,omitempty"`
 	Text    string             `json:"text"`
 	Options []hostPromptOption `json:"options"`
 
@@ -221,6 +222,94 @@ func detectTrustPrompt(screen, agent string) *hostPrompt {
 	return p
 }
 
+// detectStartPrompt finds any first-run menu: the folder trust dialog first, then any other menu.
+func detectStartPrompt(screen, agent string) *hostPrompt {
+	if p := detectTrustPrompt(screen, agent); p != nil {
+		return p
+	}
+	return detectMenuPrompt(screen, agent)
+}
+
+var menuDenyLabel = regexp.MustCompile(`(?i)^(no\b|continue without|skip\b|don.t\b|do not\b)`)
+
+// detectMenuPrompt finds a menu with a cursor row and an "Enter to confirm" or "Esc to cancel" footer,
+// such as Claude's "New MCP server found" dialog. Its title is the first line above the options.
+func detectMenuPrompt(screen, agent string) *hostPrompt {
+	lines := strings.Split(strings.TrimRight(screen, "\n "), "\n")
+	from := max(0, len(lines)-hostPromptHeaderWindow)
+	foot := -1
+	for i := len(lines) - 1; i >= from; i-- {
+		if promptFooter.MatchString(lines[i]) {
+			foot = i
+			break
+		}
+	}
+	if foot < 0 {
+		return nil
+	}
+	cur := -1
+	for i := foot - 1; i >= from && i >= foot-hostPromptOptionsGap; i-- {
+		if pl, ok := parsePromptLine(lines[i]); ok && pl.cursor {
+			cur = i
+			break
+		}
+	}
+	if cur < 0 {
+		return nil
+	}
+	pc, _ := parsePromptLine(lines[cur])
+	first, last := cur, cur
+	for i := cur - 1; i >= from; i-- {
+		pl, ok := parsePromptLine(lines[i])
+		if !ok || pl.col != pc.col || pl.cursor {
+			break
+		}
+		first = i
+	}
+	for i := cur + 1; i < foot; i++ {
+		pl, ok := parsePromptLine(lines[i])
+		if !ok || pl.col != pc.col || pl.cursor || promptFooter.MatchString(pl.label) {
+			break
+		}
+		last = i
+	}
+	if last-first < 1 {
+		return nil
+	}
+	top := first - 1
+	for top >= from && top >= first-hostPromptOptionsGap && !isBoxRule(strings.TrimSpace(lines[top])) {
+		top--
+	}
+	var text []string
+	for i := top + 1; i < first; i++ {
+		if t := strings.TrimSpace(strings.Trim(lines[i], "│┃║ ")); t != "" {
+			text = append(text, t)
+		}
+	}
+	if len(text) == 0 {
+		return nil
+	}
+	p := &hostPrompt{Kind: "menu", Agent: agent, Title: text[0], Text: strings.Join(text[1:], " "), cursor: -1}
+	if strings.Contains(strings.ToLower(text[0]), "mcp server") {
+		p.Kind = "mcp"
+	}
+	seen := map[string]bool{}
+	for i := first; i <= last; i++ {
+		pl, _ := parsePromptLine(lines[i])
+		id := "option" + strconv.Itoa(i-first+1)
+		if menuDenyLabel.MatchString(pl.label) && !seen["deny"] {
+			id = "deny"
+		}
+		seen[id] = true
+		if pl.cursor {
+			p.cursor = i - first
+		}
+		p.Options = append(p.Options, hostPromptOption{ID: id, Label: pl.label})
+		p.digits = append(p.digits, pl.num)
+	}
+	return p
+}
+
 func (p *hostPrompt) index(id string) int {
 	for i, o := range p.Options {
 		if o.ID == id {
@@ -309,7 +398,7 @@ func readHostView(h *HostInfo) (hostView, error) {
 		all = all[len(all)-r.Rows:]
 	}
 	v.screen = strings.Join(all, "\n")
-	if detectTrustPrompt(v.screen, hostAgentName(h)) != nil {
+	if detectStartPrompt(v.screen, hostAgentName(h)) != nil {
 		if p, err := hostCallWithin(h, hostRequest{Op: "ping"}, hostViewDial, hostViewTotal); err == nil {
 			v.out = p.OutBytes
 		}
@@ -367,7 +456,7 @@ func withStartState(h *HostInfo) {
 	if recentlyAnswered(h.HostID) || !v.fresh() {
 		return
 	}
-	if p := detectTrustPrompt(v.screen, hostAgentName(h)); p != nil {
+	if p := detectStartPrompt(v.screen, hostAgentName(h)); p != nil {
 		p.Folder = h.Cwd
 		h.Prompt = p
 	}
@@ -404,7 +493,7 @@ func currentHostPrompt(h *HostInfo) (*hostPrompt, error) {
 	if !v.fresh() {
 		return nil, errNoHostPrompt
 	}
-	return detectTrustPrompt(v.screen, hostAgentName(h)), nil
+	return detectStartPrompt(v.screen, hostAgentName(h)), nil
 }
 
 // answerHostPrompt moves the cursor to the chosen option, checks the screen, then confirms with Enter.
