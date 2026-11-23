@@ -83,6 +83,13 @@ final class AppStore {
     var threadsError: String?
     /// True after the first thread list load that succeeded; before it, an empty list means "not loaded yet".
     var threadsLoaded = false
+    /// Threads on the primary server's peers (ids "@<machine>:<id>") and every machine with its status.
+    var peerThreads: [V3Thread] = []
+    var fleetMachines: [FleetMachine] = []
+    /// "" shows every machine; else only threads of that machine.
+    var machineFilter: String = UserDefaults.standard.string(forKey: "threads.machine") ?? "" {
+        didSet { UserDefaults.standard.set(machineFilter, forKey: "threads.machine") }
+    }
 
     // Notification centre (/api/notify), newest first.
     var alerts: [AlertItem] = []
@@ -234,7 +241,7 @@ final class AppStore {
         approvalsByID.values.filter { $0.isPending }.sorted { $0.createdAt < $1.createdAt }
     }
 
-    func thread(_ id: String) -> V3Thread? { threads.first { $0.id == id } }
+    func thread(_ id: String) -> V3Thread? { threads.first { $0.id == id } ?? peerThreads.first { $0.id == id } }
 
     /// Thread id an approval belongs to: a driven thread, else the thread of its session.
     func threadID(of a: Approval) -> String {
@@ -260,6 +267,11 @@ final class AppStore {
     func group(of t: V3Thread) -> ThreadGroup {
         let today = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
         let recent = Double(t.lastAt) >= today
+        if t.machine != nil {
+            if t.attention == true || t.state.needsAttention { return .need }
+            if t.state == .running { return .working }
+            return recent ? .ready : .settled
+        }
         if t.isDriven, let g = t.group.flatMap(ThreadGroup.init(rawValue:)) {
             // The daemon's group knows settle and snooze; derive one only for an older daemon.
             if g != .need, !approvals(forThread: t).isEmpty { return .need }
@@ -287,7 +299,10 @@ final class AppStore {
     }
 
     func threads(in g: ThreadGroup) -> [V3Thread] {
-        threads.filter { $0.parentThread == nil || $0.parentThread == "" }
+        let selfName = fleetMachines.first { $0.isSelf }?.name ?? ""
+        let only = fleetMachines.count > 1 && fleetMachines.contains { $0.name == machineFilter } ? machineFilter : ""
+        return (threads + peerThreads).filter { $0.parentThread == nil || $0.parentThread == "" }
+            .filter { only.isEmpty || ($0.machine ?? selfName) == only }
             .filter { group(of: $0) == g }
             .sorted { $0.lastAt > $1.lastAt }
     }

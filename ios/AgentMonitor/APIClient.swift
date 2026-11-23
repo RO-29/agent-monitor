@@ -12,6 +12,10 @@ struct APIClient {
     static let shared = APIClient()
     /// Set for another machine; nil means the primary server in Config.
     var machine: Machine? = nil
+    /// A peer of the primary server, reached through its /api/m/<name> proxy.
+    var via: String? = nil
+
+    static func peer(_ name: String?) -> APIClient { name.map { APIClient(via: $0) } ?? .shared }
 
     var session: URLSession {
         let cfg = URLSessionConfiguration.default
@@ -21,7 +25,8 @@ struct APIClient {
     }
 
     func url(_ path: String) throws -> URL {
-        guard let base = machine?.baseURL ?? Config.baseURL, let u = URL(string: base.absoluteString + path) else {
+        let prefix = via.map { "/api/m/" + ($0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))) ?? $0) } ?? ""
+        guard let base = machine?.baseURL ?? Config.baseURL, let u = URL(string: base.absoluteString + prefix + path) else {
             throw APIError(message: "Bad server URL")
         }
         return u

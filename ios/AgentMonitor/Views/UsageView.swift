@@ -5,11 +5,18 @@ import SwiftUI
 struct UsageStrip: View {
     static let order = ["claude", "codex", "opencode", "cursor", "pi"]
     @State private var usage: [AgentUsage] = []
+    @State private var machines = 1
     @State private var loaded = false
 
-    private var rows: [AgentUsage] {
-        var out = Self.order.map { k in usage.first { agentKey($0.agent) == k } ?? AgentUsage(agent: k) }
-        out += usage.filter { !Self.order.contains(agentKey($0.agent)) }
+    /// One row per subscription, in agent order; an agent with no reading anywhere keeps one row.
+    private var rows: [UsageGroup] {
+        let groups = UsageGroup.group(usage)
+        var out: [UsageGroup] = []
+        for k in Self.order {
+            let g = groups.filter { agentKey($0.a.agent) == k }
+            out += g.isEmpty ? [UsageGroup(id: k, a: AgentUsage(agent: k), machines: [])] : g
+        }
+        out += groups.filter { !Self.order.contains(agentKey($0.a.agent)) }
         return out
     }
 
@@ -18,9 +25,10 @@ struct UsageStrip: View {
             if !loaded {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
             } else {
-                ForEach(Array(rows.enumerated()), id: \.element.agent) { i, a in
+                let split = Set(rows.map { $0.a.agent }.filter { a in rows.filter { $0.a.agent == a }.count > 1 })
+                ForEach(Array(rows.enumerated()), id: \.element.id) { i, g in
                     if i > 0 { Rectangle().fill(Tok.line).frame(height: 0.5) }
-                    AgentUsageRow(a: a)
+                    AgentUsageRow(a: g.a, who: machines > 1 || split.contains(g.a.agent) ? g.who(many: machines > 1) : nil, key: g.id)
                 }
             }
         }
@@ -29,7 +37,13 @@ struct UsageStrip: View {
                 #if DEBUG
                 if DebugRoute.sample { usage = Self.samples(); loaded = true; return }
                 #endif
-                if let u = try? await APIClient.shared.usageLimits() { usage = u.agents ?? [] }
+                if let f = try? await APIClient.shared.get("/api/fleet/usage", as: FleetUsage.self) {
+                    usage = f.agents ?? []
+                    machines = max(f.machines?.count ?? 1, 1)
+                } else if let u = try? await APIClient.shared.usageLimits() {
+                    usage = u.agents ?? []
+                    machines = 1
+                }
                 loaded = true
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
             }
@@ -64,11 +78,13 @@ struct UsageStrip: View {
 
 private struct AgentUsageRow: View {
     let a: AgentUsage
+    var who: String? = nil
     @AppStorage private var open: Bool
 
-    init(a: AgentUsage) {
+    init(a: AgentUsage, who: String? = nil, key: String? = nil) {
         self.a = a
-        _open = AppStorage(wrappedValue: false, "usage.open." + agentKey(a.agent))
+        self.who = who
+        _open = AppStorage(wrappedValue: false, "usage.open." + (key.map { $0.contains("acct:") ? $0 : agentKey(a.agent) } ?? agentKey(a.agent)))
     }
 
     private var notInstalled: Bool { a.installed == false }
@@ -95,6 +111,9 @@ private struct AgentUsageRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityValue(open ? "Expanded" : "Collapsed")
+            if let who, !who.isEmpty {
+                Text(who).font(.caption).foregroundStyle(Tok.muted).lineLimit(1).padding(.leading, 23).padding(.top, -8)
+            }
             if open {
                 VStack(alignment: .leading, spacing: 12) {
                     if a.hasReading {

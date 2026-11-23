@@ -93,6 +93,9 @@ struct WorkspaceView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { ConnectionChip(onlyWhenDown: true) }
                 ToolbarItem(placement: .topBarTrailing) { ComposeButton() }
+                if store.manyMachines {
+                    ToolbarItem(placement: .topBarTrailing) { MachineFilterMenu() }
+                }
             }
             .navigationDestination(for: String.self) { id in
                 if let tid = LinkedAgentsPage.threadID(fromRoute: id) {
@@ -102,6 +105,7 @@ struct WorkspaceView: View {
                 }
             }
             .refreshable {
+                await store.loadFleet()
                 await store.loadThreads()
                 await store.loadApprovals()
             }
@@ -111,6 +115,13 @@ struct WorkspaceView: View {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Tok.bg)
+                }
+            }
+            .task {
+                // Threads of the other machines: every 15 s while the list shows.
+                while !Task.isCancelled {
+                    await store.loadFleet()
+                    try? await Task.sleep(nanoseconds: 15_000_000_000)
                 }
             }
             .task {
@@ -199,6 +210,26 @@ struct WorkspaceView: View {
     }
 }
 
+/// Picks which machine's threads the list shows; only there with two or more machines.
+struct MachineFilterMenu: View {
+    @Environment(AppStore.self) private var store
+    var body: some View {
+        @Bindable var store = store
+        Menu {
+            Picker("Machine", selection: $store.machineFilter) {
+                Text("All Machines").tag("")
+                ForEach(store.fleetMachines) { m in
+                    Text(m.online ? m.name : "\(m.name) (offline)").tag(m.name)
+                }
+            }
+        } label: {
+            Image(systemName: store.machineFilter.isEmpty ? "desktopcomputer" : "desktopcomputer.trianglebadge.exclamationmark")
+                .symbolVariant(store.machineFilter.isEmpty ? .none : .fill)
+        }
+        .accessibilityLabel(store.machineFilter.isEmpty ? "All machines" : "Only \(store.machineFilter)")
+    }
+}
+
 /// The compose button every tab shows in its navigation bar.
 struct ComposeButton: View {
     @Environment(AppStore.self) private var store
@@ -246,6 +277,9 @@ struct ThreadRow: View {
 
     /// One quiet line: what it waits for or does now, else the repo.
     private var subtitle: String {
+        if group == .need, t.machine != nil {
+            return t.state == .awaitingInput ? "Waiting for a reply" : "Needs you"
+        }
         if group == .need {
             if let a = store.approvals(forThread: t).first { return a.kind == "permission" ? "Wants to run \(a.displayTool)" : a.summary }
             if t.isDriven && t.status == "error" { return "Stopped with an error" }
@@ -285,6 +319,15 @@ struct ThreadRow: View {
                 }
                 HStack(spacing: 6) {
                     AgentGlyph(agent: t.agent, size: 13)
+                    if store.manyMachines {
+                        let m = t.machine ?? store.selfMachine
+                        Text(m)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .foregroundStyle(t.machine != nil ? Tok.accent : Tok.fg2)
+                            .background(t.machine != nil ? Tok.accentSoft : Tok.panel, in: RoundedRectangle(cornerRadius: 4))
+                            .accessibilityLabel("on \(m)")
+                    }
                     if group == .working || group == .need, subtitle != t.repoName {
                         Text(t.repoName).foregroundStyle(Tok.muted)
                         Text("·").foregroundStyle(Tok.muted)

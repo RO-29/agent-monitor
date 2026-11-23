@@ -14,6 +14,8 @@ struct Composer: View {
     var onHistory: (() -> Void)? = nil
     /// The thread id: drafts follow the thread, not the session it is on now.
     var draftID: String? = nil
+    /// The machine the thread runs on; peers go through the primary server's proxy.
+    var api: APIClient = .shared
 
     @State private var text = ""
     @State private var sending = false
@@ -160,7 +162,7 @@ struct Composer: View {
                 .padding(.horizontal, 4)
                 .task(id: agent + cwd) {
                     guard skillCmds.isEmpty, !cwd.isEmpty,
-                          let list = try? await APIClient.shared.skills(agent: agentKey(agent), cwd: cwd) else { return }
+                          let list = try? await api.skills(agent: agentKey(agent), cwd: cwd) else { return }
                     skillCmds = list.compactMap { s in
                         let name = (s.insert ?? "/" + s.name).trimmingCharacters(in: CharacterSet(charactersIn: "/$ "))
                         return name.isEmpty ? nil : (name, s.description ?? "skill")
@@ -283,8 +285,8 @@ struct Composer: View {
     /// This session's ! commands newest first, then other sessions' recent ones; kept 20 s.
     private func loadHistory() async {
         guard let sid = sessionID, Date().timeIntervalSince(histAt) > 20 else { return }
-        async let mine = try? APIClient.shared.sessionCommands(sid)
-        async let all = try? APIClient.shared.recentCommands()
+        async let mine = try? api.sessionCommands(sid)
+        async let all = try? api.recentCommands()
         let byNew = { (x: [CmdItem]) in x.sorted { $0.at > $1.at }.map(\.cmd) }
         var seen = Set<String>()
         hist = (byNew(await mine ?? []) + byNew(await all ?? [])).filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -296,8 +298,8 @@ struct Composer: View {
 
     private func loadPrompts() async {
         guard Date().timeIntervalSince(promptAt) > 20 else { return }
-        async let mine = try? APIClient.shared.prompts(session: sessionID, limit: 100)
-        async let all = try? APIClient.shared.prompts(limit: 300)
+        async let mine = try? api.prompts(session: sessionID, limit: 100)
+        async let all = try? api.prompts(limit: 300)
         var seen = Set<String>()
         let mineList = sessionID == nil ? [] : (await mine ?? [])
         promptHist = (mineList + (await all ?? [])).map(\.text).filter { seen.insert($0).inserted }
@@ -446,10 +448,10 @@ struct Composer: View {
         defer { sending = false }
         do {
             if let d = drivenID {
-                try await APIClient.shared.drivenSend(d, text: body, attachments: ids)
+                try await api.drivenSend(d, text: body, attachments: ids)
                 status = nil
             } else if let sid = sessionID {
-                let sent = try await APIClient.shared.cliSendFull(sid, text: body, attachments: ids)
+                let sent = try await api.cliSendFull(sid, text: body, attachments: ids)
                 status = sent.queued ? "\(cliName) is busy and queued the message." : nil
                 if !sent.panel.isEmpty {
                     slashPanel = SlashPanel(command: String(body.split(separator: " ").first ?? ""), text: sent.panel, menu: sent.menu)
@@ -486,7 +488,7 @@ struct Composer: View {
         defer { acting = false }
         var ok = false
         do {
-            try await APIClient.shared.cliQueueAction(sessionID, action: action, itemID: id)
+            try await api.cliQueueAction(sessionID, action: action, itemID: id)
             error = nil
             ok = true
             switch action {
@@ -502,15 +504,15 @@ struct Composer: View {
     }
 
     private func loadQueue(_ sid: String) async {
-        queue = try? await APIClient.shared.cliQueue(sid)
+        queue = try? await api.cliQueue(sid)
     }
 
     /// Queue every 5 s, pane reachability every 15 s, while the chat is visible.
     private func refreshLoop(_ sid: String) async {
         var n = 0
         while !Task.isCancelled {
-            if n % 3 == 0 { pane = try? await APIClient.shared.watchedPane(sid) }
-            if n % 12 == 0, let u = try? await APIClient.shared.usageLimits() {
+            if n % 3 == 0 { pane = try? await api.watchedPane(sid) }
+            if n % 12 == 0, let u = try? await api.usageLimits() {
                 credits = u.agents?.first { $0.agent == agentKey(agent) }?.creditsLine
             }
             await loadQueue(sid)
@@ -527,6 +529,7 @@ struct Composer: View {
 // A question or plan that Claude Code shows in its pane with no held approval;
 // answered by keys the daemon sends to the pane (POST /api/session/{id}/answer).
 struct TermQuestionCard: View {
+    var api: APIClient = .shared
     @Environment(AppStore.self) private var store
     let sessionID: String
     /// From the needs-you list: the card then shows that question and does not poll.
@@ -551,7 +554,7 @@ struct TermQuestionCard: View {
         .task(id: sessionID) {
             guard item == nil else { return }
             while !Task.isCancelled {
-                polled = try? await APIClient.shared.termQuestion(sessionID)
+                polled = try? await api.termQuestion(sessionID)
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
@@ -701,7 +704,7 @@ struct TermQuestionCard: View {
         Task {
             defer { busy = false }
             do {
-                try await APIClient.shared.answerTerm(sessionID, b)
+                try await api.answerTerm(sessionID, b)
                 DraftStore.shared.clear(prefix: "term:\(sessionID):\(q.toolUseId ?? ""):")
                 sentFor = q.toolUseId
                 error = nil
@@ -712,7 +715,7 @@ struct TermQuestionCard: View {
             } catch {
                 self.error = error.localizedDescription
             }
-            if item != nil { await store.loadNeedsYou() } else { polled = try? await APIClient.shared.termQuestion(sessionID) }
+            if item != nil { await store.loadNeedsYou() } else { polled = try? await api.termQuestion(sessionID) }
         }
     }
 }

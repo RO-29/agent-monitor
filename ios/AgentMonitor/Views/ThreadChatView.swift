@@ -42,7 +42,12 @@ struct ThreadChatView: View {
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
     private var thread: V3Thread? { store.thread(threadID) }
+    /// A thread on another machine goes through the primary server's proxy at its grant level.
+    private var peer: String? { thread?.machine }
+    private var api: APIClient { .peer(peer) }
     private var drivenID: String? {
+        // A peer's orchestrator stream is not proxied: its thread opens by session.
+        if peer != nil { return nil }
         if let t = thread, t.isDriven { return (t.drivenId?.isEmpty == false ? t.drivenId : nil) ?? t.id }
         return threadID.hasPrefix("ot_") ? threadID : nil
     }
@@ -52,7 +57,7 @@ struct ThreadChatView: View {
         if let d = drivenID { return .driven(d) }
         return sessionID.map { .watched($0) }
     }
-    private var session: Session? { sessionID.flatMap { store.sessionsByID[$0] } }
+    private var session: Session? { peer != nil ? nil : sessionID.flatMap { store.sessionsByID[$0] } }
     private var title: String { thread?.name ?? driven?.title ?? session?.headline ?? "Thread" }
     private var agent: String { thread?.agent ?? driven?.agent ?? session?.tool ?? "claude" }
     private var asks: [Approval] {
@@ -61,6 +66,7 @@ struct ThreadChatView: View {
         return sessionID.map { store.approvals(forSession: $0) } ?? []
     }
     private var running: Bool {
+        if peer != nil { return thread?.state == .running }
         if drivenID != nil { return driven?.status == "running" || driven?.status == "starting" }
         return session?.state == .running
     }
@@ -207,7 +213,7 @@ struct ThreadChatView: View {
 
     private func runBash(_ sid: String, _ cmd: String) async {
         do {
-            _ = try await APIClient.shared.cliSend(sid, text: "!" + cmd, attachments: [])
+            _ = try await api.cliSend(sid, text: "!" + cmd, attachments: [])
             ToastCenter.shared.show("Sent to the terminal")
         } catch {
             ToastCenter.shared.show(error.localizedDescription, icon: "exclamationmark.triangle.fill")
@@ -347,7 +353,7 @@ struct ThreadChatView: View {
 
     private func end(_ sid: String) async {
         do {
-            let ended = try await APIClient.shared.endSession(sid)
+            let ended = try await api.endSession(sid)
             ToastCenter.shared.show(ended ? "Session ended" : "Exit sent; check the terminal", icon: ended ? "stop.circle" : "exclamationmark.circle")
         } catch { ToastCenter.shared.show("Could not end: \(error.localizedDescription)", icon: "xmark.octagon") }
         await store.loadThreads()
@@ -355,7 +361,7 @@ struct ThreadChatView: View {
 
     private func resume(_ sid: String) async {
         do {
-            try await APIClient.shared.resumeSession(sid)
+            try await api.resumeSession(sid)
             ToastCenter.shared.show("Resumed in a terminal", icon: "play.circle")
         } catch { ToastCenter.shared.show("Could not resume: \(error.localizedDescription)", icon: "xmark.octagon") }
         await store.loadThreads()
@@ -440,7 +446,7 @@ struct ThreadChatView: View {
                     ForEach(asks) { a in HookApprovalCard(a: a, showHeader: false) }
                     // The card polls /question itself and shows only while a question is open in the terminal.
                     if case .watched(let sid) = target, asks.isEmpty, agent == "claude" {
-                        TermQuestionCard(sessionID: sid)
+                        TermQuestionCard(api: api, sessionID: sid)
                     }
                     if loaded, let feedError {
                         InlineError(message: feedError)
@@ -502,6 +508,13 @@ struct ThreadChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if selecting {
                     selectBar
+                } else if !fullscreen, let p = peer, thread?.canAct == false {
+                    Label("View only on \(p). Ask its owner for Full access to answer or send.", systemImage: "eye")
+                        .font(.footnote).foregroundStyle(Tok.fg2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Tok.panel, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 12).padding(.bottom, 8)
                 } else if !fullscreen {
                     Composer(target: target, agent: agent,
                              busyCLI: running || session?.state == .awaitingPermission,
@@ -509,7 +522,7 @@ struct ThreadChatView: View {
                              nativeID: session?.sessionId ?? String((sessionID ?? "").split(separator: ":", maxSplits: 1).last ?? ""),
                              closed: driven?.status == "closed",
                              onHistory: canRunBash && sessionID != nil ? { showHistory = true } : nil,
-                             draftID: threadID)
+                             draftID: threadID, api: api)
                     // The queue panel or an error makes the composer taller: keep a reader who was at the bottom there.
                     .background(GeometryReader { g in
                         Color.clear.onChange(of: g.size.height) { old, new in
@@ -548,7 +561,7 @@ struct ThreadChatView: View {
         #endif
         while !Task.isCancelled && !loaded {
             do {
-                apply(try await APIClient.shared.watchedItems(sid), first: true)
+                apply(try await api.watchedItems(sid), first: true)
                 feedError = nil
             } catch let e as APIError where e.status == 404 || e.status == 501 {
                 feedError = e.message
@@ -562,7 +575,7 @@ struct ThreadChatView: View {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             if Task.isCancelled { return }
             do {
-                apply(try await APIClient.shared.watchedItems(sid, after: cursor), first: false)
+                apply(try await api.watchedItems(sid, after: cursor), first: false)
                 feedError = nil
             } catch {
                 if !Task.isCancelled { feedError = error.localizedDescription }
@@ -580,7 +593,7 @@ struct ThreadChatView: View {
     private func loadPrior(_ t: ODriven) async {
         guard priorSID == nil, let native = t.nativeId, !native.isEmpty, ["claude", "codex"].contains(t.agent) else { return }
         let sid = "\(t.agent):\(native)"
-        guard let r = try? await APIClient.shared.watchedItems(sid) else { return }
+        guard let r = try? await api.watchedItems(sid) else { return }
         let cut = t.createdAt ?? .max
         var next: [String: WItem] = [:]
         for it in r.items ?? [] where it.startedAt < cut { next["prior:" + it.id] = it.withID("prior:" + it.id) }
@@ -598,7 +611,7 @@ struct ThreadChatView: View {
         while !Task.isCancelled {
             var seq: Int64?
             do {
-                let d = try await APIClient.shared.drivenDetail(id)
+                let d = try await api.drivenDetail(id)
                 applyDetail(d)
                 await loadPrior(d.thread)
                 seq = d.seq
@@ -609,7 +622,7 @@ struct ThreadChatView: View {
             }
             if hasStream, let after = seq {
                 do {
-                    for try await ev in APIClient.shared.orchStream(after: after) where ev.threadId == id {
+                    for try await ev in api.orchStream(after: after) where ev.threadId == id {
                         applyEvent(ev)
                         wait = 1
                     }
@@ -663,7 +676,7 @@ struct ThreadChatView: View {
         earlierBusy = true
         defer { earlierBusy = false }
         do {
-            let r = try await APIClient.shared.watchedItems(sid, before: before)
+            let r = try await api.watchedItems(sid, before: before)
             if sid == priorSID {
                 let cut = driven?.createdAt ?? .max
                 for it in r.items ?? [] where it.startedAt < cut && prior["prior:" + it.id] == nil { prior["prior:" + it.id] = it.withID("prior:" + it.id) }
@@ -683,7 +696,7 @@ struct ThreadChatView: View {
         if DebugRoute.sample { kids = DebugRoute.sampleKids(); return }
         #endif
         while !Task.isCancelled {
-            if let r = try? await APIClient.shared.children(sid) { kids = r.children }
+            if let r = try? await api.children(sid) { kids = r.children }
             try? await Task.sleep(nanoseconds: 20_000_000_000)
         }
     }

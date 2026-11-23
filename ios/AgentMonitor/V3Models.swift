@@ -215,6 +215,11 @@ struct V3Thread: Decodable, Identifiable, Hashable {
     var kind: String?
     var status: String?
     var group: String?   // a driven thread's server group (settle and snooze included)
+    /// Set on a thread of another machine: its name, this Mac's grant there, and its id on that machine.
+    var machine: String?
+    var level: String?
+    var peerID: String?
+    var canAct: Bool { machine == nil || level == "control" || level == "full" }
 
     var sessionIDs: [String] { sessions ?? [] }
     var latestSession: String? { sessions?.last }
@@ -493,6 +498,9 @@ struct AgentUsage: Decodable, Hashable {
     var stale: Bool?
     /// When the plan reading was taken, ms.
     var measuredAt: Int64?
+    /// The subscription (hashed key, masked email, organisation) and, in fleet readings, the machine.
+    var account: UsageAccount?
+    var machine: String?
     var hasReading: Bool { windows.contains { $0.usedPercent != nil } }
     var hasLocal: Bool { (local ?? []).contains { $0.tokens.total + $0.tokens.cacheRead + $0.tokens.cacheCreate > 0 } }
     var hasModels: Bool { !(models ?? []).isEmpty }
@@ -503,7 +511,7 @@ struct AgentUsage: Decodable, Hashable {
         self.windows = windows; self.local = local; self.models = models; self.credits = credits
     }
 
-    private enum K: String, CodingKey { case agent, plan, note, installed, windows, local, models, credits, alert, stale, measuredAt }
+    private enum K: String, CodingKey { case agent, plan, note, installed, windows, local, models, credits, alert, stale, measuredAt, account, machine }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
         agent = try c.decode(String.self, forKey: .agent)
@@ -517,7 +525,56 @@ struct AgentUsage: Decodable, Hashable {
         alert = try? c.decodeIfPresent(String.self, forKey: .alert)
         stale = try? c.decodeIfPresent(Bool.self, forKey: .stale)
         measuredAt = try? c.decodeIfPresent(Int64.self, forKey: .measuredAt)
+        account = try? c.decodeIfPresent(UsageAccount.self, forKey: .account)
+        machine = try? c.decodeIfPresent(String.self, forKey: .machine)
     }
+}
+
+struct UsageAccount: Decodable, Hashable {
+    var key: String
+    var label: String?
+    var org: String?
+}
+
+/// One subscription across machines: its newest reading and the machines that use it.
+struct UsageGroup: Identifiable {
+    var id: String
+    var a: AgentUsage
+    var machines: [String]
+
+    func who(many: Bool) -> String {
+        let acct = [a.account?.label, a.account?.org].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        let whereText = many && !machines.isEmpty ? "on " + machines.joined(separator: ", ") : ""
+        return [acct, whereText].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// Groups by agent and account; a reading with no account groups by agent and machine.
+    static func group(_ list: [AgentUsage]) -> [UsageGroup] {
+        let installed = Set(list.filter { $0.installed != false }.map(\.agent))
+        var out: [UsageGroup] = []
+        for a in list {
+            if a.installed == false, installed.contains(a.agent) { continue }
+            let key = a.agent + "|" + (a.account.map { "acct:" + $0.key } ?? (a.installed == false ? "off" : "m:" + (a.machine ?? "")))
+            func fresh(_ u: AgentUsage) -> Int64 { u.hasReading || u.credits != nil ? max(u.measuredAt ?? 1, 1) : 0 }
+            if let i = out.firstIndex(where: { $0.id == key }) {
+                if let m = a.machine, !out[i].machines.contains(m) { out[i].machines.append(m) }
+                if fresh(a) > fresh(out[i].a) {
+                    var n = a
+                    n.local = out[i].a.local
+                    n.models = out[i].a.models
+                    out[i].a = n
+                }
+            } else {
+                out.append(UsageGroup(id: key, a: a, machines: a.machine.map { [$0] } ?? []))
+            }
+        }
+        return out
+    }
+}
+
+struct FleetUsage: Decodable {
+    var machines: [FleetMachine]?
+    var agents: [AgentUsage]?
 }
 
 struct UsageLimits: Decodable {
