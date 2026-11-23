@@ -37,10 +37,10 @@ Base `main` at c3f6b01. Request from the user, 2026-11-23.
    with `machine`. The client groups them by account (Part C).
 3. `GET /api/fleet/machines` (view): `{name, self, level, online, version}` for this machine and peers.
 4. Account identity in `agentUsage`: `account {key, label, org}`.
-   - Claude: `key` = first 16 hex of sha256("agent-monitor/account/" + accountUuid); `label` = emailAddress;
-     `org` = organizationName.
+   - Claude: `key` = first 16 hex of sha256("agent-monitor/account/" + accountUuid); `label` = the masked
+     emailAddress ("s•••@example.com": the full address never leaves the daemon); `org` = organizationName.
    - Codex: `account/read` in the same app-server session as `account/rateLimits/read`. `key` from
-     `accountId` (or `userId`) hashed the same way; `label` = email; `org` = workspaceName.
+     `accountId` (or `userId`) hashed the same way; `label` = the masked email; `org` = workspaceName.
    - The raw ids never leave the daemon.
 5. Proxy allowlist (`peerRoutes`), so the workspace works on a peer:
    - GET at view: `session/{id}/(children|question|pane-tail)`, `orch/threads/{id}`,
@@ -48,8 +48,8 @@ Base `main` at c3f6b01. Request from the user, 2026-11-23.
    - POST at control: `session/{id}/answer`, `session/{id}/keys`, `orch/threads/{id}/(continue|cancel)`,
      `orch/uploads`.
    - The peer still checks its own grant on every call. Terminals stay out (admin only).
-6. Level refresh: `GET /api/peers` reads the peer's `/api/devices/self` (new, view) to learn the current
-   level, so a level change on the other side shows here within 30 s.
+6. Level refresh: `/api/health` returns `machine` and the caller's `level`; `GET /api/peers` and the fleet
+   routes read it, so a level change on the other side shows here within 30 s.
 
 ## Part B: web and the Mac app
 
@@ -76,11 +76,12 @@ Base `main` at c3f6b01. Request from the user, 2026-11-23.
 
 ## Part D: iPhone
 
-- The iPhone already keeps a direct grant per machine. It reads `/api/v3/threads?compact=1` and
-  `/api/usage/limits` from each of its machines and merges them with the same rules (machine label,
-  filter, usage per account). A thread opens with that machine's `APIClient`, and its level decides
-  the composer.
-- `RemoteNeedsSection` folds into the main list with a machine label.
+- The iPhone's grant on its main server is admin, so it uses the same fleet routes as the web app:
+  `/api/fleet/threads` every 15 s and `/api/fleet/usage`. Peer threads get the id `@<machine>:<id>`.
+- A peer thread opens through the server's `/api/m/<machine>` proxy (`APIClient.peer`). View only
+  replaces the composer with one line. A peer's driven thread opens by its session (the orchestrator
+  stream is not proxied).
+- The iPhone's own direct machine list stays for remote alerts.
 
 ## Order and gates
 
