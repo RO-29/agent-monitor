@@ -238,6 +238,7 @@ func runServer() {
 		writeJSON(w, map[string]any{
 			"ok": true, "sessions": len(store.All()), "loading": !sessionsLoaded.Load(),
 			"tmuxPanes": tmuxPanes, "registeredPanes": len(paneRegistry.List()),
+			"machine": selfMachineName(), "level": callerLevel(r).String(),
 		})
 	})
 	hookHandler := func(tool Tool) http.HandlerFunc {

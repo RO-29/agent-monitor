@@ -62,6 +62,7 @@ type agentUsage struct {
 	SourcePath  string        `json:"sourcePath,omitempty"`
 	MeasuredAt  int64         `json:"measuredAt,omitempty"` // ms of the plan reading
 	Plan        string        `json:"plan,omitempty"`
+	Account     *usageAccount `json:"account,omitempty"`
 	Note        string        `json:"note,omitempty"`
 	Windows     []usageWindow `json:"windows"`
 	Local       []usageLocal  `json:"local"`
@@ -801,7 +802,7 @@ func (u *usageLimits) local(totals func(from int64) map[string]*usageModel, wins
 
 func (u *usageLimits) claudeUsage(now time.Time) agentUsage {
 	a := agentUsage{Agent: "claude", Installed: u.installed("claude"), Source: "Claude Code statusLine (dietclaude copy)", SourcePath: u.claudeState,
-		LocalSource: "Claude Code transcripts in ~/.claude/projects, cost at public list prices", Plan: u.claudePlanName(now)}
+		LocalSource: "Claude Code transcripts in ~/.claude/projects, cost at public list prices", Plan: u.claudePlanName(now), Account: u.claudeAccount(now)}
 	var st struct {
 		UpdatedAt  float64 `json:"updated_at"`
 		RateLimits map[string]struct {

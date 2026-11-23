@@ -54,6 +54,11 @@ func TestFakeCodexAppServer(t *testing.T) {
 			var b bytes.Buffer
 			_ = json.Compact(&b, []byte(fakeRateLimitsJSON))
 			res = b.String()
+		case "account/read":
+			res = `{"account":{"type":"chatgpt","email":"dev@example.com","planType":"business","workspaceName":"Example Co"},"requiresOpenaiAuth":true}`
+		default:
+			os.Stdout.WriteString(`{"id":` + string(m.ID) + `,"error":{"code":-32601,"message":"no"}}` + "\n")
+			continue
 		}
 		os.Stdout.WriteString(`{"id":` + string(m.ID) + `,"result":` + res + "}\n")
 	}

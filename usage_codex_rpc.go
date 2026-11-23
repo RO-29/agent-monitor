@@ -45,6 +45,7 @@ type codexRateSnap struct {
 type codexAmounts struct {
 	At   int64
 	Snap codexRateSnap
+	Acct *usageAccount
 }
 
 type codexRPCState struct {
@@ -75,7 +76,69 @@ func codexRateRead(ctx context.Context) (json.RawMessage, error) {
 	if err := conn.notify("initialized", nil); err != nil {
 		return nil, err
 	}
-	return conn.call(ctx, "account/rateLimits/read", map[string]any{})
+	raw, err := conn.call(ctx, "account/rateLimits/read", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+	actx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if acct, err := conn.call(actx, "account/read", map[string]any{"refreshToken": false}); err == nil {
+		raw = withCodexAccount(raw, acct)
+	}
+	return raw, nil
+}
+
+// withCodexAccount adds the account/read answer to the rate-limit answer under "agentMonitorAccount".
+func withCodexAccount(raw, acct json.RawMessage) json.RawMessage {
+	var m map[string]json.RawMessage
+	if json.Unmarshal(raw, &m) != nil || m == nil {
+		return raw
+	}
+	m["agentMonitorAccount"] = acct
+	b, err := json.Marshal(m)
+	if err != nil {
+		return raw
+	}
+	return b
+}
+
+// codexAccountOf reads the account of a combined answer; the ids are hashed and never kept raw.
+func codexAccountOf(raw json.RawMessage) *usageAccount {
+	var r struct {
+		AccountID *string `json:"accountId"`
+		Acct      *struct {
+			UserID  *string `json:"userId"`
+			Account *struct {
+				Type          string  `json:"type"`
+				Email         *string `json:"email"`
+				WorkspaceName *string `json:"workspaceName"`
+			} `json:"account"`
+		} `json:"agentMonitorAccount"`
+	}
+	if json.Unmarshal(raw, &r) != nil {
+		return nil
+	}
+	id, label, org := "", "", ""
+	if r.AccountID != nil {
+		id = *r.AccountID
+	}
+	if a := r.Acct; a != nil {
+		if id == "" && a.UserID != nil {
+			id = *a.UserID
+		}
+		if c := a.Account; c != nil {
+			if c.Email != nil {
+				label = *c.Email
+			}
+			if c.WorkspaceName != nil {
+				org = *c.WorkspaceName
+			}
+			if id == "" && label != "" {
+				id = "email:" + strings.ToLower(label)
+			}
+		}
+	}
+	return newUsageAccount(id, label, org)
 }
 
 // parseCodexAmounts picks the "codex" bucket of rateLimitsByLimitId, else the single rateLimits view.
@@ -87,13 +150,14 @@ func parseCodexAmounts(raw json.RawMessage, at int64) (*codexAmounts, error) {
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
+	acct := codexAccountOf(raw)
 	if s, ok := r.ByID["codex"]; ok {
-		return &codexAmounts{At: at, Snap: s}, nil
+		return &codexAmounts{At: at, Snap: s, Acct: acct}, nil
 	}
 	if r.RateLimits == nil {
 		return nil, errors.New("no rateLimits in the answer")
 	}
-	return &codexAmounts{At: at, Snap: *r.RateLimits}, nil
+	return &codexAmounts{At: at, Snap: *r.RateLimits, Acct: acct}, nil
 }
 
 // jsonKeyPaths lists the field names of a JSON value (no values), for a one-time log of the answer's shape.
@@ -190,6 +254,9 @@ func (u *usageLimits) applyCodexAmounts(a *agentUsage, now time.Time, flagsAt, c
 	s.mu.Unlock()
 	if errText != "" {
 		a.Note = errText
+	}
+	if res != nil && res.Acct != nil {
+		a.Account = res.Acct // the account outlives the amounts' expiry
 	}
 	if res == nil || now.UnixMilli()-res.At > codexRPCExpire.Milliseconds() {
 		return

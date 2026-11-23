@@ -162,10 +162,16 @@ var peerRoutes = []struct {
 	re     *regexp.Regexp
 }{
 	{"GET", regexp.MustCompile(`^(needs-you|sessions|health|usage/limits|v3/threads|orch/threads)$`)},
-	{"GET", regexp.MustCompile(`^session/[A-Za-z0-9:._-]{1,120}/(items|place|cli-queue)$`)},
+	{"GET", regexp.MustCompile(`^session/[A-Za-z0-9:._-]{1,120}/(items|place|cli-queue|children|question)$`)},
+	{"GET", regexp.MustCompile(`^session/[A-Za-z0-9:._-]{1,120}/children/[A-Za-z0-9:._-]{1,120}/items$`)},
+	{"GET", regexp.MustCompile(`^(queue|orch/threads)/[A-Za-z0-9:._-]{1,120}$`)},
+	{"GET", regexp.MustCompile(`^orch/threads/[A-Za-z0-9:._-]{1,120}/messages$`)},
 	{"POST", regexp.MustCompile(`^approvals/[A-Za-z0-9_-]{1,80}/decide$`)},
 	{"POST", regexp.MustCompile(`^session/prompt/[A-Za-z0-9:._-]{1,120}$`)},
-	{"POST", regexp.MustCompile(`^session/[A-Za-z0-9:._-]{1,120}/cli-queue/send$`)},
+	{"POST", regexp.MustCompile(`^session/[A-Za-z0-9:._-]{1,120}/(answer|cli-queue/send|cli-queue/clear-draft)$`)},
+	{"POST", regexp.MustCompile(`^queue/[A-Za-z0-9:._-]{1,120}$`)},
+	{"POST", regexp.MustCompile(`^orch/continue$`)},
+	{"POST", regexp.MustCompile(`^orch/threads/[A-Za-z0-9:._-]{1,120}/interrupt$`)},
 }
 
 func peerRouteAllowed(method, rest string) bool {
@@ -238,32 +244,49 @@ func servePeerProxy(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 16<<20))
 }
 
+// peerHealth is what a peer's /api/health says about it and about this machine's grant there.
+type peerHealth struct {
+	Status  string
+	Level   string
+	Machine string
+}
+
 // peerStatus asks each peer for its health with a short timeout; it never fails the list.
-func peerStatus(ps []Peer) map[string]string {
-	out := map[string]string{}
+func peerStatus(ps []Peer) map[string]peerHealth {
+	out := map[string]peerHealth{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, p := range ps {
 		wg.Add(1)
 		go func(p Peer) {
 			defer wg.Done()
-			st := "offline"
+			h := peerHealth{Status: "offline", Level: p.Level}
 			req, _ := http.NewRequest(http.MethodGet, p.URL+"/api/health", nil)
 			req.Header.Set("Authorization", "Bearer "+p.Token)
 			c := &http.Client{Timeout: 3 * time.Second, CheckRedirect: peerClient.CheckRedirect}
 			if resp, err := c.Do(req); err == nil {
-				resp.Body.Close()
 				switch resp.StatusCode {
 				case http.StatusOK:
-					st = "online"
+					h.Status = "online"
+					var b struct {
+						Level   string `json:"level"`
+						Machine string `json:"machine"`
+					}
+					if json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&b) == nil {
+						if b.Level == "view" || b.Level == "control" {
+							h.Level = b.Level // the grant as the peer sees it now
+						}
+						h.Machine = b.Machine
+					}
 				case http.StatusUnauthorized:
-					st = "revoked"
+					h.Status = "revoked"
 				default:
-					st = "error " + resp.Status
+					h.Status = "error " + resp.Status
 				}
+				resp.Body.Close()
 			}
 			mu.Lock()
-			out[p.Name] = st
+			out[p.Name] = h
 			mu.Unlock()
 		}(p)
 	}
@@ -280,7 +303,8 @@ func registerPeerRoutes(mux *http.ServeMux) {
 		st := peerStatus(ps)
 		out := []map[string]any{}
 		for _, p := range ps {
-			out = append(out, map[string]any{"name": p.Name, "url": p.URL, "level": p.Level, "addedAt": p.AddedAt, "status": st[p.Name]})
+			h := st[p.Name]
+			out = append(out, map[string]any{"name": p.Name, "url": p.URL, "level": h.Level, "addedAt": p.AddedAt, "status": h.Status, "machine": h.Machine})
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i]["name"].(string) < out[j]["name"].(string) })
 		writeJSON(w, map[string]any{"peers": out})

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -41,6 +43,7 @@ type cachedPlan struct {
 	mod    time.Time
 	at     time.Time
 	plan   string
+	acct   *usageAccount
 	usage  *claudeCachedUsage
 	loaded bool
 }
@@ -63,7 +66,7 @@ func (u *usageLimits) claudeConfig(now time.Time) {
 	c.at, c.loaded = now, true
 	st, err := os.Stat(u.claudeCfg)
 	if err != nil {
-		c.plan, c.usage, c.mod = "", nil, time.Time{}
+		c.plan, c.usage, c.acct, c.mod = "", nil, nil, time.Time{}
 		return
 	}
 	if st.ModTime().Equal(c.mod) {
@@ -73,6 +76,8 @@ func (u *usageLimits) claudeConfig(now time.Time) {
 	var cfg struct {
 		OauthAccount *struct {
 			AccountUUID       string `json:"accountUuid"`
+			EmailAddress      string `json:"emailAddress"`
+			OrganizationName  string `json:"organizationName"`
 			OrganizationType  string `json:"organizationType"`
 			UserRateLimitTier string `json:"userRateLimitTier"`
 			BillingType       string `json:"billingType"`
@@ -85,14 +90,37 @@ func (u *usageLimits) claudeConfig(now time.Time) {
 	}
 	b, err := os.ReadFile(u.claudeCfg)
 	if err != nil || json.Unmarshal(b, &cfg) != nil || cfg.OauthAccount == nil {
-		c.plan, c.usage = "", nil
+		c.plan, c.usage, c.acct = "", nil, nil
 		return
 	}
 	c.plan = claudePlanLabel(cfg.OauthAccount.OrganizationType, cfg.OauthAccount.UserRateLimitTier)
+	c.acct = newUsageAccount(cfg.OauthAccount.AccountUUID, cfg.OauthAccount.EmailAddress, cfg.OauthAccount.OrganizationName)
 	c.usage = nil
 	if k := cfg.Cached; k != nil && k.AccountUUID != "" && k.AccountUUID == cfg.OauthAccount.AccountUUID {
 		c.usage = parseClaudeUtilization(k.FetchedAtMs, k.Utilization)
 	}
+}
+
+// claudeAccount returns the account of the ~/.claude.json read in claudeConfig.
+func (u *usageLimits) claudeAccount(now time.Time) *usageAccount {
+	u.claudeConfig(now)
+	return u.claudePlan.acct
+}
+
+// usageAccount names the subscription a reading belongs to; Key is a hash, never the raw account id.
+type usageAccount struct {
+	Key   string `json:"key"`
+	Label string `json:"label,omitempty"`
+	Org   string `json:"org,omitempty"`
+}
+
+// newUsageAccount hashes id with a fixed prefix, so two machines on one account get the same key.
+func newUsageAccount(id, label, org string) *usageAccount {
+	if id == "" {
+		return nil
+	}
+	h := sha256.Sum256([]byte("agent-monitor/account/" + id))
+	return &usageAccount{Key: hex.EncodeToString(h[:8]), Label: label, Org: org}
 }
 
 // claudePlanLabel turns ("claude_team", "default_claude_max_5x") into "team (max_5x)".

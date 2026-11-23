@@ -179,6 +179,7 @@ func registerNeedsYouRoutes(mux *http.ServeMux) {
 	registerPromptAnswerRoute(mux)
 	registerSessionLifecycleRoutes(mux)
 	registerPeerRoutes(mux)
+	registerFleetRoutes(mux)
 	mux.HandleFunc("GET /api/needs-you", func(w http.ResponseWriter, r *http.Request) {
 		items := needsYou()
 		writeJSON(w, map[string]any{"items": items, "count": len(items)})
