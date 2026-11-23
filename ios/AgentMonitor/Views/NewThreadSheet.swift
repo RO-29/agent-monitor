@@ -367,6 +367,7 @@ struct NewThreadSheet: View {
         busy = true
         error = nil
         defer { busy = false }
+        await dictation.settle(into: $prompt)
         let dir = cwd.trimmingCharacters(in: .whitespaces)
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         var body: [String: Any] = ["agent": agent, "cwd": dir, "prompt": text]

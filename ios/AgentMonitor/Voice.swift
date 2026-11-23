@@ -197,6 +197,29 @@ final class Dictation {
 
     func dismiss() { phase = .idle; cleaned = nil }
 
+    /// Puts the cleaned text in the field; text typed during the clean-up stays.
+    func use(_ c: String, in text: Binding<String>) {
+        if text.wrappedValue == joined {
+            text.wrappedValue = Self.join(base, c)
+        } else if !spoken.isEmpty, let r = text.wrappedValue.range(of: spoken) {
+            text.wrappedValue.replaceSubrange(r, with: c)
+        } else {
+            text.wrappedValue = Self.join(text.wrappedValue, c)
+        }
+        dismiss()
+    }
+
+    /// Before a send: stops the mic, waits for the clean-up, and uses its text when there is one.
+    func settle(into text: Binding<String>) async {
+        if phase == .listening { stop() }
+        let end = Date().addingTimeInterval(45)
+        while phase == .listening || phase == .cleaning, Date() < end {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard phase == .review else { return }
+        if let c = cleaned { use(c, in: text) } else { dismiss() }
+    }
+
     private static func authorize() async -> Bool {
         let speech: Bool = await withCheckedContinuation { c in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0 == .authorized) }
@@ -293,19 +316,7 @@ struct DictationBar: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
-                    Button("Use This") {
-                        // Text typed during the clean-up stays: swap only the spoken part.
-                        let spoken = dictation.spoken
-                        if text == dictation.joined {
-                            text = Dictation.join(dictation.base, c)
-                        } else if !spoken.isEmpty, let r = text.range(of: spoken) {
-                            text.replaceSubrange(r, with: c)
-                        } else {
-                            text = Dictation.join(text, c)
-                        }
-                        dictation.dismiss()
-                    }
-                    .buttonStyle(.am(.accent))
+                    Button("Use This") { dictation.use(c, in: $text) }.buttonStyle(.am(.accent))
                     Button("Keep Original") { dictation.dismiss() }.buttonStyle(.am(.ghost))
                 }
             }

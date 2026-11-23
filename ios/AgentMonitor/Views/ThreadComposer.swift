@@ -47,7 +47,7 @@ struct Composer: View {
     }
     private var reachable: Bool { drivenID != nil ? !closed : (pane?.sendable ?? true) }
     private var hasContent: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !tray.ids.isEmpty }
-    private var canSend: Bool { reachable && !sending && !tray.uploading && hasContent && !dictation.listening }
+    private var canSend: Bool { reachable && !sending && !tray.uploading && hasContent }
     private var draftKey: String { "chat:" + (draftID ?? sessionID ?? drivenID ?? "") }
     /// Claude Code and Codex run a line that starts with ! as a shell command in their terminal.
     private var bashCapable: Bool { sessionID != nil && ["claude", "codex"].contains(agentKey(agent)) }
@@ -434,6 +434,10 @@ struct Composer: View {
     // MARK: actions
 
     private func send() async {
+        guard !sending else { return }
+        sending = true
+        await dictation.settle(into: $text)
+        sending = false
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let ids = tray.ids
         let key = draftKey
