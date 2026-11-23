@@ -120,7 +120,17 @@ func newUsageAccount(id, label, org string) *usageAccount {
 		return nil
 	}
 	h := sha256.Sum256([]byte("agent-monitor/account/" + id))
-	return &usageAccount{Key: hex.EncodeToString(h[:8]), Label: label, Org: org}
+	return &usageAccount{Key: hex.EncodeToString(h[:8]), Label: maskEmail(label), Org: org}
+}
+
+// maskEmail keeps the first letter and the domain ("s•••@example.com"); the full address never leaves the daemon.
+func maskEmail(e string) string {
+	user, domain, ok := strings.Cut(strings.TrimSpace(e), "@")
+	if !ok || user == "" || domain == "" {
+		return ""
+	}
+	r := []rune(user)
+	return string(r[0]) + "•••@" + domain
 }
 
 // claudePlanLabel turns ("claude_team", "default_claude_max_5x") into "team (max_5x)".

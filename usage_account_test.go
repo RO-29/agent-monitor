@@ -11,12 +11,12 @@ func TestUsageAccountClaude(t *testing.T) {
 	cfg := strings.Replace(claudeCfgJSON("acct-1", "acct-1", usageNow.Add(-time.Minute), true),
 		`"accountUuid":"acct-1","organizationType"`, `"accountUuid":"acct-1","emailAddress":"dev@example.com","organizationName":"Example Co","organizationType"`, 1)
 	a := claudeWith(t, cfg)
-	if a.Account == nil || a.Account.Label != "dev@example.com" || a.Account.Org != "Example Co" || len(a.Account.Key) != 16 {
+	if a.Account == nil || a.Account.Label != "d•••@example.com" || a.Account.Org != "Example Co" || len(a.Account.Key) != 16 {
 		t.Fatalf("account %+v", a.Account)
 	}
 	b, _ := json.Marshal(a)
-	if strings.Contains(string(b), "acct-1") {
-		t.Fatal("the raw account id left the daemon")
+	if strings.Contains(string(b), "acct-1") || strings.Contains(string(b), "dev@") {
+		t.Fatal("the raw account id or the full email left the daemon")
 	}
 	if other := claudeWith(t, claudeCfgJSON("acct-2", "acct-2", usageNow, true)); other.Account == nil || other.Account.Key == a.Account.Key {
 		t.Fatalf("two accounts share a key: %+v", other.Account)
@@ -28,7 +28,7 @@ func TestUsageAccountClaude(t *testing.T) {
 
 func TestUsageAccountCodex(t *testing.T) {
 	a, _ := codexUsageOf(t, "ok", true)
-	if a.Account == nil || a.Account.Label != "dev@example.com" || a.Account.Org != "Example Co" || a.Account.Key == "" {
+	if a.Account == nil || a.Account.Label != "d•••@example.com" || a.Account.Org != "Example Co" || a.Account.Key == "" {
 		t.Fatalf("account %+v", a.Account)
 	}
 	raw := withCodexAccount(json.RawMessage(`{"accountId":"acc-9","rateLimits":{}}`), json.RawMessage(`{"userId":"u-1","account":{"type":"chatgpt","email":"x@example.com"}}`))
