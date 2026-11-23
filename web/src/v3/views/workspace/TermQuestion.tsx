@@ -14,7 +14,7 @@ export interface TermQState {
 }
 
 /** Polls GET /api/session/{id}/question every 3 s while on, and while a sent answer waits for its result. */
-export function useTermQuestion(sessionId: string, on: boolean): TermQState {
+export function useTermQuestion(sessionId: string, on: boolean, machine?: string): TermQState {
   const [q, setQ] = useState<TermQuestion | null>(null);
   const [tick, setTick] = useState(0);
   const waiting = !!(q?.pending && q.sentAt);
@@ -26,7 +26,7 @@ export function useTermQuestion(sessionId: string, on: boolean): TermQState {
     }
     let alive = true;
     const look = () =>
-      p7.termQuestion(sessionId).then(
+      p7.termQuestion(sessionId, machine).then(
         (r) => alive && setQ(r),
         () => alive && setQ(null),
       );
@@ -43,7 +43,7 @@ export function useTermQuestion(sessionId: string, on: boolean): TermQState {
 /** True when the card has something to show; a held question shows as the approval card instead. */
 export const termQuestionShown = (q: TermQuestion | null): q is TermQuestion => !!q?.pending && !q.held && (!!q.questions?.length || q.tool === "ExitPlanMode");
 
-export function TermQuestionCard({ sessionId, st, onOpenPane, agent = "Claude Code" }: { sessionId: string; st: TermQState; onOpenPane?: () => void; agent?: string }) {
+export function TermQuestionCard({ sessionId, st, onOpenPane, agent = "Claude Code", machine }: { sessionId: string; st: TermQState; onOpenPane?: () => void; agent?: string; machine?: string }) {
   const q = st.q;
   const [busy, setBusy] = useState(false);
   const [sentFor, setSentFor] = useState("");
@@ -57,7 +57,7 @@ export function TermQuestionCard({ sessionId, st, onOpenPane, agent = "Claude Co
     flight.current = true;
     setBusy(true);
     try {
-      await p7.answerTerm(sessionId, { ...body, toolUseId: q.toolUseId });
+      await p7.answerTerm(sessionId, { ...body, toolUseId: q.toolUseId }, machine);
       setSentFor(q.toolUseId || "");
     } catch (e) {
       showToast("Not sent", (e as Error).message, { kind: "alert" });

@@ -12,7 +12,7 @@ import { agentKey } from "../../components/AgentIcon";
 import { useV3 } from "../../live";
 import { ChipRow, groupHits, hitHref, markedTerms, SessionHitRow, typedChips, useTitleOf, useTranscriptSearch, withoutChips } from "./search";
 import { UsageMini } from "../../components/Usage";
-import { PeerThreads } from "../peers";
+import { useFleet, useMachineLabels } from "../../api/fleet";
 import { FoldHead, useFold } from "../../components/fold";
 
 const HOUR = 3600_000;
@@ -87,6 +87,7 @@ export function TermIcon() {
 }
 
 function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: boolean; onMenu: (r: WRow, x: number, y: number, anchor?: HTMLElement) => void }) {
+  const ml = useMachineLabels();
   const note = noteOf(r);
   const dc = dotCls(r);
   const menuBtn = r.driven ? (
@@ -122,6 +123,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
             {r.mode === "watched" && <TermIcon />}
             {placeText(r) && <span className={`wplace p-${(r.watched?.session?.entrypoint || (r.driven ? "thread" : "")).replace(/[^a-z-]/g, "")}`}>{placeText(r)}</span>}
             {r.pinned && <PinIcon />}
+            {ml.many && <span className={`wmach-r ${r.machine ? "peer" : ""}`} title={r.machine ? `Runs on ${r.machine}` : `Runs on this machine (${ml.self})`}>{r.machine || ml.self}</span>}
             <span className="trunc">{r.repo || "no project"}</span>
             {r.branch && !note && <span className="trunc br">{r.branch}</span>}
             {note && <span className={`nt ${note.cls}`}>{note.text}</span>}
@@ -239,6 +241,13 @@ function filterTree(tree: WTree, q: string): WTree {
   return { top, kids };
 }
 
+/** Rows of one machine only; "" keeps all. Local rows have no machine field. */
+function byMachine(tree: WTree, m: string, self: string): WTree {
+  if (!m) return tree;
+  const keep = (r: WRow) => (r.machine || self) === m;
+  return { top: new Map([...tree.top].map(([g, list]) => [g, list.filter(keep)])), kids: tree.kids };
+}
+
 const TRANSCRIPT_SHOWN = 20;
 
 /** A thread group whose header folds it; closed keeps the open thread in view. A filter opens every group. */
@@ -263,7 +272,25 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   const [open, setOpenSet] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [settledShown, setSettledShown] = useState(SETTLED_SHOWN);
-  const shown = useMemo(() => filterTree(tree, q), [tree, q]);
+  const fleet = useFleet();
+  const [onlyM, setOnlyM] = useState(() => {
+    try {
+      return localStorage.getItem("threads:machine") || "";
+    } catch {
+      return "";
+    }
+  });
+  const pickM = (m: string) => {
+    setOnlyM(m);
+    try {
+      localStorage.setItem("threads:machine", m);
+    } catch {
+      /* private mode */
+    }
+  };
+  const selfName = fleet.machines.find((m) => m.self)?.name || "";
+  const mFilter = fleet.machines.length > 1 && fleet.machines.some((m) => m.name === onlyM) ? onlyM : "";
+  const shown = useMemo(() => byMachine(filterTree(tree, q), mFilter, selfName), [tree, q, mFilter, selfName]);
   const nav = useNavigate();
   const v = useV3();
   const ts = useTranscriptSearch(q);
@@ -329,6 +356,15 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
             }
           }}
         />
+        {fleet.machines.length > 1 && (
+          <div className="wmachs" role="radiogroup" aria-label="Machine">
+            {[{ name: "", label: "All machines" }, ...fleet.machines.map((m) => ({ name: m.name, label: m.name, off: m.status !== "online" }))].map((m) => (
+              <button key={m.name || "all"} role="radio" aria-checked={mFilter === m.name} className={`wmach-f ${mFilter === m.name ? "on" : ""} ${"off" in m && m.off ? "off" : ""}`} onClick={() => pickM(m.name)} title={"off" in m && m.off ? `${m.name} does not answer` : undefined}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {notice}
       <div className="wlist" role="listbox" aria-label="Threads">
@@ -378,7 +414,6 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
           </div>
         )}
       </div>
-      <PeerThreads />
       <UsageMini />
       {menu && <RowMenu r={rows.find((x) => x.id === menu.r.id) || menu.r} x={menu.x} y={menu.y} onClose={closeMenu} />}
     </aside>

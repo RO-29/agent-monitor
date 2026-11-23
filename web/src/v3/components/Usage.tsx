@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtAgo, fmtTok, fmtUsd, modelShort } from "../../lib/format";
-import { fmtResetIn, usageLevel, useUsageLimits, type AgentUsage, type ModelUsage, type UsageCredits, type UsageLocal, type UsageWindow } from "../api/usage";
+import { fmtResetIn, usageLevel, useUsageGroups, type AgentUsage, type UsageGroup, type ModelUsage, type UsageCredits, type UsageLocal, type UsageWindow } from "../api/usage";
 import { FoldHead, useFold } from "./fold";
 import "../styles/usage.css";
 
@@ -87,15 +87,26 @@ function miniSummary(agents: AgentUsage[]): string {
     .join(" · ");
 }
 
-/** Thread list footer: plan meters per agent, or local token totals when an agent has no plan reading. Folds. */
+/** Who a card belongs to: the account and, with several machines, where it is used. */
+export function whoText(g: UsageGroup, many: boolean): string {
+  const acct = g.a.account ? [g.a.account.label, g.a.account.org].filter(Boolean).join(" · ") : "";
+  const where = many && g.machines.length ? `on ${g.machines.join(", ")}` : "";
+  return [acct, where].filter(Boolean).join(" · ");
+}
+
+/** Thread list footer: plan meters per subscription, or local token totals when there is no plan reading. Folds. */
 export function UsageMini() {
-  const st = useUsageLimits(60_000);
+  const st = useUsageGroups(60_000);
   const now = useNow(30_000);
   const [closed, toggle] = useFold("usage-mini");
-  const all = [...(st.data?.agents || [])].sort(byOrder);
-  const agents = all.filter((a) => MAIN.has(a.agent) && isInstalled(a) && (hasReading(a) || tokOf(localOf(a, "weekly")) > 0));
-  const more = all.filter((a) => !MAIN.has(a.agent) && isInstalled(a));
-  if (!agents.length && !more.length) return null;
+  const many = (st.data?.machines || 1) > 1;
+  const all = [...(st.data?.groups || [])].sort((x, y) => byOrder(x.a, y.a));
+  const groups = all.filter((g) => MAIN.has(g.agent) && isInstalled(g.a) && (hasReading(g.a) || tokOf(localOf(g.a, "weekly")) > 0));
+  const more = all.filter((g) => !MAIN.has(g.agent) && isInstalled(g.a));
+  // Two cards for one agent (two accounts) always say whose each one is.
+  const split = new Set(groups.map((g) => g.agent).filter((a, i, arr) => arr.indexOf(a) !== i));
+  if (!groups.length && !more.length) return null;
+  const agents = groups.map((g) => g.a);
   return (
     <div className={`umini ${closed ? "fold-c" : ""}`}>
       <div className="umini-top">
@@ -104,7 +115,7 @@ export function UsageMini() {
         </FoldHead>
         {closed && <span className="umini-sum trunc" title={miniSummary(agents)}>{miniSummary(agents)}</span>}
         {more.length > 0 && (
-          <Link to="/settings/limits" className="umini-lk umini-more" title={`Also: ${more.map(nameOf).join(", ")}`} aria-label={`${more.length} more agents in Settings, Limits`}>
+          <Link to="/settings/limits" className="umini-lk umini-more" title={`Also: ${more.map((g) => nameOf(g.a)).join(", ")}`} aria-label={`${more.length} more agents in Settings, Limits`}>
             +{more.length}
           </Link>
         )}
@@ -113,20 +124,22 @@ export function UsageMini() {
         </Link>
       </div>
       {!closed &&
-        agents.map((a) =>
-          hasReading(a) ? (
-            <div key={a.agent} className="umini-a">
-              <span className={`umini-n ${a.agent}`}>{nameOf(a)}</span>
+        groups.map((g) => {
+          const who = many || split.has(g.agent) ? whoText(g, many) : "";
+          return hasReading(g.a) ? (
+            <div key={g.key} className="umini-a">
+              <span className={`umini-n ${g.agent}`}>{nameOf(g.a)}</span>
+              {who && <span className="umini-who trunc" title={who}>{who}</span>}
               <div className="umini-m">
-                {a.windows.map((w) => (
-                  <UsageMeter key={w.key} w={w} now={now} at={a.measuredAt} compact />
+                {g.a.windows.map((w) => (
+                  <UsageMeter key={w.key} w={w} now={now} at={g.a.measuredAt} compact />
                 ))}
               </div>
             </div>
           ) : (
-            <LocalOnly key={a.agent} a={a} />
-          ),
-        )}
+            <LocalOnly key={g.key} a={g.a} />
+          );
+        })}
     </div>
   );
 }
@@ -293,7 +306,7 @@ export function creditsLine(a?: AgentUsage): string {
   return creditsText(c);
 }
 
-function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
+function AgentCard({ a, now, who, others }: { a: AgentUsage; now: number; who?: string; others?: AgentUsage[] }) {
   if (!isInstalled(a))
     return (
       <div className="ibox ucard uoff">
@@ -313,8 +326,9 @@ function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
         {a.plan && <span className="chip t">{a.plan}</span>}
         {credits && <span className="chip">{credits}</span>}
         {a.stale && <span className="pill p-mute">old reading</span>}
-        <span className="muted">{a.measuredAt ? `reading ${fmtAgo(a.measuredAt)}` : "no reading"}</span>
+        <span className="muted">{a.measuredAt ? `reading ${fmtAgo(a.measuredAt)}${a.machine && others && others.length > 1 ? ` on ${a.machine}` : ""}` : "no reading"}</span>
       </h3>
+      {who && <p className="uwho">{who}</p>}
       {a.alert && <p className="sx-warn">{a.alert}</p>}
       {a.note && <p className="sx-p">{a.note}</p>}
       {spend && (
@@ -345,8 +359,8 @@ function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
       {a.models && a.models.length > 0 && <ModelTable models={a.models} agent={nameOf(a)} />}
       {a.local.length > 0 && (
         <>
-          <h4 className="uloc-h">Measured locally</h4>
-          <p className="sx-p">Tokens counted from this Mac's transcripts. This is not the plan limit: other devices do not count, and the cost uses public list prices.</p>
+          <h4 className="uloc-h">Measured locally{a.machine ? ` on ${a.machine}` : ""}</h4>
+          <p className="sx-p">Tokens counted from this machine's transcripts. This is not the plan limit: other devices do not count, and the cost uses public list prices.</p>
           <div className="ulocs" role="table" aria-label={`${nameOf(a)} local usage`}>
             {a.local.map((l) => (
               <LocalRow key={l.key} l={l} />
@@ -360,17 +374,18 @@ function AgentCard({ a, now }: { a: AgentUsage; now: number }) {
   );
 }
 
-/** Full plan usage section for Settings, Limits. */
+/** Full plan usage section for Settings, Limits: one card per subscription across all machines. */
 export function UsagePanel() {
-  const st = useUsageLimits(30_000);
+  const st = useUsageGroups(30_000);
   const now = useNow(30_000);
   if (st.missing) return <div className="sx-warn">This daemon has no /api/usage/limits endpoint yet. Update agent-monitor to see plan usage.</div>;
   if (st.error && !st.data) return <div className="sx-warn">Plan usage failed to load: {st.error}</div>;
   if (!st.data) return <div className="ibox muted sm">Reading usage…</div>;
+  const many = st.data.machines > 1;
   return (
     <>
-      {[...st.data.agents].sort((x, y) => Number(!isInstalled(x)) - Number(!isInstalled(y)) || byOrder(x, y)).map((a) => (
-        <AgentCard key={a.agent} a={a} now={now} />
+      {[...st.data.groups].sort((x, y) => Number(!isInstalled(x.a)) - Number(!isInstalled(y.a)) || byOrder(x.a, y.a)).map((g) => (
+        <AgentCard key={g.key} a={g.a} now={now} who={whoText(g, many)} others={g.all} />
       ))}
     </>
   );

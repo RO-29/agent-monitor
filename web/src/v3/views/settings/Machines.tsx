@@ -7,6 +7,7 @@ import { showToast } from "../../../app/toast";
 import { copy } from "../../../lib/clipboard";
 import "../../styles/settings.css";
 import { SettingsTabs } from "./Tabs";
+import { levelText } from "../../api/fleet";
 
 const LEVEL_HELP: Record<string, string> = {
   view: "sees sessions, threads and requests",
@@ -47,7 +48,7 @@ function Peers() {
                   <Link to={`/m/${encodeURIComponent(p.name)}`}>{p.name}</Link>
                 </b>
                 <div className="muted sm">
-                  {p.url} · <span className="pill">{p.level}</span> · <span className={p.status === "online" ? "ok-t" : "err-t"}>{p.status}</span>
+                  {p.url} · <span className="pill">{levelText(p.level)}</span> · <span className={p.status === "online" ? "ok-t" : "err-t"}>{p.status}</span>
                 </div>
               </div>
               <button className="btn sm ghost" onClick={() => void machinesApi.removePeer(p.name).then(load)}>
@@ -114,9 +115,9 @@ function Grants() {
               </div>
               <div className="btns">
                 <select className="inp" value={g.level} onChange={(e) => void act(() => machinesApi.setLevel(g.id, e.target.value))} aria-label={`Level of ${g.name}`}>
-                  <option value="view">view</option>
-                  <option value="control">control</option>
-                  {g.kind !== "machine" && <option value="admin">admin</option>}
+                  <option value="view">View only</option>
+                  <option value="control">Full</option>
+                  {g.kind !== "machine" && <option value="admin">Admin</option>}
                 </select>
                 <button className="btn sm deny" onClick={() => void act(() => machinesApi.revoke(g.id))}>
                   Revoke
@@ -130,8 +131,8 @@ function Grants() {
       <div className="sx-col" style={{ gap: 8 }}>
         <input className="inp" placeholder="Name of the other machine, for example rohit-mac" value={name} onChange={(e) => setName(e.target.value)} />
         <select className="inp" value={level} onChange={(e) => setLevel(e.target.value)}>
-          <option value="view">view: {LEVEL_HELP.view}</option>
-          <option value="control">control: {LEVEL_HELP.control}</option>
+          <option value="view">View only: {LEVEL_HELP.view}</option>
+          <option value="control">Full: {LEVEL_HELP.control}</option>
         </select>
         <button className="btn pri" disabled={!name.trim()} onClick={() => void make()}>
           Create pairing code

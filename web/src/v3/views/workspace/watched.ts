@@ -259,14 +259,14 @@ export interface WatchedFeedState {
 const byStart = (a: { startedAt: number | string }, b: { startedAt: number | string }) => toMs(a.startedAt) - toMs(b.startedAt);
 
 /** GET /api/session/{id}/items with cursor polling every 2 s while live; falls back to the full transcript on 404. */
-export function useWatchedFeed(sessionId: string, threadId: string, running: boolean, live: boolean): WatchedFeedState {
+export function useWatchedFeed(sessionId: string, threadId: string, running: boolean, live: boolean, machine?: string): WatchedFeedState {
   const [mode, setMode] = useState<"probe" | "items" | "legacy">("probe");
   const [ver, setVer] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const st = useRef({ items: new Map<string, OItem>(), runs: new Map<string, ORun>(), cursor: 0, more: false, earlier: undefined as number | undefined, loaded: false });
   const inflight = useRef(false);
-  const legacy = useLegacyFeed(mode === "legacy" ? sessionId : "", threadId, running);
+  const legacy = useLegacyFeed(mode === "legacy" && !machine ? sessionId : "", threadId, running);
 
   const apply = (r: WatchedItems, first: boolean) => {
     const s = st.current;
@@ -294,7 +294,7 @@ export function useWatchedFeed(sessionId: string, threadId: string, running: boo
     let tries = 0;
     // A new session writes its transcript only after the first turn starts, so the first read retries.
     const probe = () =>
-      p7.watchedItems(sessionId).then(
+      p7.watchedItems(sessionId, undefined, machine).then(
         (r) => {
           if (!alive) return;
           setError("");
@@ -323,7 +323,7 @@ export function useWatchedFeed(sessionId: string, threadId: string, running: boo
       if (inflight.current || document.hidden) return;
       inflight.current = true;
       try {
-        const r = await p7.watchedItems(sessionId, { after: st.current.cursor });
+        const r = await p7.watchedItems(sessionId, { after: st.current.cursor }, machine);
         if (alive) {
           apply(r, false);
           setError("");
@@ -351,7 +351,7 @@ export function useWatchedFeed(sessionId: string, threadId: string, running: boo
     if (busy || s.earlier == null) return;
     setBusy(true);
     try {
-      const r = await p7.watchedItems(sessionId, { before: s.earlier });
+      const r = await p7.watchedItems(sessionId, { before: s.earlier }, machine);
       for (const it of r.items || []) if (!s.items.has(it.id)) s.items.set(it.id, it);
       for (const ru of r.runs || []) if (!s.runs.has(ru.id)) s.runs.set(ru.id, ru);
       s.more = !!r.more;

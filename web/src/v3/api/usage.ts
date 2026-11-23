@@ -1,5 +1,6 @@
 // Plan usage windows (5-hour and weekly) per agent, from GET /api/usage/limits.
-import { useApi, v3 } from "./client";
+import { ApiError, useApi, v3 } from "./client";
+import { mreq } from "./machines";
 
 export interface UsagePoint {
   at: number;
@@ -65,6 +66,10 @@ export interface AgentUsage {
   alert?: string;
   /** The plan reading is older than one hour. */
   stale?: boolean;
+  /** The subscription: a hashed key, a masked email and the organisation. */
+  account?: { key: string; label?: string; org?: string };
+  /** Set in fleet readings: the machine the reading came from. */
+  machine?: string;
 }
 export interface UsageLimits {
   generatedAt: number;
@@ -92,3 +97,49 @@ export function fmtResetIn(at?: number, now = Date.now()): string {
 }
 
 export const usageLevel = (p: number | null) => (p == null ? "off" : p >= 90 ? "over" : p >= 70 ? "warn" : "ok");
+
+/** One subscription: its newest reading, the machines that use it, and every machine's reading. */
+export interface UsageGroup {
+  key: string;
+  agent: string;
+  a: AgentUsage;
+  machines: string[];
+  all: AgentUsage[];
+}
+
+const fresh = (a: AgentUsage) => (a.windows.some((w) => w.usedPercent != null) || a.credits != null ? a.measuredAt || 1 : 0);
+
+/** Groups readings by agent and account; a reading with no account groups by agent and machine. */
+export function groupUsage(agents: AgentUsage[]): UsageGroup[] {
+  const m = new Map<string, UsageGroup>();
+  const installedAgents = new Set(agents.filter((a) => a.installed !== false).map((a) => a.agent));
+  for (const a of agents) {
+    // Not installed here but installed on another machine: that machine's card says enough.
+    if (a.installed === false && installedAgents.has(a.agent)) continue;
+    const key = a.agent + "|" + (a.account?.key ? "acct:" + a.account.key : a.installed === false ? "off" : "m:" + (a.machine || ""));
+    const g = m.get(key);
+    if (!g) {
+      m.set(key, { key, agent: a.agent, a, machines: a.machine ? [a.machine] : [], all: [a] });
+      continue;
+    }
+    g.all.push(a);
+    if (a.machine && !g.machines.includes(a.machine)) g.machines.push(a.machine);
+    if (fresh(a) > fresh(g.a)) g.a = { ...a, local: g.a.local, models: g.a.models };
+  }
+  return [...m.values()];
+}
+
+/** Every machine's usage when the fleet route exists, else this machine's alone; grouped by account. */
+async function fetchGroups(): Promise<{ groups: UsageGroup[]; machines: number }> {
+  try {
+    const r = await mreq<{ machines: unknown[]; agents: AgentUsage[] }>("GET", "/api/fleet/usage");
+    const agents = (r.agents || []).map((a) => ({ ...a, windows: a.windows || [], local: a.local || [], localSource: a.localSource || "", source: a.source || "" }));
+    return { groups: groupUsage(agents), machines: (r.machines || []).length || 1 };
+  } catch (e) {
+    if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 403)) throw e;
+    const own = await fetchLimits();
+    return { groups: groupUsage(own.agents), machines: 1 };
+  }
+}
+
+export const useUsageGroups = (poll = 60_000) => useApi(fetchGroups, [], { poll });

@@ -1,5 +1,6 @@
 // Phase 7 API: composer pickers, uploads, review, merge, templates, schedules, watched items and pane.
 import { ApiError } from "./client";
+import { machineBase } from "./fleet";
 import { mockWanted, rememberThread, req, type OAgent, type OChildSpec, type OItem, type OPermissionMode, type ORun, type OSandbox, type OTerminalStart, type OThread, type OWhere } from "./orch";
 
 const enc = encodeURIComponent;
@@ -196,10 +197,10 @@ export const p7 = {
     if (r.thread) rememberThread(r.thread);
     return r;
   },
-  watchedItems: async (id: string, q?: { after?: number; before?: number }): Promise<WatchedItems> => {
+  watchedItems: async (id: string, q?: { after?: number; before?: number }, machine?: string): Promise<WatchedItems> => {
     if (mockWanted()) return (await mock()).watchedItems(id, q);
     const p = q?.after != null ? `?after=${q.after}` : q?.before != null ? `?before=${q.before}` : "";
-    return req<WatchedItems>("GET", `/api/session/${enc(id)}/items${p}`);
+    return req<WatchedItems>("GET", `${machineBase(machine)}/api/session/${enc(id)}/items${p}`);
   },
   sessionChildren: async (id: string): Promise<SessionChildren> => {
     if (mockWanted()) return { id, agent: "", count: 0, children: [] };
@@ -212,10 +213,10 @@ export const p7 = {
     return req("GET", `/api/orch/cron?expr=${enc(expr)}`);
   },
   watchedPane: async (id: string): Promise<WatchedPane> => (mockWanted() ? (await mock()).watchedPane(id) : req<WatchedPane>("GET", `/api/session/${enc(id)}/pane`)),
-  termQuestion: (id: string): Promise<TermQuestion> => (mockWanted() ? Promise.resolve({ pending: false, sendable: false, onScreen: false }) : req<TermQuestion>("GET", `/api/session/${enc(id)}/question`)),
-  answerTerm: (id: string, body: TermAnswerBody): Promise<{ ok: boolean; sentAt: number }> => {
+  termQuestion: (id: string, machine?: string): Promise<TermQuestion> => (mockWanted() ? Promise.resolve({ pending: false, sendable: false, onScreen: false }) : req<TermQuestion>("GET", `${machineBase(machine)}/api/session/${enc(id)}/question`)),
+  answerTerm: (id: string, body: TermAnswerBody, machine?: string): Promise<{ ok: boolean; sentAt: number }> => {
     if (mockWanted()) return Promise.reject(new Error("sample data mode"));
-    return req("POST", `/api/session/${enc(id)}/answer`, body);
+    return req("POST", `${machineBase(machine)}/api/session/${enc(id)}/answer`, body);
   },
 };
 

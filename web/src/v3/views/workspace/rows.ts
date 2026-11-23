@@ -6,6 +6,7 @@ import type { Approval, V3Thread } from "../../api/types";
 import type { Session } from "../../../api/types";
 import { handoverOf, serverDrivenRow, terminalTarget } from "./handover";
 import type { Row } from "../../model";
+import { peerKey, type PeerThread } from "../../api/fleet";
 
 export type WGroup = OGroup;
 export interface WRow {
@@ -27,6 +28,10 @@ export interface WRow {
   // A driven row whose session a terminal took over: a short note, and the row opens openId.
   note?: string;
   openId?: string;
+  // A thread on another machine: its name, this machine's grant there, and the peer's thread.
+  machine?: string;
+  level?: string;
+  peer?: PeerThread;
 }
 export const GROUPS: { key: WGroup; label: string; none: string }[] = [
   { key: "need", label: "Needs you", none: "Nothing needs you" },
@@ -176,6 +181,28 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
     });
   }
   return out.sort((a, b) => b.at - a.at);
+}
+
+/** Rows for threads on other machines, grouped with the same rules as this machine's watched rows. */
+export function peerRows(threads: PeerThread[], now = Date.now()): WRow[] {
+  return threads.map((t) => {
+    const today = now - t.lastAt < DAY;
+    const group: WGroup = t.attention || t.state === "awaiting-permission" || t.state === "awaiting-input" ? "need" : t.state === "running" ? "working" : today ? "ready" : "settled";
+    return {
+      id: peerKey(t.machine, t.id),
+      mode: "watched" as const,
+      group,
+      title: t.display || t.title || projectName(t.cwd),
+      agent: agentKey(t.sessions?.[t.sessions.length - 1] || t.id) || t.tools?.[0] || "",
+      repo: t.repo || projectName(t.cwd),
+      branch: t.ref || "",
+      status: group === "need" ? "Needs you" : group === "working" ? "Working" : today ? "Ready" : "Ended",
+      at: t.lastAt,
+      machine: t.machine,
+      level: t.level,
+      peer: t,
+    };
+  });
 }
 
 export interface WTree {

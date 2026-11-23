@@ -71,3 +71,6 @@
   .v3 .umod > span:not(:first-child){text-align:left}
   .v3 .umod-th{display:none}
 }
+/* Whose subscription a card shows, and on which machines. */
+.v3 .umini-who{display:block;font-size:11px;color:var(--muted);margin:-2px 0 3px}
+.v3 .uwho{margin:-4px 0 10px;font-size:12.5px;color:var(--fg-2)}

@@ -8,7 +8,9 @@ import { useV3 } from "../../live";
 import { buildRows } from "../../model";
 import { DrivenChat, NotFoundChat, useTick } from "./DrivenChat";
 import { NewThread } from "./NewThread";
-import { buildWRows, treeOf, visualOrder } from "./rows";
+import { buildWRows, peerRows, treeOf, visualOrder } from "./rows";
+import { PeerChat } from "./PeerChat";
+import { parsePeerKey, useFleet } from "../../api/fleet";
 import { rowFromSession } from "./handover";
 import { DrivenSide, WatchedSide } from "./Side";
 import { latestSession, WatchedChat, watchedLiveness } from "./WatchedChat";
@@ -43,13 +45,19 @@ export default function Workspace() {
   const needIds = useMemo(() => drivenNeedIds(ny.items, v.approvals.values()), [ny.version, v.approvals]); // eslint-disable-line react-hooks/exhaustive-deps
   // Snoozes expire on the client too, so recompute once a minute.
   const minute = useTick(true, 60_000);
-  const rows = useMemo(() => buildWRows(orch, watchedRows, needIds, Date.now(), Infinity, live.sessions), [orch, watchedRows, needIds, minute]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fleet = useFleet();
+  const peerSel = parsePeerKey(sel);
+  // Threads on other machines join the same list; their ids start with "@".
+  const rows = useMemo(
+    () => [...buildWRows(orch, watchedRows, needIds, Date.now(), Infinity, live.sessions), ...peerRows(fleet.threads)].sort((a, b) => b.at - a.at),
+    [orch, watchedRows, needIds, minute, fleet.at], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const tree = useMemo(() => treeOf(rows), [rows]);
   const selRow = rows.find((r) => r.id === sel);
-  const bareSession = sel && !selRow && !orch.threads.has(sel) ? live.sessions.get(sel) : undefined;
+  const bareSession = sel && !peerSel && !selRow && !orch.threads.has(sel) ? live.sessions.get(sel) : undefined;
   const watchedSel =
-    selRow?.mode === "watched" ? selRow.watched : !orch.threads.has(sel || "") ? watchedRows.find((r) => r.id === sel) || (bareSession ? rowFromSession(bareSession) : undefined) : undefined;
-  const drivenId = sel && !watchedSel ? sel : undefined;
+    peerSel ? undefined : selRow?.mode === "watched" ? selRow.watched : !orch.threads.has(sel || "") ? watchedRows.find((r) => r.id === sel) || (bareSession ? rowFromSession(bareSession) : undefined) : undefined;
+  const drivenId = sel && !watchedSel && !peerSel ? sel : undefined;
   const { detail, status } = useOrchThread(drivenId);
   const wl = watchedSel ? watchedLiveness(watchedSel, live.connected) : null;
   // Session tab of a watched thread: the one picked, else the hit's session, else the newest.
@@ -132,6 +140,12 @@ export default function Workspace() {
           </button>
         </div>
       </section>
+    );
+  else if (peerSel)
+    main = selRow?.peer ? (
+      <PeerChat key={selRow.id} row={selRow} onBack={back} />
+    ) : (
+      <NotFoundChat status={fleet.at ? (fleet.machines.some((m) => m.name === peerSel.machine && m.status === "online") ? "missing" : "error") : "loading"} onBack={back} />
     );
   else if (watchedSel) {
     main = <WatchedChat key={watchedSel.id} row={watchedSel} feed={wfeed} onBack={back} onSide={onSide} tab={tabSid} onTab={setTab} hit={hit && (!hit.session || hit.session === tabSid || !members.includes(hit.session)) ? hit : null} kids={kids.data} linkedPage={linkedPage} />;
