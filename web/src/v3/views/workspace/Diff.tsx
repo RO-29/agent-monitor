@@ -154,6 +154,7 @@ function DiffBody({ f, wrap }: { f: ODiffFile; wrap: boolean }) {
 }
 
 const refLabel = (r: string) => {
+  if (r.startsWith("since:")) return "session start";
   if (r === "base") return "thread start";
   if (r === "worktree") return "working tree";
   if (r === "head") return "HEAD";
@@ -204,6 +205,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
   const [single, setSingle] = useState<ODiffFile | null>(null);
   const right = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const pathKey = nav.paths?.join("\n") || "";
 
   useEffect(() => {
     let off = false;
@@ -211,7 +213,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
     setErr("");
     setDiff(null);
     setSingle(null);
-    loadDiff(threadId, nav.run != null ? { run: nav.run } : { from: nav.from, to: nav.to })
+    loadDiff(threadId, nav.run != null ? { run: nav.run } : { from: nav.from, to: nav.to, path: pathKey || undefined })
       .then((d) => !off && setDiff(d))
       .catch((e) => {
         if (off) return;
@@ -222,7 +224,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
     return () => {
       off = true;
     };
-  }, [threadId, nav.from, nav.to, nav.run]);
+  }, [threadId, nav.from, nav.to, nav.run, pathKey]);
 
   const files = diff?.files || [];
   const cur = single && single.path === nav.file ? single : files.find((f) => f.path === nav.file) || (nav.file ? undefined : files[0]);

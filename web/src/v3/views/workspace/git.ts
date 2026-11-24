@@ -3,7 +3,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useSearchParams } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { ApiError, isMissing } from "../../api/client";
-import { gitApi, toMs, type OCheckpoint, type ODetail, type OGit, type ORun } from "../../api/orch";
+import { gitApi, toMs, type OCheckpoint, type ODetail, type OFile, type OGit, type OItem, type ORun } from "../../api/orch";
 
 export type GitStatus = "loading" | "ok" | "missing" | "nogit" | "error";
 export interface GitEntry {
@@ -101,12 +101,15 @@ export interface DiffNav {
   run?: number;
   file?: string;
   label?: string;
+  /** Limit the diff to these files (newline-joined in the URL as dpaths). */
+  paths?: string[];
 }
 export function useDiffNav(): { cur: DiffNav | null; open: (d: DiffNav) => void; close: () => void; setFile: (f: string) => void } {
   const [sp, setSp] = useSearchParams();
   const from = sp.get("dfrom");
   const run = sp.get("drun");
-  const cur = from || run ? { from: from || "", to: sp.get("dto") || "", run: run ? +run : undefined, file: sp.get("dfile") || undefined, label: sp.get("dlabel") || undefined } : null;
+  const dp = sp.get("dpaths");
+  const cur = from || run ? { from: from || "", to: sp.get("dto") || "", run: run ? +run : undefined, file: sp.get("dfile") || undefined, label: sp.get("dlabel") || undefined, paths: dp ? dp.split("\n") : undefined } : null;
   const open = useCallback(
     (d: DiffNav) => {
       const n = new URLSearchParams(sp);
@@ -120,13 +123,15 @@ export function useDiffNav(): { cur: DiffNav | null; open: (d: DiffNav) => void;
       else n.delete("dfile");
       if (d.label) n.set("dlabel", d.label);
       else n.delete("dlabel");
+      if (d.paths?.length) n.set("dpaths", d.paths.join("\n"));
+      else n.delete("dpaths");
       setSp(n);
     },
     [sp, setSp],
   );
   const close = useCallback(() => {
     const n = new URLSearchParams(sp);
-    for (const k of ["dfrom", "dto", "drun", "dfile", "dlabel"]) n.delete(k);
+    for (const k of ["dfrom", "dto", "drun", "dfile", "dlabel", "dpaths"]) n.delete(k);
     setSp(n);
   }, [sp, setSp]);
   const setFile = useCallback(
@@ -180,4 +185,17 @@ export function commitSubject(d: ODetail): string {
 
 export function shortSha(s?: string) {
   return (s || "").slice(0, 7);
+}
+
+/** Files a list of items edited, with summed line counts. */
+export function filesOf(items: OItem[]): OFile[] {
+  const m = new Map<string, OFile>();
+  for (const it of items) {
+    if (it.kind !== "fileChange" || it.status === "declined" || it.status === "failed") continue;
+    for (const f of it.files || []) {
+      const was = m.get(f.path);
+      m.set(f.path, was ? { ...f, add: was.add + (f.add || 0), del: was.del + (f.del || 0), kind: was.kind === "add" ? "add" : f.kind } : { ...f, add: f.add || 0, del: f.del || 0 });
+    }
+  }
+  return [...m.values()];
 }

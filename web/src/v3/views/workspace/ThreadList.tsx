@@ -120,7 +120,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
           <span className="r2">
             <AgentIcon agent={r.agent} size={14} />
             {r.mode === "watched" && <TermIcon />}
-            {placeText(r) && <span className={`wplace p-${(r.watched?.session?.entrypoint || (r.driven ? "thread" : "")).replace(/[^a-z-]/g, "")}`}>{placeText(r)}</span>}
+            {placeText(r) && placeText(r) !== "Terminal" && <span className={`wplace p-${(r.watched?.session?.entrypoint || (r.driven ? "thread" : "")).replace(/[^a-z-]/g, "")}`}>{placeText(r)}</span>}
             {r.pinned && <PinIcon />}
             {r.machine && <span className="wmach-r peer" title={`Runs on ${r.machine}`}>{r.machine}</span>}
             <span className="trunc">{r.repo || "no project"}</span>

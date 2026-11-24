@@ -636,11 +636,12 @@ func revs(a, b string) []string {
 	return []string{a, b}
 }
 
+// pathArgs limits a diff to path; several paths are joined with newlines.
 func pathArgs(path string) []string {
 	if path == "" {
 		return nil
 	}
-	return []string{"--", path}
+	return append([]string{"--"}, strings.Split(path, "\n")...)
 }
 
 // diffRaw lists changed files between two trees with status and paths (renames detected).

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -474,13 +475,23 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 				return treeOf(ctx, root, h)
 			}
 			return emptyTree(ctx, root), nil
+		case strings.HasPrefix(spec, "since:"):
+			ms, err := strconv.ParseInt(strings.TrimPrefix(spec, "since:"), 10, 64)
+			if err != nil || ms <= 0 {
+				return "", orchBadRequest("since needs a time in ms")
+			}
+			// The last commit before the time; none means the repo started later.
+			if h, _ := git(ctx, root, "rev-list", "-1", "--before=@"+strconv.FormatInt(ms/1000, 10), "HEAD"); h != "" {
+				return treeOf(ctx, root, h)
+			}
+			return emptyTree(ctx, root), nil
 		case shaRe.MatchString(spec):
 			if t, err := treeOf(ctx, root, spec); err == nil {
 				return t, nil
 			}
 			return "", &orchHTTPError{404, "unknown ref " + spec}
 		}
-		return "", orchBadRequest("from and to must be head, worktree or a commit sha")
+		return "", orchBadRequest("from and to must be head, worktree, since:<ms> or a commit sha")
 	}
 	a, err := resolve(from)
 	if err != nil {
@@ -490,11 +501,35 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 	if err != nil {
 		return nil, err
 	}
+	if path != "" {
+		if path = repoPaths(root, path); path == "" {
+			return &orchDiff{From: from, To: to, Files: []orchDiffFile{}}, nil
+		}
+	}
 	files, truncated, err := diffTrees(ctx, root, a, b, path, true)
 	if err != nil {
 		return nil, err
 	}
 	return &orchDiff{From: from, To: to, Files: files, Truncated: truncated}, nil
+}
+
+// repoPaths keeps the newline-separated paths that lie inside root, relative to it.
+func repoPaths(root, paths string) string {
+	var out []string
+	for _, p := range strings.Split(paths, "\n") {
+		if p = strings.TrimSpace(p); p == "" {
+			continue
+		}
+		if filepath.IsAbs(p) {
+			r, err := filepath.Rel(root, p)
+			if err != nil || r == ".." || strings.HasPrefix(r, "../") {
+				continue
+			}
+			p = r
+		}
+		out = append(out, p)
+	}
+	return strings.Join(out, "\n")
 }
 
 func (m *OrchManager) fixRoutes(mux *http.ServeMux) {
@@ -504,7 +539,7 @@ func (m *OrchManager) fixRoutes(mux *http.ServeMux) {
 			orchWriteErr(w, &orchHTTPError{http.StatusForbidden, "cwd is not the folder of a watched session or a driven thread"})
 			return
 		}
-		d, err := WatchedDiff(q.Get("cwd"), q.Get("from"), q.Get("to"), q.Get("path"))
+		d, err := WatchedDiff(q.Get("cwd"), q.Get("from"), q.Get("to"), strings.Join(q["path"], "\n"))
 		if err != nil {
 			gitWriteErr(w, gitFailOr(err))
 			return

@@ -44,6 +44,28 @@ window.addEventListener("unhandledrejection", (e) => {
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String((e.reason as Error)?.message || e.reason))) reloadForNewBuild();
 });
 
+// After an install the daemon serves a new build: reload once nobody is typing, so open windows never keep the old one.
+function watchForNewBuild() {
+  const own = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/index-"]')?.getAttribute("src");
+  if (!own) return;
+  const typing = () => {
+    const a = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+    return !!a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT") && !!a.value;
+  };
+  const check = async () => {
+    try {
+      const html = await (await fetch("/", { cache: "no-store", credentials: "same-origin" })).text();
+      const live = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+      if (live && !own.endsWith(live) && !typing()) location.reload();
+    } catch {
+      /* daemon restarting: try again later */
+    }
+  };
+  window.setInterval(() => void check(), 60_000);
+  window.addEventListener("focus", () => void check());
+}
+if (location.pathname !== "/pair") watchForNewBuild();
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>

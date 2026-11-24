@@ -858,3 +858,5 @@
 .v3 .ws .wmach-f.off{opacity:.55}
 .v3 .ws .wmach{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
 .v3 .ws .wviewonly{box-sizing:border-box;width:calc(100% - 56px);max-width:760px;align-self:center;margin:8px 0 14px;padding:10px 14px;border:1px dashed var(--line-2);border-radius:12px;color:var(--fg-2);font-size:13px}
+.v3 .ws .wchat > .wstatus{cursor:pointer}
+.v3 .ws .wchat > .wstatus:hover{color:var(--fg-2)}

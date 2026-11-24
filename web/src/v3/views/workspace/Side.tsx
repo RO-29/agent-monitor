@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtAgo, fmtDuration, fmtTok, fmtUsd, modelShort, shortCwd } from "../../../lib/format";
-import { agentCls, agentLabel, allowOnce, toMs, useOrch, type ODetail, type OFile, type OItem, type OSpendStatus, type OThread } from "../../api/orch";
+import { agentCls, agentLabel, allowOnce, toMs, useOrch, type ODetail, type OSpendStatus, type OThread } from "../../api/orch";
 import { useApi, v3 } from "../../api/client";
 import { agentName, useV3 } from "../../live";
 import type { Row } from "../../model";
 import { childMap, drivenThreads, permModeLabel, WORKSPACE_LABEL, workspaceOf } from "./rows";
 import { KID_DOT, kidState, useTick } from "./DrivenChat";
 import { Checkpoints, GitBox, GitChanges, WatchedGitBox } from "./GitBox";
-import { gitKey, useDiffNav, useGit } from "./git";
+import { filesOf, gitKey, useDiffNav, useGit } from "./git";
 import type { WatchedFeed } from "./watched";
 import { ChildrenBox } from "./children";
 import { latestSession, usePane, watchedLiveness } from "./WatchedChat";
@@ -346,15 +346,3 @@ export function WatchedSide({ row, feed, onClose, sid, kids: sessionKids, kidsMi
   );
 }
 
-/** Files a list of items edited, with summed line counts. */
-export function filesOf(items: OItem[]): OFile[] {
-  const m = new Map<string, OFile>();
-  for (const it of items) {
-    if (it.kind !== "fileChange" || it.status === "declined" || it.status === "failed") continue;
-    for (const f of it.files || []) {
-      const was = m.get(f.path);
-      m.set(f.path, was ? { ...f, add: was.add + (f.add || 0), del: was.del + (f.del || 0), kind: was.kind === "add" ? "add" : f.kind } : { ...f, add: f.add || 0, del: f.del || 0 });
-    }
-  }
-  return [...m.values()];
-}

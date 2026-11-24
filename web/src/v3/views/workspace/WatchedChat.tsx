@@ -19,7 +19,7 @@ import { agentName, approvalsByThread, useV3 } from "../../live";
 import type { Row } from "../../model";
 import { BarMenu, blocksOf, FoldItem, NarrowBarItems, RunBlock, useTick } from "./DrivenChat";
 import { DiffView } from "./Diff";
-import { useDiffNav } from "./git";
+import { filesOf, useDiffNav } from "./git";
 import { agentTerm, cwdTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
 import type { WatchedFeedState } from "./watched";
 import { nativeSid } from "./handover";
@@ -174,6 +174,14 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const nav = useNavigate();
   const shell = useShell();
   const dnav = useDiffNav();
+  const [statusOpen, setStatusOpen] = useState(false);
+  // The header Diff shows what this session changed, even after a commit; Uncommitted stays in the Git box.
+  const openSessionDiff = () => {
+    const start = row.thread?.startedAt || 0;
+    const paths = filesOf(feed.feed?.items || []).map((x) => x.path);
+    if (!start) return dnav.open({ from: "head", to: "worktree", label: "Uncommitted" });
+    dnav.open({ from: `since:${start}`, to: "worktree", label: paths.length ? "Files this session edited" : "Since this session started", paths });
+  };
   const t = row.thread;
   const sid = latestSession(row);
   const session: Session | undefined = row.session || lv.sessions.get(sid);
@@ -325,7 +333,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         <span className="sp" />
         <div className="wbar-a">
           {row.cwd && (
-            <button className="btn sm ghost wbar-diff" onClick={() => dnav.open({ from: "head", to: "worktree", label: "Uncommitted" })} title="Uncommitted changes in this folder">
+            <button className="btn sm ghost wbar-diff" onClick={openSessionDiff} title="Changes to the files this session edited, since it started (committed or not)">
               Diff
             </button>
           )}
@@ -334,7 +342,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
             <TopBarItem />
             <NarrowBarItems status={status} onSide={onSide} />
             {row.cwd && (
-              <button role="menuitem" className="wmenu-narrow" onClick={() => dnav.open({ from: "head", to: "worktree", label: "Uncommitted" })}>
+              <button role="menuitem" className="wmenu-narrow" onClick={openSessionDiff}>
                 Diff
               </button>
             )}
@@ -464,8 +472,8 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         cli={row.agent === "claude" && owned ? { session: sid, name: cliName, showAll: cliAll, onShowAll: setCliAll } : undefined}
       />
       {(!!q.statusLine?.length || !!credits) && (
-        <pre className="wstatus" aria-label="Agent status line">
-          {[...(q.statusLine || []), ...(credits ? [credits] : [])].join("\n")}
+        <pre className={`wstatus ${statusOpen ? "open" : ""}`} aria-label="Agent status line" title={statusOpen ? "Show one line" : "Show the full status line"} onClick={() => setStatusOpen((o) => !o)}>
+          {[...(q.statusLine || []), ...(credits ? [credits] : [])].slice(0, statusOpen ? undefined : 1).join("\n")}
         </pre>
       )}
       <Composer
@@ -481,7 +489,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         onRunCmd={bashOk ? (cmd) => void send(cmd) : undefined}
         onEmptyUp={() => qref.current?.selectNewest() ?? false}
         disabled={mode === "off"}
-        placeholder={cliQueues ? `${cliName} is working. ⌘↵ adds the message to its own queue. @ inserts a file` : mode === "tmux" ? (bashOk ? "Message the agent in its pane. ! runs a command, / lists commands, @ inserts a file. ⌘↵ sends" : "Message the agent in its pane. @ inserts a file. ⌘↵ sends") : mode === "continue" ? "Continue this session here (message optional). ⌘↵" : offWhy}
+        placeholder={cliQueues ? `${cliName} is working. ⌘↵ adds the message to its own queue. @ inserts a file` : mode === "tmux" ? (bashOk ? "Message the agent · ! command · / commands · @ file" : "Message the agent · @ file") : mode === "continue" ? "Continue this session here (message optional). ⌘↵" : offWhy}
         cwd={row.cwd}
         files
         attach={mode === "off" ? undefined : att}
