@@ -413,7 +413,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
           </div>
         )}
       </div>
-      <UsageMini />
+      <UsageMini focus={rows.find((r) => r.id === sel || (!!r.openId && r.openId === sel))?.agent} />
       {menu && <RowMenu r={rows.find((x) => x.id === menu.r.id) || menu.r} x={menu.x} y={menu.y} onClose={closeMenu} />}
     </aside>
   );

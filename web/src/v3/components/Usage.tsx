@@ -94,8 +94,9 @@ export function whoText(g: UsageGroup, many: boolean): string {
   return [acct, where].filter(Boolean).join(" · ");
 }
 
-/** Thread list footer: plan meters per subscription, or local token totals when there is no plan reading. Folds. */
-export function UsageMini() {
+/** Thread list footer: plan meters per subscription, or local token totals when there is no plan reading. Folds.
+ *  With a thread open, only its agent's meters show; the other agents fold into one line. */
+export function UsageMini({ focus }: { focus?: string }) {
   const st = useUsageGroups(60_000);
   const now = useNow(30_000);
   const [closed, toggle] = useFold("usage-mini");
@@ -107,6 +108,8 @@ export function UsageMini() {
   const split = new Set(groups.map((g) => g.agent).filter((a, i, arr) => arr.indexOf(a) !== i));
   if (!groups.length && !more.length) return null;
   const agents = groups.map((g) => g.a);
+  const focused = focus && groups.some((g) => g.agent === focus) ? groups.filter((g) => g.agent === focus) : groups;
+  const rest = groups.filter((g) => !focused.includes(g));
   return (
     <div className={`umini ${closed ? "fold-c" : ""}`}>
       <div className="umini-top">
@@ -124,7 +127,7 @@ export function UsageMini() {
         </Link>
       </div>
       {!closed &&
-        groups.map((g) => {
+        focused.map((g) => {
           const who = many || split.has(g.agent) ? whoText(g, many) : "";
           return hasReading(g.a) ? (
             <div key={g.key} className="umini-a">
@@ -140,6 +143,11 @@ export function UsageMini() {
             <LocalOnly key={g.key} a={g.a} />
           );
         })}
+      {!closed && rest.length > 0 && (
+        <Link to="/settings/limits" className="umini-rest trunc" title="All plans in Settings, Limits">
+          {miniSummary(rest.map((g) => g.a))}
+        </Link>
+      )}
     </div>
   );
 }
