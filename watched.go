@@ -141,6 +141,8 @@ func watchedSessionRoute(w http.ResponseWriter, r *http.Request, path string) bo
 		writeJSON(w, watchedPane(strings.TrimSuffix(path, "/pane")))
 	case strings.HasSuffix(path, "/commands"):
 		serveSessionCommands(w, r, strings.TrimSuffix(path, "/commands"))
+	case strings.HasSuffix(path, "/files"):
+		serveWatchedFiles(w, strings.TrimSuffix(path, "/files"))
 	case strings.HasSuffix(path, "/items"):
 		serveWatchedItems(w, r, strings.TrimSuffix(path, "/items"))
 	case strings.HasSuffix(path, "/question"):

@@ -40,6 +40,9 @@ func TestCursorTranscriptItems(t *testing.T) {
 			t.Fatalf("item %d = %+v, want kind %s", i, items[i], k)
 		}
 	}
+	if f := items[4].Files; len(f) != 1 || f[0].Path != "/x/a.go" || f[0].Kind != "update" {
+		t.Fatalf("edit files %+v", f)
+	}
 	if items[5].Command != "go test ./..." {
 		t.Fatalf("command %q", items[5].Command)
 	}

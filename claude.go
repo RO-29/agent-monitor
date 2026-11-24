@@ -19,6 +19,7 @@ type ClaudeHookPayload struct {
 	Message          string `json:"message"`
 	ToolName         string `json:"tool_name"`
 	Reason           string `json:"reason"`
+	Source           string `json:"source"` // SessionStart: startup, resume, clear or compact
 }
 
 var permissionRe = regexp.MustCompile(`(?i)permission|approve|allow|confirm`)
@@ -58,6 +59,9 @@ func handleHook(s *Store, tool Tool, p ClaudeHookPayload) {
 		s.Upsert(in)
 		if tool == ToolClaude {
 			ensureClaudeTail(s, p.TranscriptPath, p.SessionID, cwd)
+		}
+		if p.Source == "" || p.Source == "startup" {
+			go recordSessionBase(sid(tool, p.SessionID), cwd)
 		}
 
 	case "UserPromptSubmit", "PreToolUse", "PostToolUse":

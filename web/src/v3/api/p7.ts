@@ -202,6 +202,7 @@ export const p7 = {
     const p = q?.after != null ? `?after=${q.after}` : q?.before != null ? `?before=${q.before}` : "";
     return req<WatchedItems>("GET", `${machineBase(machine)}/api/session/${enc(id)}/items${p}`);
   },
+  sessionFiles: (id: string): Promise<{ paths: string[] }> => req<{ paths: string[] }>("GET", `/api/session/${enc(id)}/files`),
   sessionChildren: async (id: string): Promise<SessionChildren> => {
     if (mockWanted()) return { id, agent: "", count: 0, children: [] };
     return req<SessionChildren>("GET", `/api/session/${enc(id)}/children`);

@@ -476,9 +476,14 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 			}
 			return emptyTree(ctx, root), nil
 		case strings.HasPrefix(spec, "since:"):
-			ms, err := strconv.ParseInt(strings.TrimPrefix(spec, "since:"), 10, 64)
+			// since:<ms>[:<session id>]: the session's recorded start tree when there is one, else the last commit before ms.
+			msText, session, _ := strings.Cut(strings.TrimPrefix(spec, "since:"), ":")
+			ms, err := strconv.ParseInt(msText, 10, 64)
 			if err != nil || ms <= 0 {
 				return "", orchBadRequest("since needs a time in ms")
+			}
+			if t := sessionBaseTree(ctx, session, root); session != "" && t != "" {
+				return t, nil
 			}
 			// The last commit before the time; none means the repo started later.
 			if h, _ := git(ctx, root, "rev-list", "-1", "--before=@"+strconv.FormatInt(ms/1000, 10), "HEAD"); h != "" {
@@ -491,7 +496,7 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 			}
 			return "", &orchHTTPError{404, "unknown ref " + spec}
 		}
-		return "", orchBadRequest("from and to must be head, worktree, since:<ms> or a commit sha")
+		return "", orchBadRequest("from and to must be head, worktree, since:<ms>[:<session>] or a commit sha")
 	}
 	a, err := resolve(from)
 	if err != nil {

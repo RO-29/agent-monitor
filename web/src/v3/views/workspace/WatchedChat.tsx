@@ -176,12 +176,19 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const dnav = useDiffNav();
   const [statusOpen, setStatusOpen] = useState(false);
   // The header Diff shows what this session changed, even after a commit; Uncommitted stays in the Git box.
-  const openSessionDiff = () => {
+  const openSessionDiff = async () => {
     const start = row.thread?.startedAt || 0;
-    const paths = filesOf(feed.feed?.items || []).map((x) => x.path);
-    // No start or no edited file loaded: a repo-wide range would show other people's commits.
+    let paths = filesOf(feed.feed?.items || []).map((x) => x.path);
+    let all = !feed.loadEarlier;
+    try {
+      paths = (await p7.sessionFiles(latestSession(row))).paths;
+      all = true;
+    } catch {
+      // older daemons have no /files route: keep the loaded turns
+    }
+    // No start or no edited file: a repo-wide range would show other people's commits.
     if (!start || !paths.length) return dnav.open({ from: "head", to: "worktree", label: "Uncommitted" });
-    dnav.open({ from: `since:${start}`, to: "worktree", label: feed.loadEarlier ? "Files edited in the loaded turns" : "Files this session edited", paths });
+    dnav.open({ from: `since:${start}:${latestSession(row)}`, to: "worktree", label: all ? "Files this session edited" : "Files edited in the loaded turns", paths });
   };
   const t = row.thread;
   const sid = latestSession(row);
@@ -334,7 +341,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         <span className="sp" />
         <div className="wbar-a">
           {row.cwd && (
-            <button className="btn sm ghost wbar-diff" onClick={openSessionDiff} title="Changes to the files this session edited, since it started (committed or not)">
+            <button className="btn sm ghost wbar-diff" onClick={() => void openSessionDiff()} title="Changes to the files this session edited, since it started (committed or not)">
               Diff
             </button>
           )}
@@ -343,7 +350,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
             <TopBarItem />
             <NarrowBarItems status={status} onSide={onSide} />
             {row.cwd && (
-              <button role="menuitem" className="wmenu-narrow" onClick={openSessionDiff}>
+              <button role="menuitem" className="wmenu-narrow" onClick={() => void openSessionDiff()}>
                 Diff
               </button>
             )}

@@ -138,6 +138,15 @@ func cursorTranscriptBuild(threadID string, sc *bufio.Scanner, fileAt int64) ([]
 					if p.Name == "StrReplace" || p.Name == "Delete" {
 						it.Kind = "fileChange"
 					}
+					if it.Kind == "fileChange" {
+						if path := cursorEditPath(p.Input); path != "" {
+							kind := "update"
+							if p.Name == "Delete" {
+								kind = "delete"
+							}
+							it.Files = []OFile{{Path: path, Kind: kind}}
+						}
+					}
 					add(it)
 				}
 			}
@@ -148,4 +157,15 @@ func cursorTranscriptBuild(threadID string, sc *bufio.Scanner, fileAt int64) ([]
 		run.EndedAt = fileAt
 	}
 	return items, runs
+}
+
+func cursorEditPath(in json.RawMessage) string {
+	var a map[string]any
+	_ = json.Unmarshal(in, &a)
+	for _, k := range []string{"path", "file_path", "target_file", "targetFile", "filePath"} {
+		if v, _ := a[k].(string); v != "" {
+			return v
+		}
+	}
+	return ""
 }
