@@ -2,18 +2,51 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtAgo } from "../../../lib/format";
-import { machinesApi, type Grant, type PeerInfo } from "../../api/machines";
+import { machinesApi, mreq, type Grant, type PeerInfo } from "../../api/machines";
 import { showToast } from "../../../app/toast";
 import { copy } from "../../../lib/clipboard";
 import "../../styles/settings.css";
 import { SettingsTabs } from "./Tabs";
-import { levelText } from "../../api/fleet";
+import { levelText, useFleet } from "../../api/fleet";
 
 const LEVEL_HELP: Record<string, string> = {
   view: "sees sessions, threads and requests",
   control: "also answers requests and drives agents",
   admin: "also terminals, search and settings",
 };
+
+/** The name every machine and the thread list show for this Mac. */
+function SelfName() {
+  const fleet = useFleet();
+  const cur = fleet.machines.find((m) => m.self)?.name || "";
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setName(cur), [cur]);
+  const save = async (n: string) => {
+    setBusy(true);
+    try {
+      const r = await mreq<{ name: string }>("PUT", "/api/fleet/name", { name: n });
+      setName(r.name);
+      showToast("Machine name saved", r.name);
+    } catch (e) {
+      showToast("Name not saved", (e as Error).message, { kind: "alert" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ibox">
+      <h3>This machine</h3>
+      <p className="sx-p">The name the thread list and other machines show for this Mac. Empty uses the computer name.</p>
+      <div className="sx-row">
+        <input className="inp" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="For example: Work Mac" aria-label="This machine's name" />
+        <button className="btn sm" disabled={busy || name.trim() === cur} onClick={() => void save(name)}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Peers() {
   const [list, setList] = useState<PeerInfo[] | null>(null);
@@ -162,6 +195,7 @@ export default function Machines() {
         </div>
       </div>
       <div className="sx-col">
+        <SelfName />
         <Peers />
         <Grants />
       </div>

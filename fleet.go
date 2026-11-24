@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -19,14 +22,59 @@ const (
 	fleetKeep        = 60 * time.Second // a peer's last good answer is shown this long when it stops answering
 )
 
-// selfMachineName is this machine's short host name ("rohit-mbp", not "rohit-mbp.local").
+var machineName = struct {
+	sync.Mutex
+	name   string
+	loaded bool
+}{}
+
+func machineNamePath() string { return filepath.Join(stateDir(), "machine-name") }
+
+// selfMachineName is the name set in Settings, else the Mac's computer name, else the short host name.
 func selfMachineName() string {
-	h, _ := os.Hostname()
-	h = strings.TrimSuffix(strings.TrimSuffix(h, "."), ".local")
-	if i := strings.IndexByte(h, '.'); i > 0 {
-		h = h[:i]
+	machineName.Lock()
+	defer machineName.Unlock()
+	if !machineName.loaded {
+		machineName.loaded = true
+		if b, err := os.ReadFile(machineNamePath()); err == nil {
+			machineName.name = strings.TrimSpace(string(b))
+		}
+		if machineName.name == "" {
+			if out, err := exec.Command("scutil", "--get", "ComputerName").Output(); err == nil {
+				machineName.name = strings.TrimSpace(string(out))
+			}
+		}
+		if machineName.name == "" {
+			h, _ := os.Hostname()
+			h = strings.TrimSuffix(strings.TrimSuffix(h, "."), ".local")
+			if i := strings.IndexByte(h, '.'); i > 0 {
+				h = h[:i]
+			}
+			machineName.name = h
+		}
 	}
-	return firstOf(h, "this machine")
+	return firstOf(machineName.name, "this machine")
+}
+
+// setMachineName keeps the name in the state dir; "" goes back to the computer name.
+func setMachineName(n string) error {
+	n = strings.TrimSpace(n)
+	if len([]rune(n)) > 40 || strings.ContainsAny(n, "/\\:@\n\r\t") {
+		return errors.New("use at most 40 characters and no / \\ : @")
+	}
+	var err error
+	if n == "" {
+		err = os.Remove(machineNamePath())
+		if os.IsNotExist(err) {
+			err = nil
+		}
+	} else {
+		err = os.WriteFile(machineNamePath(), []byte(n+"\n"), 0o600)
+	}
+	machineName.Lock()
+	machineName.loaded = false
+	machineName.Unlock()
+	return err
 }
 
 type fleetPeer struct {
@@ -185,6 +233,20 @@ func fleetPeerItems(route, key string) (machines []fleetPeer, items []json.RawMe
 }
 
 func registerFleetRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("PUT /api/fleet/name", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "bad json"})
+			return
+		}
+		if err := setMachineName(in.Name); err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "name": selfMachineName()})
+	})
 	mux.HandleFunc("GET /api/fleet/machines", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"machines": fleetMachines(fleetPeersSnapshot())})
 	})

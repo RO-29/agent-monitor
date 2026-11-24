@@ -60,9 +60,17 @@ func TestFleetRoutesNeedAdmin(t *testing.T) {
 	}
 }
 
-func TestSelfMachineNameIsShort(t *testing.T) {
-	if n := selfMachineName(); n == "" || strings.Contains(n, ".") {
-		t.Fatalf("name %q", n)
+func TestMachineNameSetAndReset(t *testing.T) {
+	t.Setenv("AGENT_MONITOR_HOME", t.TempDir())
+	t.Cleanup(func() { _ = setMachineName("") })
+	if err := setMachineName("Work Mac"); err != nil || selfMachineName() != "Work Mac" {
+		t.Fatalf("set: %v %q", err, selfMachineName())
+	}
+	if setMachineName("a/b") == nil || setMachineName(strings.Repeat("x", 41)) == nil {
+		t.Fatal("a bad name was kept")
+	}
+	if err := setMachineName(""); err != nil || selfMachineName() == "Work Mac" || selfMachineName() == "" {
+		t.Fatalf("reset: %v %q", err, selfMachineName())
 	}
 }
 
