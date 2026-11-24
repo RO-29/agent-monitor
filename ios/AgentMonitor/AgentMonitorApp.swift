@@ -8,6 +8,7 @@ struct AgentMonitorApp: App {
     init() {
         Theme.applyAppearance()
         Notifier.shared.installDelegate()
+        SigningWatch.register()
     }
 
     var body: some Scene {
@@ -29,6 +30,7 @@ struct AgentMonitorApp: App {
                     // often dropped while backgrounded.
                     if phase == .active { store.connect() } else { store.flushPendingDecisions() }
                     store.setForeground(phase == .active)
+                    if phase == .active { Task { await SigningWatch.tick() } }
                 }
                 // Bark pushes open agentmonitor://thread/<id>, agentmonitor://approvals or agentmonitor://alerts.
                 .onOpenURL { url in

@@ -7,6 +7,7 @@ func registerV3Routes(mux *http.ServeMux) {
 	registerApprovalRoutes(mux) // approvals.go
 	registerOrchRoutes(mux)     // orch_api.go: driven Codex threads; needs the approval store
 	registerOTARoutes(mux)      // ios_ota.go: iPhone install files for ios/ota.sh
+	registerIOSRenewRoutes(mux) // ios_renew.go: the iPhone asks for a build before its profile ends
 	registerLocalPprof(mux)     // pprof_local.go: profiler for this Mac only
 	registerNeedsYouRoutes(mux) // needs_you.go: the one list of requests every surface draws
 	registerPromptRoutes(mux)   // prompt_history.go: prompts you typed, from the agents' history files

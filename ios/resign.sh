@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds AgentMonitor for iOS, signs it with the Xcode account's team, and installs it on the paired iPhone.
 # Usage: ios/resign.sh [--force]. Skips when this build was installed under 20 h ago, so it is safe to run often.
+# It renews the signing profile when it ends within 3 days, or when the iPhone asked (ios_renew.go).
 # With no reachable iPhone and AM_IOS_OTA=1 (a paid team) it publishes the build over Tailscale and pushes the link.
 set -euo pipefail
 
@@ -20,8 +21,32 @@ mkdir -p "$STATE"
 log() { echo "$(date '+%F %T') $*"; }
 
 HEAD=$(git -C "$REPO" rev-parse --short HEAD)
-# Skip a recent install of this same build; a new commit installs at once.
-if [[ "${1:-}" != "--force" && -f "$STAMP" ]]; then
+
+# Free-team profiles last 7 days, and Xcode reuses its cached one, so a new install alone never moves the end.
+PROFILES="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+OLD="$STATE/old-profiles"
+RENEW="$STATE/renew" # written by the daemon when the iPhone asks (POST /api/ios/renew): its profile end, Unix ms
+RENEW_WITHIN=$((3 * 86400))
+profile_end() { security cms -D -i "$1" 2>/dev/null | plutil -extract ExpirationDate raw -o - - 2>/dev/null; }
+epoch() { date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
+# Cached profiles for this app that end within RENEW_WITHIN.
+stale_profiles() {
+  local f end
+  for f in "$PROFILES"/*.mobileprovision; do
+    [[ -f "$f" ]] || continue
+    security cms -D -i "$f" 2>/dev/null | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null |
+      grep -q "\.com\.rohit\.agentmonitor$" || continue
+    end=$(epoch "$(profile_end "$f")")
+    (( end - $(date +%s) < RENEW_WITHIN )) && echo "$f"
+  done
+  return 0
+}
+STALE=$(stale_profiles)
+RENEWING=0
+[[ -n "$STALE" || -f "$RENEW" ]] && RENEWING=1
+
+# Skip a recent install of this same build; a new commit or a profile renewal installs at once.
+if [[ "${1:-}" != "--force" && "$RENEWING" == 0 && -f "$STAMP" ]]; then
   age=$(( $(date +%s) - $(stat -f %m "$STAMP") ))
   if (( age < MIN_AGE )) && [[ "$(cat "$STAMP")" == "$HEAD" ]]; then log "skip: $HEAD installed $((age / 3600)) h ago"; exit 0; fi
 fi
@@ -70,14 +95,32 @@ fi
 DEST='generic/platform=iOS'
 [[ -n "${UDID:-}" ]] && DEST="platform=iOS,id=$UDID"
 
+# Move the ending profile aside so Xcode asks Apple for a new one; put it back if the build fails.
+moved=0
+if [[ -n "$STALE" ]]; then
+  mkdir -p "$OLD"
+  while IFS= read -r f; do mv "$f" "$OLD/" && moved=1; done <<<"$STALE"
+  log "renew: moved the ending profile aside"
+fi
+restore() { (( moved )) && mv "$OLD"/*.mobileprovision "$PROFILES/" 2>/dev/null; return 0; }
+
 log "build $HEAD for team $TEAM"
-xcodebuild -project "$REPO/ios/AgentMonitor.xcodeproj" -scheme AgentMonitor -configuration Release \
+if ! xcodebuild -project "$REPO/ios/AgentMonitor.xcodeproj" -scheme AgentMonitor -configuration Release \
   -destination "$DEST" -derivedDataPath "$OUT" -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-  DEVELOPMENT_TEAM="$TEAM" AM_DEFAULT_SERVER="${AM_DEFAULT_SERVER:-}" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" MARKETING_VERSION="1.0.$BUILD" build -quiet
+  DEVELOPMENT_TEAM="$TEAM" AM_DEFAULT_SERVER="${AM_DEFAULT_SERVER:-}" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" MARKETING_VERSION="1.0.$BUILD" build -quiet; then
+  restore; log "build failed"; exit 1
+fi
 APP="$OUT/Build/Products/Release-iphoneos/AgentMonitor.app"
-[[ -d "$APP" ]] || { log "no app at $APP"; exit 1; }
+[[ -d "$APP" ]] || { restore; log "no app at $APP"; exit 1; }
+END=$(profile_end "$APP/embedded.mobileprovision")
+rm -f "$OLD"/*.mobileprovision
+# The iPhone already has this end date: a reinstall would only restart the app, so try again later.
+if [[ -f "$RENEW" ]] && (( $(epoch "$END") * 1000 <= $(tr -dc 0-9 <"$RENEW") )) && [[ "$(cat "$STAMP" 2>/dev/null)" == "$HEAD" ]]; then
+  log "renew: Apple gave the same profile (ends $END); will try again"; exit 0
+fi
 
 log "install on $DEVICE"
 xcrun devicectl device install app --device "$DEVICE" "$APP"
 echo "$HEAD" > "$STAMP"
-log "done; profile expires $(security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | /usr/bin/plutil -extract ExpirationDate raw -o - - 2>/dev/null || echo unknown)"
+if [[ -f "$RENEW" ]] && (( $(epoch "$END") * 1000 > $(tr -dc 0-9 <"$RENEW") )); then rm -f "$RENEW"; log "renew: done"; fi
+log "done; profile expires ${END:-unknown}"

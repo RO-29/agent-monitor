@@ -166,6 +166,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(id: "alert-\(id)", kind: kind, title: title, body: body, info: info)
     }
 
+    /// The app's signing profile ends soon; SigningWatch sends it once per end date.
+    func signing(title: String, body: String) {
+        post(id: "signing", kind: .needsYou, title: title, body: body, info: [:], force: true)
+    }
+
     /// Settings test: a sample of this kind with its current sound, even when the kind is off.
     func test(_ kind: NotifyKind, threadId: String?) {
         let go = { [self] in
