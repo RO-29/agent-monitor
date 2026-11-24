@@ -35,7 +35,7 @@ func selfMachineName() string {
 	machineName.Lock()
 	defer machineName.Unlock()
 	if !machineName.loaded {
-		machineName.loaded = true
+		machineName.loaded, machineName.name = true, ""
 		if b, err := os.ReadFile(machineNamePath()); err == nil {
 			machineName.name = strings.TrimSpace(string(b))
 		}
