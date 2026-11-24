@@ -16,6 +16,7 @@ func TestCursorAgentMatchesOnlyRealRuns(t *testing.T) {
 		"/Users/u/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker/agent-cli/.local/bin/cursor-agent --api-key x": false,
 		"/Users/u/.local/bin/cursor-agent acp":                                                                                                       false,
 		"/Users/u/.local/bin/cursor-agent status":                                                                                                    false,
+		"/Users/u/.local/bin/cursor-agent -p update the README":                                                                                      true,
 		"grep cursor-agent": false,
 	}
 	for cmd, want := range cases {
