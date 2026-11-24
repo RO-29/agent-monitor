@@ -140,6 +140,8 @@ func serveWatchedItems(w http.ResponseWriter, r *http.Request, id string) {
 		read := func() ([]*OItem, []*ORun, error) { return cursorItemsFor(ref.ID, ref.Path) }
 		if id, ok := strings.CutPrefix(ref.Path, cursorDeskPrefix); ok {
 			read = func() ([]*OItem, []*ORun, error) { return cursorDesktopItems(ref.ID, id) }
+		} else if isCursorTranscript(ref.Path) {
+			read = func() ([]*OItem, []*ORun, error) { return cursorTranscriptItems(ref.ID, ref.Path) }
 		}
 		items, runs, err := read()
 		if err != nil {
