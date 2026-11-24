@@ -513,6 +513,26 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 	return &orchDiff{From: from, To: to, Files: files, Truncated: truncated}, nil
 }
 
+// relInside is p relative to root when p lies inside it, comparing real paths too (/var is /private/var).
+func relInside(root, p string) (string, bool) {
+	in := func(root, p string) (string, bool) {
+		r, err := filepath.Rel(root, p)
+		return r, err == nil && r != ".." && !strings.HasPrefix(r, "../")
+	}
+	if r, ok := in(root, p); ok {
+		return r, true
+	}
+	rr, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	rp, err := filepath.EvalSymlinks(filepath.Dir(p))
+	if err != nil {
+		return "", false
+	}
+	return in(rr, filepath.Join(rp, filepath.Base(p)))
+}
+
 // repoPaths keeps the newline-separated paths that lie inside root, relative to it.
 func repoPaths(root, paths string) string {
 	var out []string
@@ -521,8 +541,8 @@ func repoPaths(root, paths string) string {
 			continue
 		}
 		if filepath.IsAbs(p) {
-			r, err := filepath.Rel(root, p)
-			if err != nil || r == ".." || strings.HasPrefix(r, "../") {
+			r, ok := relInside(root, p)
+			if !ok {
 				continue
 			}
 			p = r
