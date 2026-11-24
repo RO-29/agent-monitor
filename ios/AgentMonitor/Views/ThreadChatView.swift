@@ -326,11 +326,11 @@ struct ThreadChatView: View {
                 Label("Select Messages", systemImage: "checkmark.circle")
             }
             Button { setFullscreen(true) } label: { Label("Read Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") }
-            if sessionID != nil, canRunBash {
+            if sessionID != nil, canRunBash, peer == nil {
                 Button { showHistory = true } label: { Label("Command History", systemImage: "clock.arrow.circlepath") }
                 Button { showScreen = true } label: { Label("Terminal Screen", systemImage: "terminal") }
             }
-            if let sid = sessionID, canRunBash {
+            if let sid = sessionID, canRunBash, peer == nil {
                 if sessionLive {
                     Button(role: .destructive) { confirmEnd = true } label: { Label("End Session", systemImage: "stop.circle") }
                 } else {

@@ -502,7 +502,7 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 		return nil, err
 	}
 	if path != "" {
-		if path = repoPaths(root, path); path == "" {
+		if path = repoPaths(root, cwd, path); path == "" {
 			return &orchDiff{From: from, To: to, Files: []orchDiffFile{}}, nil
 		}
 	}
@@ -533,21 +533,21 @@ func relInside(root, p string) (string, bool) {
 	return in(rr, filepath.Join(rp, filepath.Base(p)))
 }
 
-// repoPaths keeps the newline-separated paths that lie inside root, relative to it.
-func repoPaths(root, paths string) string {
+// repoPaths keeps the newline-separated paths that lie inside root, relative to it; relative ones start at cwd.
+func repoPaths(root, cwd, paths string) string {
 	var out []string
 	for _, p := range strings.Split(paths, "\n") {
 		if p = strings.TrimSpace(p); p == "" {
 			continue
 		}
-		if filepath.IsAbs(p) {
-			r, ok := relInside(root, p)
-			if !ok {
-				continue
-			}
-			p = r
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(cwd, p)
 		}
-		out = append(out, p)
+		r, ok := relInside(root, p)
+		if !ok || r == "." {
+			continue
+		}
+		out = append(out, r)
 	}
 	return strings.Join(out, "\n")
 }

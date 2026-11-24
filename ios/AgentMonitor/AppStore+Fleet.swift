@@ -15,6 +15,13 @@ struct FleetMachine: Decodable, Hashable, Identifiable {
 struct FleetThreads: Decodable {
     var machines: [FleetMachine]?
     var threads: [V3Thread]?
+    enum CodingKeys: String, CodingKey { case machines, threads }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        machines = try c.decodeIfPresent([FleetMachine].self, forKey: .machines)
+        // One peer thread from another daemon version must not blank the rest.
+        threads = try c.decodeIfPresent([Lossy<V3Thread>].self, forKey: .threads)?.compactMap(\.value)
+    }
 }
 
 // Threads of other machines come through GET /api/fleet/threads on the primary server.

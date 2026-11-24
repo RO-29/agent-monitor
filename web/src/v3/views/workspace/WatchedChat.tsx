@@ -179,8 +179,9 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const openSessionDiff = () => {
     const start = row.thread?.startedAt || 0;
     const paths = filesOf(feed.feed?.items || []).map((x) => x.path);
-    if (!start) return dnav.open({ from: "head", to: "worktree", label: "Uncommitted" });
-    dnav.open({ from: `since:${start}`, to: "worktree", label: paths.length ? "Files this session edited" : "Since this session started", paths });
+    // No start or no edited file loaded: a repo-wide range would show other people's commits.
+    if (!start || !paths.length) return dnav.open({ from: "head", to: "worktree", label: "Uncommitted" });
+    dnav.open({ from: `since:${start}`, to: "worktree", label: feed.loadEarlier ? "Files edited in the loaded turns" : "Files this session edited", paths });
   };
   const t = row.thread;
   const sid = latestSession(row);

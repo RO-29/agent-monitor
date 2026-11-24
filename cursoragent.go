@@ -97,15 +97,20 @@ func cursorAgentMatches(cmd string) bool {
 	if len(f) == 0 || filepath.Base(f[0]) != "cursor-agent" {
 		return false
 	}
-	sub := ""
+	var pos []string
 	for _, a := range f[1:] {
 		switch a {
 		case "--version", "-v", "-V", "--help", "-h":
 			return false
 		}
-		if sub == "" && !strings.HasPrefix(a, "-") && !strings.HasSuffix(a, ".js") {
-			sub = a
+		if !strings.HasPrefix(a, "-") && !strings.HasSuffix(a, ".js") {
+			pos = append(pos, a)
 		}
+	}
+	// ps drops quotes, so a prompt like "update the README" also starts with a command word: only a lone word is a command.
+	sub := ""
+	if len(pos) == 1 {
+		sub = pos[0]
 	}
 	switch sub {
 	case "acp", "worker-server", "status", "whoami", "login", "logout", "update", "upgrade", "ls", "mcp", "about", "models",

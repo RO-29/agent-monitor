@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -12,6 +13,7 @@ import (
 type sessionOwner struct {
 	Pid  int    `json:"pid"`
 	Tmux string `json:"tmux,omitempty"`
+	Pane string `json:"pane,omitempty"`
 	Host string `json:"hostId,omitempty"`
 }
 
@@ -25,15 +27,17 @@ var psCommandsFn = func() string {
 var tmuxPanesFn = listTmuxPanes
 
 // resumePids are the agent processes whose command line resumes raw: `claude --resume <id>` or `codex resume <id>`.
+// A fork writes a new session, so it does not count.
 func resumePids(tool Tool, raw string) []int {
 	var out []int
 	for _, line := range strings.Split(psCommandsFn(), "\n") {
 		f := strings.Fields(line)
-		if len(f) < 3 || filepath.Base(f[1]) != string(tool) {
+		if len(f) < 3 || filepath.Base(f[1]) != string(tool) || slices.Contains(f, "--fork-session") {
 			continue
 		}
-		for i := 2; i+1 < len(f); i++ {
-			if f[i+1] == raw && (f[i] == "--resume" || f[i] == "-r" || f[i] == "resume") {
+		for i := 2; i < len(f); i++ {
+			hit := f[i] == "--resume="+raw || (i+1 < len(f) && f[i+1] == raw && (f[i] == "--resume" || f[i] == "-r" || f[i] == "resume"))
+			if hit {
 				if pid, err := strconv.Atoi(f[0]); err == nil {
 					out = append(out, pid)
 				}
@@ -59,8 +63,15 @@ func liveSessionOwner(agentID string) *sessionOwner {
 		o = &sessionOwner{Pid: h.AgentPid, Host: h.HostID}
 	}
 	if o == nil {
+		// argv goes stale: a process started with --resume A that moved to B (/clear, /resume) owns B now.
+		moved := map[int]bool{}
+		for _, h := range hosts {
+			if h.AgentPid > 0 && h.SessionID != "" && h.SessionID != raw {
+				moved[h.AgentPid] = true
+			}
+		}
 		for _, pid := range resumePids(tool, raw) {
-			if pidAlive(pid) {
+			if !moved[pid] && pidAlive(pid) {
 				o = &sessionOwner{Pid: pid}
 				break
 			}
@@ -80,7 +91,7 @@ func liveSessionOwner(agentID string) *sessionOwner {
 		tree := procTree()
 		for _, p := range panes {
 			if (pane != "" && p.PaneID == pane) || (pane == "" && o.Pid > 0 && isDescendant(tree, p.PanePID, o.Pid)) {
-				o.Tmux = p.SessionName
+				o.Tmux, o.Pane = p.SessionName, p.PaneID
 				break
 			}
 		}

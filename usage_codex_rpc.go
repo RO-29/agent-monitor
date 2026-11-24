@@ -133,9 +133,6 @@ func codexAccountOf(raw json.RawMessage) *usageAccount {
 			if c.WorkspaceName != nil {
 				org = *c.WorkspaceName
 			}
-			if id == "" && label != "" {
-				id = "email:" + strings.ToLower(label)
-			}
 		}
 	}
 	return newUsageAccount(id, label, org)

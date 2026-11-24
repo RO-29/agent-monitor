@@ -367,7 +367,7 @@ function AgentCard({ a, now, who, others }: { a: AgentUsage; now: number; who?: 
       {a.models && a.models.length > 0 && <ModelTable models={a.models} agent={nameOf(a)} />}
       {a.local.length > 0 && (
         <>
-          <h4 className="uloc-h">Measured locally{a.machine ? ` on ${a.machine}` : ""}</h4>
+          <h4 className="uloc-h">Measured locally{(a.localMachine || a.machine) ? ` on ${a.localMachine || a.machine}` : ""}</h4>
           <p className="sx-p">Tokens counted from this machine's transcripts. This is not the plan limit: other devices do not count, and the cost uses public list prices.</p>
           <div className="ulocs" role="table" aria-label={`${nameOf(a)} local usage`}>
             {a.local.map((l) => (

@@ -162,3 +162,6 @@ textarea {
   background: var(--border-strong);
   border-radius: 4px;
 }
+
+/* A new build is served; main.tsx adds this button to a visible window. */
+#am-newbuild{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:9999;padding:7px 14px;border-radius:999px;border:0;background:var(--accent);color:var(--bg-0);font:600 12.5px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}

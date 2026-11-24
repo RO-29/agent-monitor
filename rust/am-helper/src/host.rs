@@ -108,7 +108,11 @@ fn resume_target(agent: &str, rest: &[String]) -> Option<String> {
     if tool != "claude" && tool != "codex" {
         return None;
     }
-    let id = rest.windows(2).find(|w| w[0] == "--resume" || w[0] == "-r" || (tool == "codex" && w[0] == "resume")).map(|w| w[1].clone())?;
+    if rest.iter().any(|a| a == "--fork-session") {
+        return None;
+    }
+    let eq = rest.iter().find_map(|a| a.strip_prefix("--resume=").map(|s| s.to_string()));
+    let id = eq.or_else(|| rest.windows(2).find(|w| w[0] == "--resume" || w[0] == "-r" || (tool == "codex" && w[0] == "resume")).map(|w| w[1].clone()))?;
     let ok = id.len() == 36 && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
     if ok {
         Some(format!("{}:{}", tool, id))
@@ -143,6 +147,13 @@ fn open_running_copy(agent: &str, rest: &[String]) -> Option<i32> {
     if !here.is_empty() && here != sess {
         eprintln!("agent-monitor: this session already runs in tmux session {}. Opening it.", sess);
         let ok = Command::new("tmux").args(["switch-client", "-t", &format!("={}", sess)]).status().map(|s| s.success()).unwrap_or(false);
+        return Some(if ok { 0 } else { 1 });
+    }
+    let pane = o.fstr("pane");
+    if !here.is_empty() && !pane.is_empty() {
+        eprintln!("agent-monitor: this session already runs in another window of this tmux session. Opening it.");
+        let ok = Command::new("tmux").args(["select-window", "-t", &pane]).status().map(|s| s.success()).unwrap_or(false)
+            && Command::new("tmux").args(["select-pane", "-t", &pane]).status().map(|s| s.success()).unwrap_or(false);
         return Some(if ok { 0 } else { 1 });
     }
     eprintln!("agent-monitor: this session already runs in tmux session {}. Open it with: tmux attach -t {}", sess, sess);
@@ -911,6 +922,8 @@ mod tests {
         assert_eq!(resume_target("claude", &a(&["--resume"])), None);
         assert_eq!(resume_target("claude", &a(&["--resume", "not-an-id"])), None);
         assert_eq!(resume_target("cursor-agent", &a(&["--resume", id])), None);
+        assert_eq!(resume_target("claude", &a(&[format!("--resume={}", id).as_str()])), Some(format!("claude:{}", id)));
+        assert_eq!(resume_target("claude", &a(&["--resume", id, "--fork-session"])), None);
     }
 
     #[test]

@@ -70,6 +70,8 @@ export interface AgentUsage {
   account?: { key: string; label?: string; org?: string };
   /** Set in fleet readings: the machine the reading came from. */
   machine?: string;
+  /** In a merged card: the machine the local token counts came from. */
+  localMachine?: string;
 }
 export interface UsageLimits {
   generatedAt: number;
@@ -124,7 +126,7 @@ export function groupUsage(agents: AgentUsage[]): UsageGroup[] {
     }
     g.all.push(a);
     if (a.machine && !g.machines.includes(a.machine)) g.machines.push(a.machine);
-    if (fresh(a) > fresh(g.a)) g.a = { ...a, local: g.a.local, models: g.a.models };
+    if (fresh(a) > fresh(g.a)) g.a = { ...a, local: g.a.local, models: g.a.models, localSource: g.a.localSource, localMachine: g.a.localMachine ?? g.a.machine };
   }
   return [...m.values()];
 }

@@ -44,25 +44,35 @@ window.addEventListener("unhandledrejection", (e) => {
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String((e.reason as Error)?.message || e.reason))) reloadForNewBuild();
 });
 
-// After an install the daemon serves a new build: reload once nobody is typing, so open windows never keep the old one.
+// After an install the daemon serves a new build: a hidden window reloads, a visible one offers a Reload button.
 function watchForNewBuild() {
   const own = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/index-"]')?.getAttribute("src");
   if (!own) return;
-  const typing = () => {
-    const a = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
-    return !!a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT") && !!a.value;
+  let stale = false;
+  const offer = () => {
+    if (document.getElementById("am-newbuild")) return;
+    const b = document.createElement("button");
+    b.id = "am-newbuild";
+    b.textContent = "New version · Reload";
+    b.onclick = () => location.reload();
+    document.body.appendChild(b);
   };
   const check = async () => {
-    try {
-      const html = await (await fetch("/", { cache: "no-store", credentials: "same-origin" })).text();
-      const live = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
-      if (live && !own.endsWith(live) && !typing()) location.reload();
-    } catch {
-      /* daemon restarting: try again later */
+    if (!stale) {
+      try {
+        const html = await (await fetch("/", { cache: "no-store", credentials: "same-origin" })).text();
+        const live = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+        stale = !!live && !own.endsWith(live);
+      } catch {
+        return; // daemon restarting: try again later
+      }
     }
+    if (!stale) return;
+    if (document.hidden) reloadForNewBuild();
+    else offer();
   };
   window.setInterval(() => void check(), 60_000);
-  window.addEventListener("focus", () => void check());
+  document.addEventListener("visibilitychange", () => void check());
 }
 if (location.pathname !== "/pair") watchForNewBuild();
 

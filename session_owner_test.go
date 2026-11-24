@@ -15,9 +15,11 @@ func TestResumePidsFindsOnlyTheAgentResumingTheSession(t *testing.T) {
 			"  11 /x/.local/bin/claude --resume " + id + "\n" +
 			"  12 /x/.local/bin/claude --resume 99999999-2222-3333-4444-555555555555\n" +
 			"  13 /bin/zsh -c claude --resume " + id + "\n" +
-			"  14 codex resume " + id + "\n"
+			"  14 codex resume " + id + "\n" +
+			"  15 /x/claude --resume " + id + " --fork-session\n" +
+			"  16 /x/claude --resume=" + id + "\n"
 	}
-	if got := resumePids(ToolClaude, id); len(got) != 1 || got[0] != 11 {
+	if got := resumePids(ToolClaude, id); len(got) != 2 || got[0] != 11 || got[1] != 16 {
 		t.Fatalf("claude: %v", got)
 	}
 	if got := resumePids(ToolCodex, id); len(got) != 1 || got[0] != 14 {
