@@ -141,7 +141,8 @@ struct WorkspaceView: View {
         let other = store.permissions.count
         if !cards.isEmpty || !waiting.isEmpty || other > 0 {
             FoldSection(ThreadGroup.need.label, key: "home.need", tint: Tok.need) {
-                Text("\(store.approvalsCount)") // the needs-you count, as on the Approvals tab
+                // The Approvals tab count, but never fewer than the cards shown (the server list can lag).
+                Text("\(max(store.approvalsCount, cards.count + waiting.count + other))")
             } content: {
                 ForEach(cards) { a in
                     QuickApprovalCard(a: a)
