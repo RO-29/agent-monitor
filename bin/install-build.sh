@@ -15,5 +15,6 @@ if [[ "${2:-}" == --app ]]; then
   rm -rf "$HOME/Applications/agent-monitor.app" && ditto "$SRC/agent-monitor.app" "$HOME/Applications/agent-monitor.app"
 fi
 launchctl kickstart -k "gui/$(id -u)/com.rohit.agent-monitor"
-sleep 3
+# The daemon loads every session before it listens: wait for it (up to 60 s) before the smoke test.
+for _ in $(seq 1 60); do curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:7777/api/health 2>/dev/null && break; sleep 1; done
 python3 "$LIVE/e2e/smoke.py" --no-agent
