@@ -132,8 +132,10 @@ export function groupUsage(agents: AgentUsage[]): UsageGroup[] {
 /** Every machine's usage when the fleet route exists, else this machine's alone; grouped by account. */
 async function fetchGroups(): Promise<{ groups: UsageGroup[]; machines: number }> {
   try {
-    const r = await mreq<{ machines: unknown[]; agents: AgentUsage[] }>("GET", "/api/fleet/usage");
-    const agents = (r.agents || []).map((a) => ({ ...a, windows: a.windows || [], local: a.local || [], localSource: a.localSource || "", source: a.source || "" }));
+    const r = await mreq<{ machines: { name: string; self?: boolean }[]; agents: AgentUsage[] }>("GET", "/api/fleet/usage");
+    const self = (r.machines || []).find((m) => m.self)?.name;
+    // This machine reads as "this Mac", whatever its name.
+    const agents = (r.agents || []).map((a) => ({ ...a, machine: self && a.machine === self ? "this Mac" : a.machine, windows: a.windows || [], local: a.local || [], localSource: a.localSource || "", source: a.source || "" }));
     return { groups: groupUsage(agents), machines: (r.machines || []).length || 1 };
   } catch (e) {
     if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 403)) throw e;

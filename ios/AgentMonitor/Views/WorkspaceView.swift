@@ -219,7 +219,7 @@ struct MachineFilterMenu: View {
             Picker("Machine", selection: $store.machineFilter) {
                 Text("All Machines").tag("")
                 ForEach(store.fleetMachines) { m in
-                    Text(m.online ? m.name : "\(m.name) (offline)").tag(m.name)
+                    Text(m.isSelf ? "Main Mac" : m.online ? m.name : "\(m.name) (offline)").tag(m.name)
                 }
             }
         } label: {

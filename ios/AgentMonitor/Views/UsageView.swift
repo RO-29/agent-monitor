@@ -38,7 +38,12 @@ struct UsageStrip: View {
                 if DebugRoute.sample { usage = Self.samples(); loaded = true; return }
                 #endif
                 if let f = try? await APIClient.shared.get("/api/fleet/usage", as: FleetUsage.self) {
-                    usage = f.agents ?? []
+                    let main = f.machines?.first { $0.isSelf }?.name
+                    usage = (f.agents ?? []).map { a in
+                        var a = a
+                        if a.machine != nil, a.machine == main { a.machine = "main Mac" }
+                        return a
+                    }
                     machines = max(f.machines?.count ?? 1, 1)
                 } else if let u = try? await APIClient.shared.usageLimits() {
                     usage = u.agents ?? []
