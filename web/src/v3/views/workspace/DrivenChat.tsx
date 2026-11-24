@@ -535,7 +535,13 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
         <UserShell key={b.id} it={b} />
       ))}
       {users.map((u0) => {
-        if (u0.by === "schedule") return <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>{u0.text}</div>;
+        if (u0.by === "schedule")
+          return (
+            <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>
+              <span className="wwake-t">{wakeTitle(u0.text || "")}</span>
+              {u0.repeat && <span className="wwake-n"> · {u0.repeat.n} runs since {new Date(u0.repeat.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, same answer</span>}
+            </div>
+          );
         const note = splitFileNote(u0.text || "");
         const u = note.files.length ? { ...u0, text: note.text, attachments: [...(u0.attachments || []), ...note.files] } : u0;
         return (
@@ -621,7 +627,37 @@ export function blocksOf(list: OItem[], runList: ORun[]): { key: string; run?: O
   }
   const runs = new Map(runList.map((r) => [r.id, r]));
   order.sort((a, b) => (runs.get(a)?.index ?? 1e9) - (runs.get(b)?.index ?? 1e9) || toMs(byRun.get(a)![0].startedAt) - toMs(byRun.get(b)![0].startedAt));
-  return order.map((k) => ({ key: k || "_", run: runs.get(k), items: byRun.get(k)! }));
+  return foldWakeRepeats(order.map((k) => ({ key: k || "_", run: runs.get(k), items: byRun.get(k)! })));
+}
+
+type Block = { key: string; run?: ORun; items: OItem[] };
+const wakeOf = (b: Block) => b.items.find((i) => i.kind === "user" && i.by === "schedule");
+const answerOf = (b: Block) => [...b.items].reverse().find((i) => i.kind === "agent")?.text?.trim() || "";
+
+// Back-to-back runs of one scheduled task with the same answer show as the newest run plus a count.
+function foldWakeRepeats(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  for (const b of blocks) {
+    const prev = out[out.length - 1];
+    const w = wakeOf(b), pw = prev && wakeOf(prev);
+    if (w && pw && b.run?.status !== "running" && w.text === pw.text && answerOf(b) && answerOf(b) === answerOf(prev)) {
+      const since = pw.repeat?.since ?? toMs(prev.run?.startedAt ?? pw.startedAt);
+      const n = (pw.repeat?.n ?? 1) + 1;
+      out[out.length - 1] = { ...b, items: b.items.map((i) => (i === w ? { ...i, repeat: { n, since } } : i)) };
+      continue;
+    }
+    out.push(b);
+  }
+  return out;
+}
+
+// "Scheduled task: X watch (long instructions…)" shows as "Scheduled task: X watch"; the tooltip keeps all of it.
+function wakeTitle(t: string): string {
+  const head = t.indexOf(": ");
+  const body = head > 0 ? t.slice(head + 2) : t;
+  const cut = body.search(/ \(|\. /);
+  const short = cut >= 8 ? body.slice(0, cut) : body;
+  return (head > 0 ? t.slice(0, head + 2) : "") + (short.length > 80 ? short.slice(0, 80) + "…" : short);
 }
 
 type KidState = "need" | "run" | "done" | "err" | "closed";

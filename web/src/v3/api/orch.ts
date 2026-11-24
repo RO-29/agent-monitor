@@ -127,6 +127,7 @@ export interface OItem {
   attachments?: OAttachment[]; // phase 7, on user items
   childId?: string; // phase 7, review items
   parentId?: string; // a tool call a Code Mode script made: the script item's id
+  repeat?: { n: number; since: number }; // set in the UI: this scheduled turn folds n identical earlier ones
   by?: "user" | "schedule"; // "user": a ! or slash command the user ran; "schedule": a turn a scheduled task started
   bg?: boolean; // a ! command moved to the background; output fills from its task file
 }
