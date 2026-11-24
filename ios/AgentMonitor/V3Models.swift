@@ -296,8 +296,53 @@ struct WItem: Codable, Identifiable, Hashable {
     var attachments: [OAttachment]?
     /// A tool call that a Code Mode script made: the script item's id.
     var parentId: String?
+    /// Set on the client: this scheduled turn stands for this many identical runs, the first at wakeSince.
+    var wakeRuns: Int?
+    var wakeSince: Int64?
 
     var failed: Bool { status == "failed" || (exitCode ?? 0) != 0 }
+}
+
+enum WakeFold {
+    /// Back-to-back runs of one scheduled task with the same answer show as the newest run plus a count.
+    static func fold(_ items: [WItem]) -> [WItem] {
+        var runs: [[WItem]] = []
+        for it in items {
+            if let last = runs.last?.last, last.runId == it.runId { runs[runs.count - 1].append(it) } else { runs.append([it]) }
+        }
+        var out: [[WItem]] = []
+        for r in runs {
+            if let prev = out.last, let w = wake(r), let pw = wake(prev), w.text == pw.text,
+               !r.contains(where: { $0.status == "started" }), let a = answer(r), a == answer(prev) {
+                var cur = r
+                if let i = cur.firstIndex(where: { $0.id == w.id }) {
+                    cur[i].wakeRuns = (pw.wakeRuns ?? 1) + 1
+                    cur[i].wakeSince = pw.wakeSince ?? pw.startedAt
+                }
+                out[out.count - 1] = cur
+            } else {
+                out.append(r)
+            }
+        }
+        return out.flatMap { $0 }
+    }
+
+    /// "Scheduled task: X watch (long instructions…)" reads as "Scheduled task: X watch".
+    static func title(_ t: String) -> String {
+        guard let head = t.range(of: ": ") else { return t }
+        let body = t[head.upperBound...]
+        var short = Substring(body)
+        for sep in [" (", ". "] {
+            if let r = short.range(of: sep), short.distance(from: short.startIndex, to: r.lowerBound) >= 8 { short = short[..<r.lowerBound] }
+        }
+        return String(t[..<head.upperBound]) + (short.count > 80 ? String(short.prefix(80)) + "…" : String(short))
+    }
+
+    private static func wake(_ r: [WItem]) -> WItem? { r.first { $0.kind == "user" && $0.by == "schedule" } }
+    private static func answer(_ r: [WItem]) -> String? {
+        let t = r.last { $0.kind == "agent" }?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return t.isEmpty ? nil : t
+    }
 }
 
 struct WRun: Codable, Identifiable, Hashable {

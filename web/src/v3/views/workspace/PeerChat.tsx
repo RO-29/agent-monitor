@@ -11,6 +11,7 @@ import { Composer } from "./Composer";
 import { ListShowBtn, TopReveal } from "./barToggles";
 import { TermQuestionCard, termQuestionShown, useTermQuestion } from "./TermQuestion";
 import { useWatchedFeed } from "./watched";
+import { PeerSessionNeeds } from "../peers";
 import type { WRow } from "./rows";
 
 const enc = encodeURIComponent;
@@ -94,6 +95,7 @@ export function PeerChat({ row, onBack }: { row: WRow; onBack?: () => void }) {
         {blocks.map((b) => (
           <RunBlock key={b.key} run={b.run} items={b.items} now={now} />
         ))}
+        <PeerSessionNeeds peer={machine} ids={[sid, t.id]} act={act} />
         {termQuestionShown(tq.q) &&
           (act ? (
             <Boundary what="This question">

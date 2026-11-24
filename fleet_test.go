@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFleetThreadsTagsPeerRowsAndKeepsLastGood(t *testing.T) {
@@ -93,5 +94,21 @@ func TestPeerRoutesForTheChatScreen(t *testing.T) {
 		if peerRouteAllowed(c.m, c.r) != c.ok {
 			t.Errorf("%s %s: want %v", c.m, c.r, c.ok)
 		}
+	}
+}
+
+func TestFleetKeptServesOnlyAFreshAnswer(t *testing.T) {
+	fleetCache.Lock()
+	fleetCache.m["kept-a v3/threads"] = fleetCacheEntry{at: time.Now(), body: json.RawMessage(`{"threads":[]}`)}
+	fleetCache.m["kept-b v3/threads"] = fleetCacheEntry{at: time.Now().Add(-2 * fleetKeep), body: json.RawMessage(`{}`)}
+	fleetCache.Unlock()
+	if _, ok := fleetKept("kept-a", "v3/threads"); !ok {
+		t.Fatal("a fresh answer must be kept")
+	}
+	if _, ok := fleetKept("kept-b", "v3/threads"); ok {
+		t.Fatal("an old answer must not be served")
+	}
+	if _, ok := fleetKept("kept-c", "v3/threads"); ok {
+		t.Fatal("no answer, nothing to serve")
 	}
 }

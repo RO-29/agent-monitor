@@ -76,7 +76,7 @@ struct ThreadChatView: View {
     }
     /// Top rows and the tool calls of each Code Mode script, keyed by the script item's id.
     private var scriptTree: (top: [WItem], kids: [String: [WItem]]) {
-        let all = sorted
+        let all = WakeFold.fold(sorted)
         let ids = Set(all.map(\.id))
         var top: [WItem] = []
         var kids: [String: [WItem]] = [:]
@@ -729,7 +729,7 @@ struct ChatItemView: View {
     var body: some View {
         switch item.kind {
         case "user" where item.by == "schedule":
-            Text(item.text)
+            Text(WakeFold.title(item.text) + (item.wakeRuns.map { n in " · \(n) runs since \(Date(timeIntervalSince1970: Double(item.wakeSince ?? item.startedAt) / 1000).formatted(date: .omitted, time: .shortened)), same answer" } ?? ""))
                 .font(.caption).foregroundStyle(Tok.muted).lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
         case "user":

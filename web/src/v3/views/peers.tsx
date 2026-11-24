@@ -12,6 +12,8 @@ export interface PeerNeed {
   title?: string;
   message?: string;
   agent?: string;
+  sessionId?: string;
+  threadId?: string;
   approval?: { approvalId?: string; id?: string; tool?: string; summary?: string };
 }
 export interface PeerSession {
@@ -115,6 +117,49 @@ export function PeerNeedsBox({ feed, compact }: { feed: Feed; compact?: boolean 
             <Link className="btn sm ghost" to={`/m/${encodeURIComponent(peer.name)}`} title={peer.level === "view" ? `This Mac has view access on ${peer.name}: answer it there` : undefined}>
               Open
             </Link>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** This session's open requests on a peer, polled every 4 s, with Allow and Deny when the grant allows. */
+export function PeerSessionNeeds({ peer, ids, act }: { peer: string; ids: string[]; act: boolean }) {
+  const [items, setItems] = useState<PeerNeed[]>([]);
+  const [gone, setGone] = useState<Record<string, true>>({});
+  const key = ids.join(",");
+  useEffect(() => {
+    let live = true;
+    const raw = (id: string) => id.slice(id.lastIndexOf(":") + 1); // "claude:<id>" and "<id>" name one session
+    const want = new Set(key.split(",").filter(Boolean).map(raw));
+    const load = () =>
+      machinesApi
+        .peer<{ items: PeerNeed[] }>(peer, "GET", "needs-you")
+        .then((r) => live && setItems((r.items || []).filter((n) => (!!n.sessionId && want.has(raw(n.sessionId))) || (!!n.threadId && want.has(raw(n.threadId))))))
+        .catch(() => {});
+    void load();
+    const t = window.setInterval(load, 4000);
+    return () => ((live = false), window.clearInterval(t));
+  }, [peer, key]);
+  const shown = items.filter((n) => !gone[n.key]);
+  if (!shown.length) return null;
+  const decide = (n: PeerNeed, b: "allow" | "deny") => void decidePeer(peer, n, b).then((ok) => ok && setGone((g) => ({ ...g, [n.key]: true })));
+  return (
+    <section className="peer-needs compact" aria-label={`Requests on ${peer}`}>
+      {shown.map((n) => (
+        <div key={n.key} className="peer-need">
+          <div style={{ minWidth: 0 }}>
+            <b>{n.title || n.agent || n.kind}</b>
+            <div className="muted sm">{n.approval?.summary || n.message || n.kind}</div>
+          </div>
+          {n.kind === "approval" && act ? (
+            <div className="btns">
+              <button className="btn sm allow" onClick={() => decide(n, "allow")}>Allow</button>
+              <button className="btn sm deny" onClick={() => decide(n, "deny")}>Deny</button>
+            </div>
+          ) : (
+            <span className="muted sm">Answer on {peer}</span>
           )}
         </div>
       ))}

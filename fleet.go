@@ -159,6 +159,17 @@ func fleetFetch(ps []Peer, route string) map[string]json.RawMessage {
 	return out
 }
 
+// fleetKept is a peer's last good answer for route while it is younger than fleetKeep.
+func fleetKept(name, route string) (json.RawMessage, bool) {
+	fleetCache.Lock()
+	defer fleetCache.Unlock()
+	e, ok := fleetCache.m[name+" "+route]
+	if !ok || time.Since(e.at) >= fleetKeep {
+		return nil, false
+	}
+	return e.body, true
+}
+
 func fleetPeersSnapshot() []Peer {
 	peerStore.Lock()
 	defer peerStore.Unlock()
@@ -220,6 +231,14 @@ func fleetPeerItems(route, key string) (machines []fleetPeer, items []json.RawMe
 		}
 	}
 	got := fleetFetch(online, route)
+	// A missed health probe must not empty the list: show the last good answer for fleetKept.
+	for _, m := range machines[1:] {
+		if m.Status != "online" && m.Status != "revoked" {
+			if b, ok := fleetKept(m.Name, route); ok {
+				got[m.Name] = b
+			}
+		}
+	}
 	names := make([]string, 0, len(got))
 	for n := range got {
 		names = append(names, n)

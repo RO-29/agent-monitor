@@ -303,7 +303,8 @@ export function useWatchedFeed(sessionId: string, threadId: string, running: boo
         },
         (e: Error) => {
           if (!alive) return;
-          if (isMissing(e)) return setMode("legacy");
+          // The legacy transcript read is local only, so a peer 404 must show as an error, not as a blank feed.
+          if (isMissing(e)) return machine ? setError(`${machine} has no transcript for this session, or it runs an older agent-monitor (${e.message})`) : setMode("legacy");
           setError(/no such file/i.test(e.message) ? "waiting" : e.message);
           retry = window.setTimeout(probe, Math.min(30_000, 2000 * 1.5 ** tries++));
         },
