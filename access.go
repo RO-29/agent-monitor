@@ -64,6 +64,7 @@ var accessRules = []accessRule{
 	{"", "/events/", "", levelLocal},
 	{"", "/api/approvals/hook/", "", levelLocal},
 	{"", "/api/pane/announce$", "", levelLocal},
+	{"GET", "/api/session/owner/", "", levelLocal},
 	{"POST", "/api/hosts$", "", levelLocal},
 	{"DELETE", "/api/hosts/", "", levelLocal},
 	{"", "/api/permission/request$", "", levelLocal},

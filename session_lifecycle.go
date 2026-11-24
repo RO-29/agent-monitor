@@ -123,11 +123,22 @@ func resumeSession(id, prompt string, attachments []string, origin ...string) (*
 	if pid := agentPidOf(id); (pid > 0 && pidAlive(pid)) || hostForSession(id) != nil {
 		return nil, http.StatusConflict, errors.New("this session still runs in a terminal; open it there or end it first")
 	}
+	if o := liveSessionOwner(id); o != nil {
+		where := "another terminal"
+		if o.Tmux != "" {
+			where = "tmux session " + o.Tmux
+		}
+		return nil, http.StatusConflict, errors.New("this session already runs in " + where + "; open it there")
+	}
 	if st, err := os.Stat(s.Cwd); s.Cwd == "" || err != nil || !st.IsDir() {
 		return nil, http.StatusConflict, errors.New("the session's folder no longer exists")
 	}
 	codeMode := s.Tool == ToolClaude && transcriptCodeMode(s.TranscriptPath)
-	started, err := startTerminal(terminalStart{Agent: string(s.Tool), Cwd: s.Cwd, Prompt: prompt, Attachments: attachments, Resume: s.SessionID, CodeMode: codeMode, Origin: firstOf(origin...)})
+	perm := ""
+	if s.Tool == ToolClaude {
+		perm = transcriptPermissionMode(s.TranscriptPath)
+	}
+	started, err := startTerminal(terminalStart{Agent: string(s.Tool), Cwd: s.Cwd, Prompt: prompt, Attachments: attachments, Resume: s.SessionID, PermissionMode: perm, CodeMode: codeMode, Origin: firstOf(origin...)})
 	if err != nil {
 		var bad errTerminalBadRequest
 		if errors.As(err, &bad) {

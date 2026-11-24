@@ -223,7 +223,7 @@ struct MachineFilterMenu: View {
                 }
             }
         } label: {
-            Image(systemName: store.machineFilter.isEmpty ? "desktopcomputer" : "desktopcomputer.trianglebadge.exclamationmark")
+            Image(systemName: "desktopcomputer")
                 .symbolVariant(store.machineFilter.isEmpty ? .none : .fill)
         }
         .accessibilityLabel(store.machineFilter.isEmpty ? "All machines" : "Only \(store.machineFilter)")
@@ -319,13 +319,12 @@ struct ThreadRow: View {
                 }
                 HStack(spacing: 6) {
                     AgentGlyph(agent: t.agent, size: 13)
-                    if store.manyMachines {
-                        let m = t.machine ?? store.selfMachine
+                    if let m = t.machine {
                         Text(m)
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 5).padding(.vertical, 1)
-                            .foregroundStyle(t.machine != nil ? Tok.accent : Tok.fg2)
-                            .background(t.machine != nil ? Tok.accentSoft : Tok.panel, in: RoundedRectangle(cornerRadius: 4))
+                            .foregroundStyle(Tok.accent)
+                            .background(Tok.accentSoft, in: RoundedRectangle(cornerRadius: 4))
                             .accessibilityLabel("on \(m)")
                     }
                     if group == .working || group == .need, subtitle != t.repoName {

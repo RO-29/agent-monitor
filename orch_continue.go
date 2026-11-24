@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -70,6 +71,31 @@ func transcriptCodeMode(path string) bool {
 		}
 	}
 	return false
+}
+
+var transcriptPermPattern = regexp.MustCompile(`"permissionMode":"(acceptEdits|plan|auto|default|bypassPermissions)"`)
+
+// transcriptPermissionMode is the last permission mode Claude recorded, for a resume flag; "" when none applies.
+func transcriptPermissionMode(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	const tail = 2 << 20
+	if st, err := f.Stat(); err == nil && st.Size() > tail {
+		_, _ = f.Seek(st.Size()-tail, io.SeekStart)
+	}
+	b, _ := io.ReadAll(io.LimitReader(f, tail))
+	all := transcriptPermPattern.FindAllSubmatch(b, -1)
+	if len(all) == 0 {
+		return ""
+	}
+	switch m := string(all[len(all)-1][1]); m {
+	case "acceptEdits", "plan", "auto":
+		return m
+	}
+	return ""
 }
 
 // sessionLive is true when a CLI process still owns the session: a live pid, a pane, or a recent active state.

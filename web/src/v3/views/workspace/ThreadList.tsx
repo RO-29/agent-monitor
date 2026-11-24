@@ -12,7 +12,7 @@ import { agentKey } from "../../components/AgentIcon";
 import { useV3 } from "../../live";
 import { ChipRow, groupHits, hitHref, markedTerms, SessionHitRow, typedChips, useTitleOf, useTranscriptSearch, withoutChips } from "./search";
 import { UsageMini } from "../../components/Usage";
-import { useFleet, useMachineLabels } from "../../api/fleet";
+import { useFleet } from "../../api/fleet";
 import { FoldHead, useFold } from "../../components/fold";
 
 const HOUR = 3600_000;
@@ -87,7 +87,6 @@ export function TermIcon() {
 }
 
 function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: boolean; onMenu: (r: WRow, x: number, y: number, anchor?: HTMLElement) => void }) {
-  const ml = useMachineLabels();
   const note = noteOf(r);
   const dc = dotCls(r);
   const menuBtn = r.driven ? (
@@ -123,7 +122,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
             {r.mode === "watched" && <TermIcon />}
             {placeText(r) && <span className={`wplace p-${(r.watched?.session?.entrypoint || (r.driven ? "thread" : "")).replace(/[^a-z-]/g, "")}`}>{placeText(r)}</span>}
             {r.pinned && <PinIcon />}
-            {ml.many && <span className={`wmach-r ${r.machine ? "peer" : ""}`} title={r.machine ? `Runs on ${r.machine}` : `Runs on this machine (${ml.self})`}>{r.machine || ml.self}</span>}
+            {r.machine && <span className="wmach-r peer" title={`Runs on ${r.machine}`}>{r.machine}</span>}
             <span className="trunc">{r.repo || "no project"}</span>
             {r.branch && !note && <span className="trunc br">{r.branch}</span>}
             {note && <span className={`nt ${note.cls}`}>{note.text}</span>}
@@ -358,8 +357,8 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
         />
         {fleet.machines.length > 1 && (
           <div className="wmachs" role="radiogroup" aria-label="Machine">
-            {[{ name: "", label: "All machines" }, ...fleet.machines.map((m) => ({ name: m.name, label: m.name, off: m.status !== "online" }))].map((m) => (
-              <button key={m.name || "all"} role="radio" aria-checked={mFilter === m.name} className={`wmach-f ${mFilter === m.name ? "on" : ""} ${"off" in m && m.off ? "off" : ""}`} onClick={() => pickM(m.name)} title={"off" in m && m.off ? `${m.name} does not answer` : undefined}>
+            {[{ name: "", label: "All machines" }, ...fleet.machines.map((m) => ({ name: m.name, label: m.self ? "This Mac" : m.name, off: m.status !== "online" }))].map((m) => (
+              <button key={m.name || "all"} role="radio" aria-checked={mFilter === m.name} className={`wmach-f ${mFilter === m.name ? "on" : ""} ${"off" in m && m.off ? "off" : ""}`} onClick={() => pickM(m.name)} title={"off" in m && m.off ? `${m.name} does not answer` : m.name || undefined}>
                 {m.label}
               </button>
             ))}

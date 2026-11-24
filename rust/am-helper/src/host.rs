@@ -84,6 +84,9 @@ pub fn run_main(args: &[String]) -> i32 {
         announce_pane(&tool_from_agent(agent), &pane);
     }
     if is_terminal(0) && is_terminal(1) {
+        if let Some(code) = open_running_copy(agent, &args[1..]) {
+            return code;
+        }
         return run_host(args, &pane);
     }
     let bin = match util::look_path(agent) {
@@ -96,6 +99,54 @@ pub fn run_main(args: &[String]) -> i32 {
     let e = Command::new(&bin).arg0(agent).args(&args[1..]).env_clear().envs(child_env()).exec();
     eprintln!("agent-monitor run: exec failed: {}", util::io_err_text(&e));
     1
+}
+
+/// The session id in `claude --resume <id>` / `-r <id>` or `codex resume <id>`.
+fn resume_target(agent: &str, rest: &[String]) -> Option<String> {
+    let base = std::path::Path::new(agent).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tool = tool_from_agent(&base);
+    if tool != "claude" && tool != "codex" {
+        return None;
+    }
+    let id = rest.windows(2).find(|w| w[0] == "--resume" || w[0] == "-r" || (tool == "codex" && w[0] == "resume")).map(|w| w[1].clone())?;
+    let ok = id.len() == 36 && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+    if ok {
+        Some(format!("{}:{}", tool, id))
+    } else {
+        None
+    }
+}
+
+/// A resume of a session that already runs opens that copy instead, so one session never has two writers.
+/// AM_ALLOW_SECOND_COPY=1 skips the check.
+fn open_running_copy(agent: &str, rest: &[String]) -> Option<i32> {
+    if getenv("AM_ALLOW_SECOND_COPY") == "1" {
+        return None;
+    }
+    let id = resume_target(agent, rest)?;
+    let r = crate::http::request("GET", &(daemon_url() + "/api/session/owner/" + &id), None, Some(Duration::from_secs(2))).ok()?;
+    let j = crate::http::decode(r).ok()?;
+    if !j.fbool("live") {
+        return None;
+    }
+    let o = j.get("owner")?;
+    let (pid, sess) = (o.fint("pid"), o.fstr("tmux"));
+    let here = if getenv("TMUX").is_empty() {
+        String::new()
+    } else {
+        Command::new("tmux").args(["display-message", "-p", "#S"]).output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default()
+    };
+    if sess.is_empty() {
+        eprintln!("agent-monitor: this session already runs (pid {}). Exit that copy first, or set AM_ALLOW_SECOND_COPY=1.", pid);
+        return Some(1);
+    }
+    if !here.is_empty() && here != sess {
+        eprintln!("agent-monitor: this session already runs in tmux session {}. Opening it.", sess);
+        let ok = Command::new("tmux").args(["switch-client", "-t", &format!("={}", sess)]).status().map(|s| s.success()).unwrap_or(false);
+        return Some(if ok { 0 } else { 1 });
+    }
+    eprintln!("agent-monitor: this session already runs in tmux session {}. Open it with: tmux attach -t {}", sess, sess);
+    Some(1)
 }
 
 struct Ring {
@@ -848,6 +899,19 @@ fn read_agent_pid(h: &Arc<Host>, r: i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resume_target_reads_the_session_id() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let id = "f7c3e243-d5fe-4cdc-806d-be083d3ff14d";
+        assert_eq!(resume_target("claude", &a(&["--resume", id])), Some(format!("claude:{}", id)));
+        assert_eq!(resume_target("claude", &a(&["-r", id, "--model", "x"])), Some(format!("claude:{}", id)));
+        assert_eq!(resume_target("codex", &a(&["resume", id])), Some(format!("codex:{}", id)));
+        assert_eq!(resume_target("claude", &a(&["resume", id])), None);
+        assert_eq!(resume_target("claude", &a(&["--resume"])), None);
+        assert_eq!(resume_target("claude", &a(&["--resume", "not-an-id"])), None);
+        assert_eq!(resume_target("cursor-agent", &a(&["--resume", id])), None);
+    }
 
     #[test]
     fn key_names() {

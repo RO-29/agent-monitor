@@ -151,6 +151,16 @@ func (d *SessionDB) Count() int {
 
 func (d *SessionDB) Close() error { return d.db.Close() }
 
+// dropCursorProcessRows deletes rows the process scan made; a live run comes back within one scan.
+// Older rows kept whole command lines, some with a Cursor API key in them.
+func (d *SessionDB) dropCursorProcessRows() {
+	if r, err := d.db.Exec(`DELETE FROM sessions WHERE tool = ? AND session_id LIKE 'pid-%'`, string(ToolCursorAgent)); err == nil {
+		if n, _ := r.RowsAffected(); n > 0 {
+			log.Printf("sessions.db: dropped %d cursor-agent process row(s)", n)
+		}
+	}
+}
+
 // importSnapshotIfEmpty seeds the DB from the newest sessions-snapshot-*.json
 // (written by hand before the sqlite migration) the first time the DB is empty,
 // so the migration restart doesn't lose the sessions that were only in memory.
@@ -184,6 +194,7 @@ func (d *SessionDB) importSnapshotIfEmpty() {
 // the store to SQLite every `every` and returns a flush func for shutdown.
 func StartSessionPersistence(s *Store, db *SessionDB, every time.Duration) (flush func()) {
 	db.importSnapshotIfEmpty()
+	db.dropCursorProcessRows()
 	if hist, err := db.LoadAll(); err == nil && len(hist) > 0 {
 		added := s.LoadHistorical(hist)
 		log.Printf("sessions.db: restored %d historical session(s) (%d already live)", added, len(hist)-added)

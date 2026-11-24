@@ -178,6 +178,7 @@ func cachedTermQuestion(s *Session) *TermQuestion {
 func registerNeedsYouRoutes(mux *http.ServeMux) {
 	registerPromptAnswerRoute(mux)
 	registerSessionLifecycleRoutes(mux)
+	registerSessionOwnerRoutes(mux)
 	registerPeerRoutes(mux)
 	registerFleetRoutes(mux)
 	mux.HandleFunc("GET /api/needs-you", func(w http.ResponseWriter, r *http.Request) {
