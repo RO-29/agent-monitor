@@ -539,7 +539,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
           return (
             <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>
               <span className="wwake-t">{wakeTitle(u0.text || "")}</span>
-              {u0.repeat && <span className="wwake-n"> · {u0.repeat.n} runs since {new Date(u0.repeat.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, same answer</span>}
+              {u0.wakeRuns && <span className="wwake-n"> · {u0.wakeRuns.n} runs since {new Date(u0.wakeRuns.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, same answer</span>}
             </div>
           );
         const note = splitFileNote(u0.text || "");
@@ -641,9 +641,9 @@ function foldWakeRepeats(blocks: Block[]): Block[] {
     const prev = out[out.length - 1];
     const w = wakeOf(b), pw = prev && wakeOf(prev);
     if (w && pw && b.run?.status !== "running" && w.text === pw.text && answerOf(b) && answerOf(b) === answerOf(prev)) {
-      const since = pw.repeat?.since ?? toMs(prev.run?.startedAt ?? pw.startedAt);
-      const n = (pw.repeat?.n ?? 1) + 1;
-      out[out.length - 1] = { ...b, items: b.items.map((i) => (i === w ? { ...i, repeat: { n, since } } : i)) };
+      const since = pw.wakeRuns?.since ?? toMs(prev.run?.startedAt ?? pw.startedAt);
+      const n = (pw.wakeRuns?.n ?? 1) + 1;
+      out[out.length - 1] = { ...b, items: b.items.map((i) => (i === w ? { ...i, wakeRuns: { n, since } } : i)) };
       continue;
     }
     out.push(b);
