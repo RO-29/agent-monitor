@@ -36,6 +36,9 @@ func TestUsageAccountCodex(t *testing.T) {
 	if k == nil || k.Key != newUsageAccount("acc-9", "", "").Key || strings.Contains(string(raw), "agentMonitorAccount") == false {
 		t.Fatalf("accountId must win: %+v", k)
 	}
+	if codexAccountOf(withCodexAccount(json.RawMessage(`{"rateLimits":{}}`), json.RawMessage(`{"account":{"email":"x@example.com"}}`))) != nil {
+		t.Fatal("an email alone must give no account key")
+	}
 	if codexAccountOf(json.RawMessage(`{"rateLimits":{}}`)) != nil {
 		t.Fatal("no id must give no account")
 	}
