@@ -860,6 +860,7 @@ type wClaudeLine struct {
 	Cwd              string          `json:"cwd"`
 	Content          string          `json:"content"`
 	IsMeta           bool            `json:"isMeta"`
+	WakeupSource     string          `json:"wakeupSource"`
 	IsSidechain      bool            `json:"isSidechain"`
 	IsCompactSummary bool            `json:"isCompactSummary"`
 	Level            string          `json:"level"`
@@ -963,6 +964,13 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 		return
 	case "user", "assistant":
 	default:
+		return
+	}
+	// A scheduled task or wakeup prompts Claude by itself: it opens its own turn, so its reply never hides the one before.
+	if j.Type == "user" && j.IsMeta && j.WakeupSource != "" && j.Message != nil {
+		text, _ := claudeUserText(j.Message.Content)
+		p.startTurn(off, ts, wakeupLabel(j.WakeupSource, text))
+		p.cur.user.it.By = "schedule"
 		return
 	}
 	if j.Type == "user" && j.Message != nil && !j.IsCompactSummary && (p.cur != nil && p.cur.cmd || bytes.Contains(b, bLocalCmd) || bytes.Contains(b, bTaskNote)) &&
@@ -1587,4 +1595,20 @@ func (p *wParser) claudeBang(off, ts int64, content json.RawMessage) bool {
 		p.endRun(off, ts, "completed") // reopened if the agent answers
 	}
 	return true
+}
+
+// wakeupLabel is the one line a turn the agent started by itself shows: its kind and the prompt's first line.
+func wakeupLabel(source, prompt string) string {
+	kind := "Scheduled task"
+	if !strings.Contains(source, "schedule") {
+		kind = "Wakeup"
+	}
+	line, _, _ := strings.Cut(strings.TrimSpace(prompt), "\n")
+	if r := []rune(line); len(r) > 120 {
+		line = string(r[:120]) + "…"
+	}
+	if line == "" {
+		return kind
+	}
+	return kind + ": " + line
 }

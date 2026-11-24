@@ -535,6 +535,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
         <UserShell key={b.id} it={b} />
       ))}
       {users.map((u0) => {
+        if (u0.by === "schedule") return <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>{u0.text}</div>;
         const note = splitFileNote(u0.text || "");
         const u = note.files.length ? { ...u0, text: note.text, attachments: [...(u0.attachments || []), ...note.files] } : u0;
         return (

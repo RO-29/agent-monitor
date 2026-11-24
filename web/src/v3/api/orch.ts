@@ -127,7 +127,7 @@ export interface OItem {
   attachments?: OAttachment[]; // phase 7, on user items
   childId?: string; // phase 7, review items
   parentId?: string; // a tool call a Code Mode script made: the script item's id
-  by?: "user"; // a ! shell command or a slash command the user ran in the agent CLI
+  by?: "user" | "schedule"; // "user": a ! or slash command the user ran; "schedule": a turn a scheduled task started
   bg?: boolean; // a ! command moved to the background; output fills from its task file
 }
 export interface OAttachment {

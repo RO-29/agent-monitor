@@ -728,6 +728,10 @@ struct ChatItemView: View {
 
     var body: some View {
         switch item.kind {
+        case "user" where item.by == "schedule":
+            Text(item.text)
+                .font(.caption).foregroundStyle(Tok.muted).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
         case "user":
             let note = FileNote.split(item.text)
             let att = (item.attachments ?? []) + note.files
