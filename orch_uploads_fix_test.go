@@ -72,8 +72,9 @@ func TestUploadMarkupInTextFiles(t *testing.T) {
 		{"blob", "", "<div>x</div>"},
 		{"pic.png", "image/png", "<!-- x --> text"},
 	} {
-		if _, err := e.m.SaveUploadTyped("new", c.name, c.ctype, strings.NewReader(c.body)); err == nil {
-			t.Fatalf("%s accepted", c.name)
+		img, err := e.m.SaveUploadTyped("new", c.name, c.ctype, strings.NewReader(c.body))
+		if err != nil || img.Mime != "application/octet-stream" || !strings.HasSuffix(img.Path, ".bin") {
+			t.Fatalf("%s must be kept as an inert download: %v %+v", c.name, err, img)
 		}
 	}
 }
