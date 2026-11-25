@@ -19,7 +19,7 @@ type turnWatchState struct {
 var turnWatch = struct {
 	mu      sync.Mutex
 	seen    map[string]*turnWatchState
-	prompts map[string]bool
+	prompts map[string]string // key -> prompt fingerprint: one session key covers many prompts
 	primed  bool
 }{seen: map[string]*turnWatchState{}}
 
@@ -128,14 +128,19 @@ func endingQuestion(answer string) string {
 func promptNotifyTick(items []NeedsYouItem) {
 	turnWatch.mu.Lock()
 	defer turnWatch.mu.Unlock()
-	now := map[string]bool{}
+	now := map[string]string{}
 	for _, it := range items {
 		if it.Kind != "prompt" && it.Kind != "question" {
 			continue
 		}
-		now[it.Key] = true
-		if !turnWatch.primed || turnWatch.prompts[it.Key] {
+		fp := it.PromptKey
+		now[it.Key] = fp
+		old, had := turnWatch.prompts[it.Key]
+		if !turnWatch.primed || had && (old == fp || fp == "") {
 			continue
+		}
+		if had {
+			turnNotifyResolve(it.Key) // prompt A closed and prompt B opened between two ticks
 		}
 		title := firstOf(it.Title, "Agent")
 		body, head := it.Message, title+" needs you"
@@ -150,7 +155,7 @@ func promptNotifyTick(items []NeedsYouItem) {
 		turnNotifyEmit(notifyEvent{Kind: "needs-you", ThreadID: it.SessionID, Title: head, Body: clipString(body, 300), Keys: []string{it.Key}})
 	}
 	for k := range turnWatch.prompts {
-		if !now[k] {
+		if _, ok := now[k]; !ok {
 			turnNotifyResolve(k)
 		}
 	}

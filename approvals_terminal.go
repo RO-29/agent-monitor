@@ -235,6 +235,9 @@ func (s *ApprovalStore) checkTerminal(id string) bool {
 	var seen bool
 	s.updateWatch(id, func(w *termWatch) {
 		w.lost = 0
+		if covered {
+			w.gone = 0 // two one-tick flickers apart are not "gone for two checks"
+		}
 		if covered && w.seen {
 			w.covered++
 		} else {

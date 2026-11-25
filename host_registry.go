@@ -409,8 +409,19 @@ func targetHost(target string) (*HostInfo, bool, error) {
 	return h, true, nil
 }
 
+// termWrites holds one lock per terminal: a message typed in parts must not interleave with other keys.
+var termWrites sync.Map
+
+func termWriteLock(target string) func() {
+	m, _ := termWrites.LoadOrStore(target, &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
 // targetText types text into a target ("host:<id>" or a tmux pane id), then Enter when asked.
 func targetText(target, text string, enter bool) error {
+	defer termWriteLock(target)()
 	if h, isHost, err := targetHost(target); isHost {
 		if err != nil {
 			return err
@@ -421,6 +432,7 @@ func targetText(target, text string, enter bool) error {
 }
 
 func targetKeys(target string, keys []string) error {
+	defer termWriteLock(target)()
 	if h, isHost, err := targetHost(target); isHost {
 		if err != nil {
 			return err

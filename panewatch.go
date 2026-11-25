@@ -91,6 +91,10 @@ func applyPaneScreen(s *Store, sess *Session, content string) {
 	atPrompt := panePromptOpen(content)
 	switch {
 	case atPrompt && sess.State != StateAwaitingPermission && parsedPromptOpen(content):
+		paneSeenPrompt(sess.ID, promptKey(content))
+		s.SetState(sess.Tool, sess.SessionID, StateAwaitingPermission, promptSummary(lastLines(content, 24)))
+	case atPrompt && sess.State == StateAwaitingPermission && parsedPromptOpen(content) && paneSeenPrompt(sess.ID, promptKey(content)):
+		// A different prompt replaced the one shown: its card must not keep the old question.
 		s.SetState(sess.Tool, sess.SessionID, StateAwaitingPermission, promptSummary(lastLines(content, 24)))
 	case !atPrompt && sess.State == StateAwaitingPermission:
 		next := StateRunning // the prompt was answered
@@ -99,6 +103,23 @@ func applyPaneScreen(s *Store, sess *Session, content string) {
 		}
 		s.SetState(sess.Tool, sess.SessionID, next, "")
 	}
+}
+
+// paneKeys is the last prompt fingerprint seen per session; paneSeenPrompt reports a change from a known one.
+var paneKeys = struct {
+	sync.Mutex
+	m map[string]string
+}{m: map[string]string{}}
+
+func paneSeenPrompt(id, key string) bool {
+	if key == "" {
+		return false
+	}
+	paneKeys.Lock()
+	defer paneKeys.Unlock()
+	old, had := paneKeys.m[id]
+	paneKeys.m[id] = key
+	return had && old != key
 }
 
 // ended holds sessions whose SessionEnd hook fired; a prompt shown while they exit must not mark them running again.

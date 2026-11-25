@@ -22,7 +22,8 @@ var iosRenewGap = 30 * time.Minute
 
 var iosRenewState struct {
 	sync.Mutex
-	last time.Time
+	last   time.Time
+	asking bool // the request is on its way to the peers
 }
 
 var iosKick = func() error {
@@ -54,6 +55,10 @@ func iosRenew(expires int64, now time.Time, via bool) map[string]any {
 		return map[string]any{"ok": false, "error": "expires is more than 8 days ahead"}
 	}
 	iosRenewState.Lock()
+	if iosRenewState.asking {
+		iosRenewState.Unlock()
+		return map[string]any{"ok": false, "error": "a renewal request is still on its way to the other Macs; try again in a minute"}
+	}
 	if !iosRenewState.last.IsZero() && now.Sub(iosRenewState.last) < iosRenewGap {
 		iosRenewState.Unlock()
 		return map[string]any{"ok": true, "started": false}
@@ -71,10 +76,15 @@ func iosRenew(expires int64, now time.Time, via bool) map[string]any {
 		return map[string]any{"ok": true, "started": true}
 	}
 	_ = os.Remove(flag)
+	iosRenewState.asking = !via
 	iosRenewState.Unlock()
 	// The phone talks to this Mac; the build job may run on a peer. A forwarded request goes no further.
 	if !via {
-		if name, started, ok := iosRenewPeers(expires); ok {
+		name, started, ok := iosRenewPeers(expires)
+		iosRenewState.Lock()
+		iosRenewState.asking = false
+		iosRenewState.Unlock()
+		if ok {
 			return map[string]any{"ok": true, "started": started, "peer": name}
 		}
 	}

@@ -95,6 +95,8 @@ func (m *OrchManager) hunkRoutes(mux *http.ServeMux) {
 			orchWriteErr(w, orchConflict("not a git repository"))
 			return
 		}
+		unlock := m.git.lockRepo(root) // no checkpoint or commit reads the file between the check and the apply
+		defer unlock()
 		if err := revertHunk(root, in.Path, in.Hunk, in.Hash); err != nil {
 			gitWriteErr(w, err)
 			return
