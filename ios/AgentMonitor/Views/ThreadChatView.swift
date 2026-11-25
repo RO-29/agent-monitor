@@ -330,7 +330,17 @@ struct ThreadChatView: View {
         }.map(\.id)
     }
 
-    private func jump(_ proxy: ScrollViewProxy) {
+    fileprivate var lastLen: Int { sorted.last.map { $0.text.count + ($0.output?.count ?? 0) } ?? 0 }
+
+    fileprivate func onFindText(_ proxy: ScrollViewProxy) { findAt = max(findHits.count - 1, 0); jump(proxy) }
+    fileprivate func clampFind(_ n: Int) { if findAt >= n { findAt = max(n - 1, 0) } }
+    fileprivate func follow(_ proxy: ScrollViewProxy) {
+        if atBottom || Date().timeIntervalSince(bottomLeftAt) < 0.5 { proxy.scrollTo("bottom", anchor: .bottom) }
+    }
+    fileprivate var findState: (on: Bool, text: String, at: Int, hits: Int) { (finding, findText, findAt, findHits.count) }
+    fileprivate var findBarView: some View { findBar }
+
+    fileprivate func jump(_ proxy: ScrollViewProxy) {
         guard findHits.indices.contains(findAt) else { return }
         withAnimation { proxy.scrollTo(findHits[findAt], anchor: .center) }
     }
@@ -521,6 +531,7 @@ struct ThreadChatView: View {
                 .padding(.vertical, 16)
             }
             .defaultScrollAnchor(.bottom)
+            .modifier(FindFollow(view: self, proxy: proxy))
             .scrollDismissesKeyboard(.interactively)
             .modifier(FullscreenGestures(fullscreen: Binding(get: { store.chatFullscreen }, set: { store.chatFullscreen = $0 })))
             .onChange(of: sorted.last?.id) { _, _ in
@@ -538,14 +549,6 @@ struct ThreadChatView: View {
             }
             .onChange(of: items.count) { _, _ in settlePending() }
             .onChange(of: asks.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
-            .onChange(of: findText) { _, _ in findAt = max(findHits.count - 1, 0); jump(proxy) }
-            .onChange(of: findAt) { _, _ in jump(proxy) }
-            .onChange(of: findHits.count) { _, n in if findAt >= n { findAt = max(n - 1, 0) } }
-            // A streamed reply grows one item: follow its text, not only new ids.
-            .onChange(of: sorted.last.map { $0.text.count + ($0.output?.count ?? 0) } ?? 0) { _, _ in
-                if atBottom || Date().timeIntervalSince(bottomLeftAt) < 0.5 { proxy.scrollTo("bottom", anchor: .bottom) }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) { if finding { findBar } }
             .environment(\.canFillComposer, true)
             .overlay(alignment: .topTrailing) {
                 if !atTop && loaded {
@@ -1297,4 +1300,20 @@ func attachmentIcon(_ mime: String) -> String {
     if mime.contains("zip") || mime.contains("compressed") || mime.contains("rar") || mime.contains("tar") || mime.contains("gzip") { return "doc.zipper" }
     if mime.contains("spreadsheet") || mime.contains("excel") || mime == "text/csv" { return "tablecells" }
     return "doc"
+}
+
+/// Find in Chat and streaming follow, kept apart so the chat body stays small enough for the type checker.
+private struct FindFollow: ViewModifier {
+    let view: ThreadChatView
+    let proxy: ScrollViewProxy
+    func body(content: Content) -> some View {
+        let f = view.findState
+        content
+            .onChange(of: f.text) { _, _ in view.onFindText(proxy) }
+            .onChange(of: f.at) { _, _ in view.jump(proxy) }
+            .onChange(of: f.hits) { _, n in view.clampFind(n) }
+            // A streamed reply grows one item: follow its text, not only new ids.
+            .onChange(of: view.lastLen) { _, _ in view.follow(proxy) }
+            .safeAreaInset(edge: .top, spacing: 0) { if f.on { view.findBarView } }
+    }
 }

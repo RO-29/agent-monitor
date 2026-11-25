@@ -124,10 +124,10 @@ export default function Now() {
   const [denyId, setDenyId] = useState<string | null>(null);
   // Keys act only on the cards shown: a request past the cap is not on screen.
   const queue = asks.slice(0, ASK_CAP).flatMap((r) => r.approvals.map((a) => ({ r, a })));
+  const cur = queue[Math.min(sel, queue.length - 1)];
   useEffect(() => {
     document.querySelector(".ask.sel")?.scrollIntoView({ block: "nearest" });
   }, [cur?.a.id]);
-  const cur = queue[Math.min(sel, queue.length - 1)];
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
