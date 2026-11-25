@@ -800,19 +800,20 @@ extension Notification.Name {
     static let chatSent = Notification.Name("am.chatSent")
 }
 
-/// After 20 s with the answer not taken: unlock the card to send again, or look at the terminal.
+/// After 20 s with the answer not taken: look at the terminal; after 90 s (the daemon's resend lock) answer again.
 private struct SentLate: View {
     let sentAt: Int64
     let retry: () -> Void
     let look: () -> Void
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { tl in
-            if sentAt > 0, tl.date.timeIntervalSince1970 * 1000 - Double(sentAt) > 20_000 {
+            let age = tl.date.timeIntervalSince1970 * 1000 - Double(sentAt)
+            if sentAt > 0, age > 20_000 {
                 HStack(spacing: 8) {
                     Text("Not taken yet.").font(Typo.ui(12.5)).foregroundStyle(Tok.fg2)
                     Spacer()
                     Button("Terminal", action: look).buttonStyle(.am(.ghost))
-                    Button("Answer again", action: retry).buttonStyle(.am(.ghost))
+                    if age > 90_000 { Button("Answer again", action: retry).buttonStyle(.am(.ghost)) }
                 }
             }
         }
