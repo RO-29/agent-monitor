@@ -515,6 +515,7 @@ func WatchedDiff(cwd, from, to, path string) (*orchDiff, error) {
 	if err != nil {
 		return nil, err
 	}
+	addWorktreeHashes(root, to, files)
 	return &orchDiff{From: from, To: to, Files: files, Truncated: truncated}, nil
 }
 

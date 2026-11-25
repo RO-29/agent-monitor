@@ -3,6 +3,7 @@ import { ScrollJump } from "./ScrollJump";
 import { SessionLifeBtn } from "./SessionLife";
 import { agentCommands } from "./agentCommands";
 import { FillCtx } from "../../components/Markdown";
+import { CostBadge } from "../../components/SpendBits";
 import { insertFor } from "../../../lib/insert";
 import { DetailsBtn, ListShowBtn, TopBarItem, TopReveal } from "./barToggles";
 import { clearSent, useDraft } from "../../../lib/draft";
@@ -361,6 +362,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           <span className={`wstat ${status.cls}`}>{status.l}</span>
         ))}
         <LinkedChip list={linked} page={`/w/${encodeURIComponent(row.id)}/linked`} />
+        <CostBadge cost={row.thread?.costUsd} est={row.thread?.costEstimated} tokens={row.thread?.tokens} />
         <span className="sp" />
         <div className="wbar-a">
           {row.cwd && (

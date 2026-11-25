@@ -615,6 +615,7 @@ type orchDiffFile struct {
 	Binary    bool   `json:"binary"`
 	Patch     string `json:"patch"`
 	Truncated bool   `json:"truncated,omitempty"`
+	Hash      string `json:"hash,omitempty"` // work tree content, for a hunk revert
 	mode      string
 }
 
@@ -899,6 +900,7 @@ func (m *OrchManager) Diff(id, from, to, path string, run *int) (*orchDiff, erro
 	if err != nil {
 		return nil, err
 	}
+	addWorktreeHashes(root, to, files)
 	return &orchDiff{From: from, To: to, Files: files, Truncated: truncated}, nil
 }
 
