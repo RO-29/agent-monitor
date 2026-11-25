@@ -706,7 +706,7 @@ final class AppStore {
         if alerts.count > 300 { alerts.removeLast(alerts.count - 300) }
         // Alert only for fresh needs-you items; a reconnect replays older ones.
         let fresh = Int64(Date().timeIntervalSince1970 * 1000) - a.at < 120_000
-        if !(a.quiet ?? false), !(a.resolved ?? false), fresh {
+        if !(a.quiet ?? false), !(a.resolved ?? false), fresh, !showsChat(a.threadId), !(a.kind == "needs-you" && bannerShown(a.threadId)) {
             var kind = NotifyKind.from(alertKind: a.kind)
             if kind == .needsYou, let t = a.threadId, approvals.contains(where: { threadID(of: $0) == resolveThreadID(t) && $0.kind == "question" }) {
                 kind = .question
@@ -754,10 +754,26 @@ final class AppStore {
         }
     }
 
+    /// True while the app is open on this chat: a banner about it would repeat what is on screen.
+    private func showsChat(_ id: String?) -> Bool {
+        guard let id, appActive, tab == .threads, let open = workspacePath.last else { return false }
+        return open == resolveThreadID(id)
+    }
+
+    /// The daemon's alert and the app's own needs-you check can both see one prompt; one banner per session per 2 min.
+    private var bannerAt: [String: Date] = [:]
+    private func bannerShown(_ id: String?) -> Bool {
+        guard let id else { return false }
+        if let t = bannerAt[id], Date().timeIntervalSince(t) < 120 { return true }
+        bannerAt[id] = Date()
+        return false
+    }
+
     /// Fire a distinct-tune notification for a new approval ask, once per id.
     private func maybeNotifyApproval(id: String, title: String, body: String, session: Bool = false, question: Bool = false) {
         guard notifsReady, !notifiedApprovals.contains(id) else { return }
         notifiedApprovals.insert(id)
+        if session && (showsChat(id) || bannerShown(id)) { return }
         if session {
             Notifier.shared.sessionAsk(sessionID: id, question: question, title: title, body: body)
         } else {

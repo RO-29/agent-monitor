@@ -53,6 +53,7 @@ func handleHook(s *Store, tool Tool, p ClaudeHookPayload) {
 
 	switch evt {
 	case "SessionStart":
+		markSessionEnded(sid(tool, p.SessionID), false)
 		in := base
 		in.State, in.HasState = StateRunning, true
 		in.EventKind, in.EventText = evt, msg
@@ -102,6 +103,7 @@ func handleHook(s *Store, tool Tool, p ClaudeHookPayload) {
 		s.Upsert(in)
 
 	case "SessionEnd":
+		markSessionEnded(sid(tool, p.SessionID), true)
 		s.SetState(tool, p.SessionID, StateCompleted, msg)
 
 	default:

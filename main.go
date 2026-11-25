@@ -151,6 +151,7 @@ func runServer() {
 	// Detect AskUserQuestion / permission prompts from pane content (they don't
 	// fire the Notification hook) so they show up in the Approvals tab.
 	startPanePromptWatcher(store, paneRegistry)
+	startTurnNotifier() // turn_notify.go: finished, asking and interrupted turns, and terminal prompts
 
 	// Auto-kill agent tmux sessions (claude-…/codex-… from the zsh wrappers)
 	// idle for >7 days, so the terminal doesn't accumulate dead widgets.

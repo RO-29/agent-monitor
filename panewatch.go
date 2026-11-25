@@ -3,6 +3,7 @@ package main
 import (
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -92,14 +93,40 @@ func applyPaneScreen(s *Store, sess *Session, content string) {
 	case atPrompt && sess.State != StateAwaitingPermission && parsedPromptOpen(content):
 		s.SetState(sess.Tool, sess.SessionID, StateAwaitingPermission, promptSummary(lastLines(content, 24)))
 	case !atPrompt && sess.State == StateAwaitingPermission:
-		s.SetState(sess.Tool, sess.SessionID, StateRunning, "") // the prompt was answered
+		next := StateRunning // the prompt was answered
+		if sessionEnded(sess.ID) {
+			next = StateCompleted // a prompt shown on /exit: the session stays ended
+		}
+		s.SetState(sess.Tool, sess.SessionID, next, "")
 	}
+}
+
+// ended holds sessions whose SessionEnd hook fired; a prompt shown while they exit must not mark them running again.
+var ended = struct {
+	sync.Mutex
+	m map[string]bool
+}{m: map[string]bool{}}
+
+func markSessionEnded(id string, done bool) {
+	ended.Lock()
+	defer ended.Unlock()
+	if done {
+		ended.m[id] = true
+	} else {
+		delete(ended.m, id)
+	}
+}
+
+func sessionEnded(id string) bool {
+	ended.Lock()
+	defer ended.Unlock()
+	return ended.m[id]
 }
 
 // parsedPromptOpen is true only for a prompt agent-monitor can read: the broad pattern also matches output such as "(y/n)".
 func parsedPromptOpen(screen string) bool {
 	return claudePermOptions(screen) != nil || codexPermOptions(screen) != nil ||
-		strings.Contains(screen, "Enter to select") || len(planOptionsOnScreen(screen)) > 0
+		strings.Contains(screen, "Enter to select") || strings.Contains(screen, "Enter to confirm") || len(planOptionsOnScreen(screen)) > 0
 }
 
 type promptWatchTarget struct{ agentID, target string }
