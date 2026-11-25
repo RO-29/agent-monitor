@@ -18,7 +18,7 @@ struct AgentMonitorApp: App {
                 .tint(Tok.accent)
                 .task {
                     Notifier.shared.onRoute = { [store] r in store.open(r) }
-                    NotifyAction.replyTarget = { [store] id in store.replyTarget(id) }
+                    NotifyAction.replyTarget = { [store] id in await store.replyTargetLoaded(id) }
                     #if DEBUG
                     if DebugRoute.screen == nil { Notifier.shared.requestAuthorization() }
                     #else

@@ -1,5 +1,5 @@
 // Watched (terminal) sessions in the same conversation view as driven threads.
-import { ScrollJump } from "./ScrollJump";
+import { ScrollJump, useKeepPlace } from "./ScrollJump";
 import { SessionLifeBtn } from "./SessionLife";
 import { agentCommands } from "./agentCommands";
 import { FillCtx } from "../../components/Markdown";
@@ -214,6 +214,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const newMark = useNewMark(sid, f?.items, atBottom);
 
   const scroller = useRef<HTMLDivElement>(null);
+  const keepPlace = useKeepPlace(scroller);
   const pinned = useRef(true);
   const lastText = f?.items.length ? f.items[f.items.length - 1].text?.length || 0 : 0;
   const size = `${f?.items.length || 0}:${asks.length}:${sent.list.length}:${lastText}`;
@@ -435,12 +436,12 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         {oldTab && <div className="wnote-tab">Earlier session of this thread. Messages you send go to the newest session.</div>}
         {f && blocks.length === 0 && <div className="state">No messages in this session yet.</div>}
         {hidden > 0 && (
-          <button className="wearlier" onClick={() => setMore(true)}>
+          <button className="wearlier" onClick={() => (keepPlace(), setMore(true))}>
             Show {hidden} earlier {hidden === 1 ? "turn" : "turns"}
           </button>
         )}
         {feed.loadEarlier && (
-          <button className="wearlier" disabled={feed.earlierBusy} onClick={feed.loadEarlier}>
+          <button className="wearlier" disabled={feed.earlierBusy} onClick={() => (keepPlace(), feed.loadEarlier?.())}>
             {feed.earlierBusy ? "Loading earlier turns…" : "Show earlier turns"}
           </button>
         )}

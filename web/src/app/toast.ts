@@ -8,6 +8,7 @@ export interface Toast {
   body?: string;
   kind: "info" | "alert";
   onClick?: () => void;
+  action?: string; // a short label: the toast shows onClick as a real button
   output?: string; // command output, shown in a scrollable block
 }
 
@@ -19,8 +20,8 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-export function showToast(title: string, body?: string, opts: { kind?: "info" | "alert"; onClick?: () => void; ms?: number; output?: string } = {}) {
-  const t: Toast = { id: nextId++, title, body, kind: opts.kind || "info", onClick: opts.onClick, output: opts.output || undefined };
+export function showToast(title: string, body?: string, opts: { kind?: "info" | "alert"; onClick?: () => void; action?: string; ms?: number; output?: string } = {}) {
+  const t: Toast = { id: nextId++, title, body, kind: opts.kind || "info", onClick: opts.onClick, action: opts.action, output: opts.output || undefined };
   toasts.push(t);
   while (toasts.length > 4) toasts.shift();
   emit();

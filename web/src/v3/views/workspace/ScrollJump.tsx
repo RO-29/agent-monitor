@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useLayoutEffect, useRef, useEffect, useState, type RefObject } from "react";
 
 /** Top and Bottom buttons over a chat feed; each shows only when that end is far away. */
 export function ScrollJump({ el }: { el: RefObject<HTMLDivElement | null> }) {
@@ -54,4 +54,20 @@ export function ScrollJump({ el }: { el: RefObject<HTMLDivElement | null> }) {
       </div>
     </div>
   );
+}
+
+// Older turns added above the reader: keep the turn on screen where it was, as no WebKit view anchors at the top.
+export function useKeepPlace(el: RefObject<HTMLDivElement | null>) {
+  const at = useRef<{ h: number; top: number; t: number } | null>(null);
+  useLayoutEffect(() => {
+    const f = el.current, a = at.current;
+    if (a && Date.now() - a.t > 15_000) at.current = null; // the load failed: forget the mark
+    if (!f || !at.current || !a || f.scrollHeight === a.h) return;
+    f.scrollTop = a.top + f.scrollHeight - a.h;
+    at.current = null;
+  });
+  return () => {
+    const f = el.current;
+    if (f) at.current = { h: f.scrollHeight, top: f.scrollTop, t: Date.now() };
+  };
 }

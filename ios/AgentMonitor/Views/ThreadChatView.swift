@@ -47,6 +47,8 @@ struct ThreadChatView: View {
     @State private var finding = false
     @State private var findText = ""
     @State private var findAt = 0
+    @State private var findHitIDs: [String] = []
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var findFocus: Bool
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
@@ -322,7 +324,15 @@ struct ThreadChatView: View {
 
     /// One trailing control for linked agents and details, so the title keeps its width; the badge counts linked agents.
     /// Items whose text holds the search words, oldest first; the newest is shown first.
-    private var findHits: [String] {
+    // Kept in state: the body, the bar and FindFollow all read it, and a long chat makes each scan slow.
+    private var findHits: [String] { findHitIDs }
+    @discardableResult fileprivate func refreshFind() -> Int {
+        let h = scanFind()
+        if h != findHitIDs { findHitIDs = h }
+        return h.count
+    }
+
+    private func scanFind() -> [String] {
         let q = findText.trimmingCharacters(in: .whitespaces)
         guard finding, q.count >= 2 else { return [] }
         return scriptTree.top.filter { it in
@@ -332,7 +342,12 @@ struct ThreadChatView: View {
 
     fileprivate var lastLen: Int { sorted.last.map { $0.text.count + ($0.output?.count ?? 0) } ?? 0 }
 
-    fileprivate func onFindText(_ proxy: ScrollViewProxy) { findAt = max(findHits.count - 1, 0); jump(proxy) }
+    fileprivate func onFindText(_ proxy: ScrollViewProxy) {
+        let h = scanFind()
+        findHitIDs = h
+        findAt = max(h.count - 1, 0)
+        if let id = h.last { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+    }
     fileprivate func clampFind(_ n: Int) { if findAt >= n { findAt = max(n - 1, 0) } }
     fileprivate func follow(_ proxy: ScrollViewProxy) {
         if atBottom || Date().timeIntervalSince(bottomLeftAt) < 0.5 { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -344,11 +359,14 @@ struct ThreadChatView: View {
     fileprivate func jump(_ proxy: ScrollViewProxy) {
         guard findHits.indices.contains(findAt) else { return }
         withAnimation { proxy.scrollTo(findHits[findAt], anchor: .center) }
+        AccessibilityNotification.Announcement("Match \(findAt + 1) of \(findHits.count)").post()
     }
 
     private var findBar: some View {
         let hits = findHits
-        return HStack(spacing: 10) {
+        // At the accessibility text sizes the field gets its own row, so it does not shrink to a few letters.
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Tok.muted)
                 TextField("Find in this chat", text: $findText)
@@ -358,8 +376,9 @@ struct ThreadChatView: View {
                     .submitLabel(.search)
                     .onSubmit { if !hits.isEmpty { findAt = (findAt - 1 + hits.count) % hits.count } }
             }
-            .padding(.horizontal, 10).frame(height: 36)
+            .padding(.horizontal, 10).frame(minHeight: 36)
             .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 10))
+            HStack(spacing: 10) {
             Text(hits.isEmpty ? (findText.count >= 2 ? "0" : "") : "\(findAt + 1)/\(hits.count)")
                 .font(.footnote.monospacedDigit()).foregroundStyle(Tok.muted)
             Button { findAt = (findAt - 1 + hits.count) % max(hits.count, 1) } label: { Image(systemName: "chevron.up").frame(width: 36, height: 44).contentShape(Rectangle()) }
@@ -367,6 +386,7 @@ struct ThreadChatView: View {
             Button { findAt = (findAt + 1) % max(hits.count, 1) } label: { Image(systemName: "chevron.down").frame(width: 36, height: 44).contentShape(Rectangle()) }
                 .disabled(hits.count < 2).accessibilityLabel("Later match")
             Button("Done") { withAnimation(.snappy) { finding = false; findText = ""; findAt = 0 } }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(Tok.panel)
@@ -655,13 +675,12 @@ struct ThreadChatView: View {
     /// Sets the "New" line once from the last visit, then records what the reader has seen at the bottom.
     private func markSeen() {
         guard loaded, let last = sorted.last else { return }
-        let key = "chat.seen:" + threadID
-        let seen = Int64(UserDefaults.standard.double(forKey: key))
+        let seen = ChatSeen.get(threadID)
         if !markSet {
             markSet = true
             if seen > 0 { newMark = scriptTree.top.first { $0.startedAt > seen }?.id }
         }
-        if atBottom, last.startedAt > seen { UserDefaults.standard.set(Double(last.startedAt), forKey: key) }
+        if atBottom, last.startedAt > seen { ChatSeen.set(threadID, last.startedAt) }
     }
 
     // MARK: feed
@@ -1338,7 +1357,8 @@ private struct FindFollow: ViewModifier {
             .onChange(of: f.at) { _, _ in view.jump(proxy) }
             .onChange(of: f.hits) { _, n in view.clampFind(n) }
             // A streamed reply grows one item: follow its text, not only new ids.
-            .onChange(of: view.lastLen) { _, _ in view.follow(proxy) }
+            .onChange(of: view.lastLen) { _, _ in view.follow(proxy); if f.on { view.refreshFind() } }
+            .onChange(of: f.on) { _, _ in view.refreshFind() }
             .safeAreaInset(edge: .top, spacing: 0) { if f.on { view.findBarView } }
             .environment(\.chatAPI, view.chatAPI)
     }
@@ -1378,5 +1398,23 @@ struct DoneBellChip: View {
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: on)
         .accessibilityValue(on ? "On" : "Off")
+    }
+}
+
+/// Last item read per thread, in one UserDefaults entry kept to the 500 newest threads.
+enum ChatSeen {
+    private static let key = "chat.seenAll"
+    static func get(_ id: String) -> Int64 {
+        if let v = (UserDefaults.standard.dictionary(forKey: key)?[id] as? Double) { return Int64(v) }
+        return Int64(UserDefaults.standard.double(forKey: "chat.seen:" + id)) // before the single entry
+    }
+    static func set(_ id: String, _ at: Int64) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        all[id] = Double(at)
+        if all.count > 500 {
+            for (k, _) in all.sorted(by: { $0.value < $1.value }).prefix(all.count - 500) { all[k] = nil }
+        }
+        UserDefaults.standard.set(all, forKey: key)
+        UserDefaults.standard.removeObject(forKey: "chat.seen:" + id)
     }
 }

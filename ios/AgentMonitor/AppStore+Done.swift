@@ -20,6 +20,11 @@ enum DoneWatch {
 
 extension AppStore {
     /// A reply from a banner goes to the thread's newest session; a driven thread keeps its own id.
+    func replyTargetLoaded(_ id: String) async -> String {
+        if !threadsLoaded { await loadThreads() }
+        return replyTarget(id)
+    }
+
     func replyTarget(_ id: String) -> String {
         let t = thread(resolveThreadID(id))
         if let d = t?.drivenId, !d.isEmpty, !id.contains(":") { return d }

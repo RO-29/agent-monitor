@@ -275,7 +275,7 @@ enum NotifyAction {
     }
 
     /// Maps a thread id to the session a reply should go to; the app sets it from the store.
-    @MainActor static var replyTarget: ((String) -> String)?
+    @MainActor static var replyTarget: ((String) async -> String)?
 
     static func run(_ action: String, info: [AnyHashable: Any], text: String?, bannerID: String, title: String) async {
         let thread = (info["sessionId"] as? String) ?? (info["threadId"] as? String)
@@ -305,7 +305,15 @@ enum NotifyAction {
                 let body = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 guard let raw = thread, !body.isEmpty else { return }
                 // A resumed thread has a newer session than the one the banner named.
-                let id = await MainActor.run { replyTarget?(raw) ?? raw }
+                // A cold launch from the banner: the store sets the closure, then loads the threads.
+                var target = await MainActor.run { replyTarget }
+                var tries = 0
+                while target == nil && tries < 30 {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    target = await MainActor.run { replyTarget }
+                    tries += 1
+                }
+                let id = await target?(raw) ?? raw
                 if id.contains(":") {
                     _ = try await api.cliSendFull(id, text: body, attachments: [])
                 } else {

@@ -392,6 +392,11 @@ export default function V3Shell() {
                 </button>
                 <b>{t.title}</b>
                 {t.body && <div className="fg2 xs">{t.body}</div>}
+                {t.action && t.onClick && (
+                  <button className="btn sm ghost toast-do" onClick={(e) => (e.stopPropagation(), t.onClick?.(), dismissToast(t.id))}>
+                    {t.action}
+                  </button>
+                )}
                 {t.output && (
                   <pre className="toast-out" onClick={(e) => e.stopPropagation()}>
                     {t.output}

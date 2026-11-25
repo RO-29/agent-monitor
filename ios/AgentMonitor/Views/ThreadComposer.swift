@@ -830,6 +830,7 @@ private struct SentLate: View {
                     Button("Terminal", action: look).buttonStyle(.am(.ghost))
                     if age > 90_000 { Button("Answer again", action: retry).buttonStyle(.am(.ghost)) }
                 }
+                .onAppear { AccessibilityNotification.Announcement("The agent did not take the answer yet").post() }
             }
         }
     }

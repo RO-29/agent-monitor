@@ -1,4 +1,4 @@
-import { ScrollJump } from "./ScrollJump";
+import { ScrollJump, useKeepPlace } from "./ScrollJump";
 import { FillCtx } from "../../components/Markdown";
 import { CostBadge } from "../../components/SpendBits";
 import { insertFor } from "../../../lib/insert";
@@ -825,6 +825,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const waitingOn = myKids.filter((c) => c.status === "running" || c.status === "starting" || c.status === "waiting");
   const now = useTick(running || waitingOn.length > 0 || detail.runs.some((r) => r.status === "running"));
   const feed = useRef<HTMLDivElement>(null);
+  const keepPlace = useKeepPlace(feed);
   const [text, setText] = useDraft("d:" + t.id);
   useDocTitle(t.title);
   const [busy, setBusy] = useState(false);
@@ -1104,7 +1105,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         )}
         {t.error && <div className="werr">{t.error}</div>}
         {past.loadEarlier && (
-          <button className="wearlier" disabled={past.earlierBusy} onClick={past.loadEarlier}>
+          <button className="wearlier" disabled={past.earlierBusy} onClick={() => (keepPlace(), past.loadEarlier?.())}>
             {past.earlierBusy ? "Loading earlier turns…" : "Show earlier turns"}
           </button>
         )}

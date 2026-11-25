@@ -1,6 +1,6 @@
 import { PeerNeedsBox, usePeerFeed } from "./peers";
 import { AskKeysCtx, askFromApproval, WsApproval } from "./workspace/WsApproval";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { showToast } from "../../app/toast";
@@ -125,7 +125,11 @@ export default function Now() {
   // Keys act only on the cards shown: a request past the cap is not on screen.
   const queue = asks.slice(0, ASK_CAP).flatMap((r) => r.approvals.map((a) => ({ r, a })));
   const cur = queue[Math.min(sel, queue.length - 1)];
+  // Scroll only after j or k: a request closed on another device must not move the page under the reader.
+  const keyMoved = useRef(false);
   useEffect(() => {
+    if (!keyMoved.current) return;
+    keyMoved.current = false;
     document.querySelector(".ask.sel")?.scrollIntoView({ block: "nearest" });
   }, [cur?.a.id]);
 
@@ -133,8 +137,8 @@ export default function Now() {
     const onKey = (e: KeyboardEvent) => {
       if (typing(e) || e.metaKey || e.ctrlKey || e.altKey || !queue.length) return;
       if (document.querySelector(".scrim, .drawer")) return;
-      if (e.key === "j") setSel((i) => Math.min(i + 1, queue.length - 1));
-      else if (e.key === "k") setSel((i) => Math.max(i - 1, 0));
+      if (e.key === "j") (keyMoved.current = true), setSel((i) => Math.min(i + 1, queue.length - 1));
+      else if (e.key === "k") (keyMoved.current = true), setSel((i) => Math.max(i - 1, 0));
       else if ((e.key === "a" || e.key === "A") && cur) {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();

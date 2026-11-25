@@ -51,13 +51,15 @@ export async function rowAction(r: WRow, a: RowAction) {
       done = until ? `Snoozed until ${fmtUntil(until)}` : "Unsnoozed";
       undo = () => snoozeThread(t.id, was);
     }
-    showToast(`${done}: ${r.title}`, "Click to undo", {
-      onClick: () => void undo().catch((e: Error) => showToast("Could not undo", e.message, { kind: "alert" })),
-    });
+    const run = () => void undo().catch((e: Error) => showToast("Could not undo", e.message, { kind: "alert" }));
+    lastUndo = { run, until: Date.now() + 8000 };
+    showToast(`${done}: ${r.title}`, undefined, { action: "Undo (u)", onClick: () => ((lastUndo = null), run()) });
   } catch (e) {
     showToast("Could not update the thread", (e as Error).message, { kind: "alert" });
   }
 }
+// The last row action, for the u key while its toast shows.
+let lastUndo: { run: () => void; until: number } | null = null;
 // Settle on a settled (not snoozed) row means unsettle.
 const settleLabel = (r: WRow) => (r.group === "settled" && !r.snoozedUntil ? "Unsettle" : "Settle");
 
@@ -327,6 +329,13 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   // e settles, p pins, z snoozes the selected driven row for 1 hour (z again clears it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "u" && lastUndo && Date.now() < lastUndo.until && !typing(e) && !overlayOpen() && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const u = lastUndo;
+        lastUndo = null;
+        u.run();
+        return;
+      }
       if (typing(e) || overlayOpen() || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !["e", "p", "z"].includes(e.key)) return;
       const r = rows.find((x) => x.id === sel);
       if (!r?.driven) return;
