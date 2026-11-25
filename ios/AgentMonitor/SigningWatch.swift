@@ -6,7 +6,11 @@ import Foundation
 @MainActor
 enum SigningWatch {
     nonisolated static let taskID = "com.rohit.agentmonitor.signing"
-    static let renewWithin: TimeInterval = 3 * 86400
+    /// 3 days; a test launch can widen it with the argument `-signing.renewDays 7`.
+    static var renewWithin: TimeInterval {
+        let days = UserDefaults.standard.double(forKey: "signing.renewDays")
+        return (days > 0 ? days : 3) * 86400
+    }
     static let checkEvery: TimeInterval = 86400
     static let askEvery: TimeInterval = 40 * 60
 

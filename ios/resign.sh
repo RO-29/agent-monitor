@@ -29,15 +29,16 @@ RENEW="$STATE/renew" # written by the daemon when the iPhone asks (POST /api/ios
 RENEW_WITHIN=$((3 * 86400))
 profile_end() { security cms -D -i "$1" 2>/dev/null | plutil -extract ExpirationDate raw -o - - 2>/dev/null; }
 epoch() { date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
-# Cached profiles for this app that end within RENEW_WITHIN.
+# Cached profiles for this app that end within RENEW_WITHIN, or no later than the end the iPhone asked to replace.
 stale_profiles() {
-  local f end
+  local f end want=0
+  [[ -f "$RENEW" ]] && want=$(tr -dc 0-9 <"$RENEW")
   for f in "$PROFILES"/*.mobileprovision; do
     [[ -f "$f" ]] || continue
     security cms -D -i "$f" 2>/dev/null | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null |
       grep -q "\.com\.rohit\.agentmonitor$" || continue
     end=$(epoch "$(profile_end "$f")")
-    (( end - $(date +%s) < RENEW_WITHIN )) && echo "$f"
+    if (( end - $(date +%s) < RENEW_WITHIN || end * 1000 <= ${want:-0} )); then echo "$f"; fi
   done
   return 0
 }
