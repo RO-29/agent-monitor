@@ -584,6 +584,7 @@ function installGitMock(all: OThread[], m: (min: number) => number) {
       const thread: OThread = { ...t, worktree: { ...t.worktree, removed: true }, updatedAt: Date.now() };
       return wait({ ok: true, thread });
     },
+    revertHunk: async () => wait({ ok: true }),
   };
   setMockGitApi(api);
 }

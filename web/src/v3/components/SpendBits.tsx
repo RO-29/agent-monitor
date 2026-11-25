@@ -1,8 +1,7 @@
 // Cost and token figures: a header badge per session, today's total, and a warning for plan windows near their limit.
-import { api } from "../../api/client";
 import type { TokenUsage } from "../../api/types";
 import { fmtTok, fmtUsd } from "../../lib/format";
-import { useApi } from "../api/client";
+import { useApi, v3 } from "../api/client";
 import { fmtResetIn, useUsageGroups } from "../api/usage";
 import { agentName } from "../live";
 
@@ -23,7 +22,7 @@ export function CostBadge({ cost, est, tokens }: { cost?: number; est?: boolean;
 
 /** Today's spend across every watched session and driven thread, from GET /api/v3/now. */
 export function SpendTodayBox() {
-  const st = useApi(() => api.now(), [], { poll: 60_000 });
+  const st = useApi(() => v3.now(), [], { poll: 60_000 });
   if (!st.data) return null;
   return (
     <div className="ibox">
