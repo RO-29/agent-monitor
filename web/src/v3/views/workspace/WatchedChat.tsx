@@ -17,7 +17,7 @@ import { continueSession, sendMessage, useOrch } from "../../api/orch";
 import { useShell } from "../../ctx";
 import { agentName, approvalsByThread, useV3 } from "../../live";
 import type { Row } from "../../model";
-import { BarMenu, blocksOf, FoldItem, NarrowBarItems, RunBlock, useTick } from "./DrivenChat";
+import { BarMenu, blocksOf, ChatAgentCtx, FoldItem, NarrowBarItems, RunBlock, useTick } from "./DrivenChat";
 import { DiffView } from "./Diff";
 import { filesOf, useDiffNav } from "./git";
 import { agentTerm, cwdTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
@@ -248,6 +248,15 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   // A reachable terminal gets the message at once, as if typed: a busy CLI queues it itself.
   const busyNow = running || session?.state === "awaiting-permission";
   const cliQueues = mode === "tmux" && busyNow;
+  // Esc in the terminal stops the turn (or closes an open prompt), as in Claude Code and Codex.
+  const pressEsc = async () => {
+    try {
+      await api.sendKeys(sid, ["Escape"]);
+      showToast("Esc sent to the terminal");
+    } catch (e) {
+      showToast("Esc not sent", e instanceof Error ? e.message : undefined, { kind: "alert" });
+    }
+  };
   const amQueue = async (body: string) => {
     await queueApi.add(row.id, body, { session: pane.target || sid });
   };
@@ -382,6 +391,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
       <ChildCtx.Provider value={kidCtx}>
       <SelectCtx.Provider value={sel}>
       <HitCtx.Provider value={hlId}>
+      <ChatAgentCtx.Provider value={row.agent}>
       <div
         className={`wfeed ${sel.on ? "wselecting" : ""}`}
         ref={scroller}
@@ -443,6 +453,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         )}
       </div>
       <ScrollJump el={scroller} />
+      </ChatAgentCtx.Provider>
       </HitCtx.Provider>
       </SelectCtx.Provider>
       </ChildCtx.Provider>
@@ -517,9 +528,16 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
               {busy ? "Continuing…" : "Continue here"}
             </button>
           ) : (
+            <>
+            {mode === "tmux" && busyNow && (
+              <button className="btn sm ghost" onClick={() => void pressEsc()} title={`Press Esc in the terminal: ${cliName} stops its turn`} aria-label="Stop with Esc">
+                Esc
+              </button>
+            )}
             <button className="wsend" onClick={() => void send()} disabled={busy || mode === "off" || att.uploading || (!text.trim() && !att.ids.length)} aria-label={cliQueues ? "Queue" : "Send"} title={cliQueues ? `Add to the ${cliName} queue (⌘↵)` : "Send (⌘↵)"}>
               ↑
             </button>
+            </>
           )}
       </Composer>
       </>

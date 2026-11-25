@@ -495,6 +495,15 @@ func TestDropDim(t *testing.T) {
 	if got := dropDim(in); got != "❯  and typed" {
 		t.Fatalf("%q", got)
 	}
+	// A focused terminal draws the cursor as an inverse first letter of the suggestion.
+	for _, s := range []string{"❯\u00a0\x1b[7mY\x1b[27m\x1b[2mes add it\x1b[0m", "❯\u00a0\x1b[7mY\x1b[2mes add it\x1b[0m", "❯\u00a0\x1b[7mé\x1b[0m\x1b[2mtape\x1b[0m"} {
+		if got := strings.TrimSpace(draftOf("────────────────────────────\n" + dropDim(s) + "\n────────────────────────────")); got != "" {
+			t.Fatalf("a suggestion under the cursor read as a draft: %q from %q", got, s)
+		}
+	}
+	if got := dropDim("❯ fix it\x1b[7m \x1b[27m"); got != "❯ fix it " {
+		t.Fatalf("typed text with the cursor after it: %q", got)
+	}
 }
 
 // Screens captured from Claude Code 2.1.327, which writes enqueue records with no text.

@@ -8,7 +8,7 @@ import { splitFileNote } from "../../../lib/fileNote";
 import { clearSent, useDraft } from "../../../lib/draft";
 import { useDocTitle } from "../../../lib/title";
 import { usd } from "../../components/Spend";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
@@ -36,8 +36,40 @@ import { useWatchedFeed } from "./watched";
 import { CmdCopy, MsgCopy, OutCopy, ResumeChip, SelectBar, SelectBox, SelectCtx, useSelectCtx, useSelection } from "./MsgActions";
 import { handoverOf, serverDrivenRow, terminalTarget } from "./handover";
 import { ChildChips } from "./children";
+import { AgentIcon, agentKey } from "../../components/AgentIcon";
 
 export const isReviewItem = (it: OItem) => it.kind === "review" || (it.kind === "other" && it.command === "review");
+
+/** The chat's agent, for the icon on its answers. */
+export const ChatAgentCtx = createContext("");
+
+const clockOf = (v?: number | string) => {
+  const ms = toMs(v);
+  return ms ? new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+};
+
+function PersonIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <circle cx="8" cy="5.2" r="2.7" />
+      <path d="M2.8 14c.6-2.8 2.6-4.3 5.2-4.3s4.6 1.5 5.2 4.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Who wrote a message and when: a person for yours, the agent's glyph for its answers. */
+export function MsgMeta({ it, mine }: { it: OItem; mine?: boolean }) {
+  const ctx = useContext(ChatAgentCtx);
+  const agent = ctx || agentKey(it.threadId);
+  const at = clockOf(it.startedAt);
+  return (
+    <div className={`wmeta ${mine ? "wmeta-u" : ""}`} title={toMs(it.startedAt) ? new Date(toMs(it.startedAt)).toLocaleString() : undefined}>
+      {mine ? <span className="wmeta-i" role="img" aria-label="You"><PersonIcon /></span> : <AgentIcon agent={agent} size={12} />}
+      <span>{mine ? "You" : agentName(agent)}</span>
+      {at && <span className="muted">· {at}</span>}
+    </div>
+  );
+}
 
 export function ItemRow({ it }: { it: OItem }) {
   const hl = useContext(HitCtx) === it.id;
@@ -157,6 +189,7 @@ function ItemBody({ it, hl }: { it: OItem; hl: boolean }) {
   if (it.kind === "agent")
     return (
       <div className={`wagent ${it.status === "started" ? "streaming" : ""}`}>
+        <MsgMeta it={it} />
         {it.text ? <Markdown text={it.text} collapseAt={0} /> : <span className="wcaret" />}
         {it.text && it.status !== "started" && <MsgCopy text={it.text} />}
       </div>
@@ -502,7 +535,11 @@ function ScriptGroup({ it, kids }: { it: OItem; kids: OItem[] }) {
 
 export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun; items: OItem[]; now: number; after?: React.ReactNode; diff?: DiffNav | null; onDiff?: (d: DiffNav) => void }) {
   const running = run?.status === "running" || items.some((i) => i.status === "started" && !i.bg);
-  const users = items.filter((i) => i.kind === "user" && (i.text || i.attachments?.length));
+  const allUsers = items.filter((i) => i.kind === "user" && (i.text || i.attachments?.length));
+  // Messages typed while the agent worked show where they came, not folded into the steps.
+  const firstPrompt = allUsers.find((i) => i.by !== "schedule");
+  const users = allUsers.filter((i) => i.by === "schedule" || i === firstPrompt);
+  const later = allUsers.filter((i) => !users.includes(i));
   // A slash command that opened the turn shows above its prompt; later user commands follow the answer.
   // A turn opened by a ! command has no prompt: its leading user commands open it.
   let firstUser = items.findIndex((i) => i.kind === "user");
@@ -518,6 +555,8 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const finalAt = final ? items.indexOf(final) : -1;
   const bangsBefore = finalAt >= 0 ? bangs.filter((b) => items.indexOf(b) < finalAt) : [];
   const bangsAfter = finalAt >= 0 ? bangs.filter((b) => items.indexOf(b) > finalAt) : bangs;
+  const laterBefore = finalAt >= 0 ? later.filter((u) => items.indexOf(u) < finalAt) : [];
+  const laterAfter = finalAt >= 0 ? later.filter((u) => items.indexOf(u) > finalAt) : later;
   const { top, kids } = scriptTree(work);
   const [open, setOpen] = useState<boolean | null>(null);
   const hl = useContext(HitCtx);
@@ -529,45 +568,49 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const took = start && end > start ? fmtDuration(end - start) : "";
   const tail = run?.status === "interrupted" ? " · stopped" : run?.status === "failed" ? " · failed" : "";
   const cost = run?.usage?.costUsd != null && run.status !== "running" ? fmtUsd(run.usage.costUsd) : "";
+  const bubble = (u0: OItem) => {
+    if (u0.by === "schedule")
+      return (
+        <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>
+          <span className="wwake-t">{wakeTitle(u0.text || "")}</span>
+          {u0.wakeRuns && <span className="wwake-n"> · {u0.wakeRuns.n} runs since {new Date(u0.wakeRuns.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, same answer</span>}
+        </div>
+      );
+    const note = splitFileNote(u0.text || "");
+    const u = note.files.length ? { ...u0, text: note.text, attachments: [...(u0.attachments || []), ...note.files] } : u0;
+    return (
+    <div key={u.id}>
+    <div className={`wu-wrap ${hl === u.id ? "whit" : ""} ${sel?.on ? "wsel-on" : ""} ${sel?.picked.has(u.id) ? "wsel-y" : ""}`} data-iid={u.id} onClick={sel?.on ? () => sel.toggle(u.id) : undefined}>
+      <SelectBox id={u.id} />
+      <div className="wu">
+        {u.attachments && u.attachments.length > 0 && (
+          <span className="wu-att">
+            {u.attachments.map((x) => PLAYABLE(x.mime) ? (
+              <span key={x.id} className="wu-media" title={x.name || x.mime}>
+                {x.mime.startsWith("video/") ? <video src={x.url} controls preload="metadata" /> : <audio src={x.url} controls preload="metadata" />}
+                <a href={x.url} target="_blank" rel="noopener" className="trunc">{x.name || "media"}</a>
+              </span>
+            ) : (
+              <a key={x.id} href={x.url} target="_blank" rel="noopener" title={x.name || x.mime} className={IMAGE_TYPES.includes(x.mime) ? "" : "wu-file"}>
+                {IMAGE_TYPES.includes(x.mime) ? <img src={x.url} alt={x.name || "attached image"} /> : <><b>{extOf(x.name || `.${x.mime.split("/")[1] || ""}`)}</b><span className="trunc">{x.name || "file"}</span></>}
+              </a>
+            ))}
+          </span>
+        )}
+        {u.text}
+      </div>
+      {!sel?.on && u.text?.trim() && <MsgCopy text={u.text} className="wu-cp" title="Copy this prompt" />}
+    </div>
+    <MsgMeta it={u} mine />
+    </div>
+    );
+  };
   return (
     <>
       {lead.map((b) => (
         <UserShell key={b.id} it={b} />
       ))}
-      {users.map((u0) => {
-        if (u0.by === "schedule")
-          return (
-            <div key={u0.id} className="wwake" data-iid={u0.id} title={u0.text}>
-              <span className="wwake-t">{wakeTitle(u0.text || "")}</span>
-              {u0.wakeRuns && <span className="wwake-n"> · {u0.wakeRuns.n} runs since {new Date(u0.wakeRuns.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, same answer</span>}
-            </div>
-          );
-        const note = splitFileNote(u0.text || "");
-        const u = note.files.length ? { ...u0, text: note.text, attachments: [...(u0.attachments || []), ...note.files] } : u0;
-        return (
-        <div key={u.id} className={`wu-wrap ${hl === u.id ? "whit" : ""} ${sel?.on ? "wsel-on" : ""} ${sel?.picked.has(u.id) ? "wsel-y" : ""}`} data-iid={u.id} onClick={sel?.on ? () => sel.toggle(u.id) : undefined}>
-          <SelectBox id={u.id} />
-          <div className="wu">
-            {u.attachments && u.attachments.length > 0 && (
-              <span className="wu-att">
-                {u.attachments.map((x) => PLAYABLE(x.mime) ? (
-                  <span key={x.id} className="wu-media" title={x.name || x.mime}>
-                    {x.mime.startsWith("video/") ? <video src={x.url} controls preload="metadata" /> : <audio src={x.url} controls preload="metadata" />}
-                    <a href={x.url} target="_blank" rel="noopener" className="trunc">{x.name || "media"}</a>
-                  </span>
-                ) : (
-                  <a key={x.id} href={x.url} target="_blank" rel="noopener" title={x.name || x.mime} className={IMAGE_TYPES.includes(x.mime) ? "" : "wu-file"}>
-                    {IMAGE_TYPES.includes(x.mime) ? <img src={x.url} alt={x.name || "attached image"} /> : <><b>{extOf(x.name || `.${x.mime.split("/")[1] || ""}`)}</b><span className="trunc">{x.name || "file"}</span></>}
-                  </a>
-                ))}
-              </span>
-            )}
-            {u.text}
-          </div>
-          {!sel?.on && u.text?.trim() && <MsgCopy text={u.text} className="wu-cp" title="Copy this prompt" />}
-        </div>
-        );
-      })}
+      {users.map(bubble)}
       {work.length > 0 && (
         <div className="wgroup">
           <div className="worked-row">
@@ -598,10 +641,12 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
       {bangsBefore.map((b) => (
         <UserShell key={b.id} it={b} />
       ))}
+      {laterBefore.map(bubble)}
       {final && <ItemRow it={final} />}
       {bangsAfter.map((b) => (
         <UserShell key={b.id} it={b} />
       ))}
+      {laterAfter.map(bubble)}
       {work.length === 0 && final && (cost || (diff && onDiff)) && (
         <div className="wrunmeta">
           {cost}
@@ -1023,6 +1068,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
       )}
       <SelectCtx.Provider value={sel}>
       <HitCtx.Provider value={hlId}>
+      <ChatAgentCtx.Provider value={t.agent}>
       <div
         className={`wfeed ${sel.on ? "wselecting" : ""}`}
         ref={feed}
@@ -1087,6 +1133,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         )}
       </div>
       <ScrollJump el={feed} />
+      </ChatAgentCtx.Provider>
       </HitCtx.Provider>
       </SelectCtx.Provider>
       <SelectBar sel={sel} blocks={allBlocks} title={t.title} />

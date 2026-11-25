@@ -206,6 +206,20 @@ struct Composer: View {
                 .background(bashMode ? Tok.needSoft : Tok.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(bashMode ? Tok.need : focused ? Tok.accent : Tok.line2, lineWidth: 1))
+                if busyCLI, sessionID != nil, reachable {
+                    // Esc in the terminal stops the turn, or closes an open prompt.
+                    Button { Task { await pressEsc() } } label: {
+                        Image(systemName: "stop.fill").font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Tok.fg)
+                            .frame(width: 36, height: 36)
+                            .background(Tok.panel3, in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(acting)
+                    .accessibilityLabel("Stop with Esc")
+                }
                 Button { Task { await send() } } label: {
                     ZStack {
                         Circle().fill(canSend ? Tok.accent : Tok.panel3)
@@ -478,6 +492,19 @@ struct Composer: View {
             // 409: a prompt is open in the terminal, or the terminal cannot be reached.
             self.error = error.localizedDescription
             status = nil
+        }
+    }
+
+    private func pressEsc() async {
+        guard let sessionID else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            try await api.keys(sessionID, ["Escape"])
+            error = nil
+            status = "Esc sent. \(cliName) stops its turn."
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

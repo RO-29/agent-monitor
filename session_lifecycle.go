@@ -61,6 +61,10 @@ func endSession(id string) (bool, int, error) {
 		if panePromptOpen(scr) {
 			return errPromptOpen
 		}
+		// Read the colours too: a dim suggestion in the box is not a draft.
+		if col, err := targetCapture(t, 0, false); err == nil {
+			scr = dropDim(col)
+		}
 		if boxDraft(scr) {
 			return errBoxDraft
 		}

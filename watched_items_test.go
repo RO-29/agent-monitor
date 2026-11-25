@@ -373,3 +373,36 @@ func TestWatchedItemsIdleEviction(t *testing.T) {
 		t.Fatalf("after eviction: %+v %v", inc, err)
 	}
 }
+
+func TestWatchedItemsClaudeQueuedMessage(t *testing.T) {
+	queued := func(sec int, prompt any, origin string) map[string]any {
+		a := map[string]any{"type": "queued_command", "prompt": prompt, "commandMode": "prompt"}
+		if origin != "" {
+			a["origin"] = map[string]any{"kind": origin}
+		}
+		return map[string]any{"type": "attachment", "timestamp": tsAt(sec), "attachment": a}
+	}
+	path := filepath.Join(t.TempDir(), "s1.jsonl")
+	jsonl(t, path,
+		cUser(1, "Fix the build"),
+		cAsst(2, "m1", "tool_use", map[string]any{"type": "tool_use", "id": "t1", "name": "Bash", "input": map[string]any{"command": "make"}}),
+		queued(3, "also run the linter", "human"),
+		queued(3, "<agent-message from=\"x\">report</agent-message>", "agent"),
+		queued(4, []any{map[string]any{"type": "text", "text": "and push it"}}, ""),
+		cResult(5, "t1", "ok", false),
+		cAsst(6, "m2", "end_turn", map[string]any{"type": "text", "text": "Done, linted and pushed."}),
+	)
+	res, err := watchedItemsFor(claudeRef(path), -1, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Runs) != 1 {
+		t.Fatalf("a message typed mid-turn stays in its turn: runs=%d", len(res.Runs))
+	}
+	if got := kinds(res.Items); got != "user,command,user,user,agent" {
+		t.Fatalf("kinds %s", got)
+	}
+	if res.Items[2].Text != "also run the linter" || res.Items[3].Text != "and push it" || res.Items[2].StartedAt != parseTimestamp(tsAt(3)) {
+		t.Fatalf("queued messages: %+v %+v", res.Items[2], res.Items[3])
+	}
+}

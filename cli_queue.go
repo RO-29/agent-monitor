@@ -1138,13 +1138,15 @@ func cliTypedEmpty(target string) bool {
 }
 
 // dropDim removes text drawn dim (SGR 2) and then every escape sequence.
+// A focused terminal draws its cursor as one inverse letter over a dim suggestion; that letter goes too.
 func dropDim(s string) string {
-	var b strings.Builder
-	dim := false
+	var b []byte
+	dim, inv := false, false
+	invAt, invEnd := -1, -1
 	for i := 0; i < len(s); i++ {
 		if s[i] != 0x1b {
 			if !dim {
-				b.WriteByte(s[i])
+				b = append(b, s[i])
 			}
 			continue
 		}
@@ -1164,8 +1166,28 @@ func dropDim(s string) string {
 							k += 4
 						}
 					case "2":
+						end := invEnd
+						if inv {
+							end = len(b)
+						}
+						if !dim && end == len(b) && invAt >= 0 && end > invAt && utf8.RuneCount(b[invAt:end]) == 1 {
+							b = b[:invAt]
+						}
 						dim = true
-					case "", "0", "22":
+					case "7":
+						if !inv {
+							inv, invAt = true, len(b)
+						}
+					case "27":
+						if inv {
+							inv, invEnd = false, len(b)
+						}
+					case "", "0":
+						if inv {
+							inv, invEnd = false, len(b)
+						}
+						dim = false
+					case "22":
 						dim = false
 					}
 				}
@@ -1175,7 +1197,7 @@ func dropDim(s string) string {
 		}
 		i++ // a two-byte escape
 	}
-	return b.String()
+	return string(b)
 }
 
 // typeBang types "!" alone first, since only "!" in an empty box switches Claude Code to bash mode.

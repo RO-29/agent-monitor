@@ -769,6 +769,8 @@ struct ChatItemView: View {
                         .contextMenu { CopyMenuItems(markdown: shown) }
                     if !selecting {
                         HStack(spacing: 4) {
+                            Image(systemName: "person.fill").font(.caption2).foregroundStyle(Tok.fg2)
+                                .accessibilityLabel("You")
                             Text(clock(item.startedAt)).font(.caption2.monospacedDigit()).foregroundStyle(Tok.muted)
                             CopyButton(markdown: shown)
                         }
@@ -783,6 +785,12 @@ struct ChatItemView: View {
             .accessibilityAddTraits(selecting && selected ? .isSelected : [])
         case "agent":
             VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    AgentGlyph(agent: agent, size: 11)
+                    Text(agentName(agent)).font(.caption.weight(.medium)).foregroundStyle(Tok.fg2)
+                    Text(clock(item.startedAt)).font(.caption2.monospacedDigit()).foregroundStyle(Tok.muted)
+                }
+                .accessibilityElement(children: .combine)
                 FoldedProse(text: item.text, size: 17)
                     .contextMenu { CopyMenuItems(markdown: item.text) }
                 if !selecting && !item.text.isEmpty {

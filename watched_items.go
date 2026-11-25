@@ -871,11 +871,14 @@ type wClaudeLine struct {
 	HookErrors       []string        `json:"hookErrors"`
 	ToolUseResult    json.RawMessage `json:"toolUseResult"`
 	Attachment       *struct {
-		Type      string   `json:"type"`
-		Envelopes []string `json:"envelopes"`
-		HookName  string   `json:"hookName"`
-		Stderr    string   `json:"stderr"`
-		Content   string   `json:"content"`
+		Type        string          `json:"type"`
+		Envelopes   []string        `json:"envelopes"`
+		HookName    string          `json:"hookName"`
+		Stderr      string          `json:"stderr"`
+		Content     string          `json:"content"`
+		Prompt      json.RawMessage `json:"prompt"`
+		CommandMode string          `json:"commandMode"`
+		Origin      *wOrigin        `json:"origin"`
 	} `json:"attachment"`
 	Message *struct {
 		ID         string          `json:"id"`
@@ -949,6 +952,10 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 	}
 	if j.Type == "attachment" && j.Attachment != nil && j.Attachment.Type == "poll_events" {
 		p.replEvents(off, strings.Join(j.Attachment.Envelopes, "\n"))
+		return
+	}
+	if j.Type == "attachment" && j.Attachment != nil && j.Attachment.Type == "queued_command" {
+		p.claudeQueued(off, ts, j.Attachment.Prompt, j.Attachment.CommandMode, j.Attachment.Origin)
 		return
 	}
 	switch j.Type {
@@ -1089,6 +1096,28 @@ func (p *wParser) claudeLine(off int64, b []byte, start bool) {
 	if m.StopReason == "end_turn" {
 		p.endRun(off, ts, "completed")
 	}
+}
+
+type wOrigin struct {
+	Kind string `json:"kind"`
+}
+
+// claudeQueued shows a message typed while Claude worked: Claude Code logs it only as a queued_command attachment.
+func (p *wParser) claudeQueued(off, ts int64, raw json.RawMessage, mode string, origin *wOrigin) {
+	if (mode != "" && mode != "prompt") || (origin != nil && origin.Kind != "human") {
+		return
+	}
+	text, isResult := claudeUserText(raw)
+	text = strings.TrimSpace(text)
+	if isResult || text == "" || (origin == nil && strings.HasPrefix(text, "<")) {
+		return
+	}
+	if p.cur == nil {
+		p.startTurn(off, ts, text)
+		return
+	}
+	p.touch(off, ts)
+	p.add(off, 0, &OItem{Kind: "user", Status: "completed", Text: text, StartedAt: ts, EndedAt: ts})
 }
 
 // ── codex ──
