@@ -6,7 +6,7 @@ import { FillCtx } from "../../components/Markdown";
 import { insertFor } from "../../../lib/insert";
 import { DetailsBtn, ListShowBtn, TopBarItem, TopReveal } from "./barToggles";
 import { clearSent, useDraft } from "../../../lib/draft";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../../api/client";
 import type { Session } from "../../../api/types";
@@ -39,6 +39,7 @@ import { ResumeChip, SelectBar, SelectCtx, useSelection } from "./MsgActions";
 import { LinkedChip, LinkedPage, sessionLinks, type LinkedEntry } from "./linked";
 import { NewThreadBtn } from "./NewThread";
 import { useCmdHistory } from "./bash";
+import { NewLine, PendingBubbles, useNewMark, usePendingSends } from "./sendMarks";
 import { useDocTitle } from "../../../lib/title";
 import { useUsageLimits } from "../../api/usage";
 import { creditsLine } from "../../components/Usage";
@@ -207,6 +208,9 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   // The items endpoint pages on the daemon; the legacy path holds the whole transcript and slices here.
   const shownBlocks = more || feed.source === "items" ? blocks : blocks.slice(-MAX_RUNS);
   const hidden = blocks.length - shownBlocks.length;
+  const [atBottom, setAtBottom] = useState(true);
+  const sent = usePendingSends(f?.items, sid);
+  const newMark = useNewMark(sid, f?.items, atBottom);
 
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -272,6 +276,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
       if (mode === "tmux") {
         try {
           const r = await cliApi.sendFull(sid, body, ids);
+          if (!again) sent.add(body, busyNow);
           if (r.panel) showToast(body.split(/\s/)[0], r.menu ? "A menu is open in the terminal. Answer it there." : undefined, { output: r.panel });
         } catch (e) {
           const st = (e as { status?: number }).status;
@@ -398,6 +403,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         onScroll={(e) => {
           const el = e.currentTarget;
           pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          if (pinned.current !== atBottom) setAtBottom(pinned.current);
         }}
       >
         {!f && !feed.error && (
@@ -427,8 +433,12 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           </button>
         )}
         {shownBlocks.map((b) => (
-          <RunBlock key={b.key} run={b.run} items={b.items} now={now} />
+          <Fragment key={b.key}>
+            {b.key === newMark && b !== shownBlocks[0] && <NewLine />}
+            <RunBlock run={b.run} items={b.items} now={now} />
+          </Fragment>
         ))}
+        {!oldTab && <PendingBubbles list={sent.list} drop={sent.drop} />}
         {!oldTab && <AskAnnouncer asks={asks} />}
         {!oldTab && asks.map((a) => (
           <Boundary key={a.approvalId} what="This request">

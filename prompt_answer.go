@@ -16,7 +16,7 @@ import (
 // Clients keep the card and show the message for 423.
 const statusRefused = http.StatusLocked
 
-var rePromptEnd = regexp.MustCompile(`(?i)esc to cancel|enter to confirm|enter to select|^\s*❯?\s*[1-9]\.\s`)
+var rePromptEnd = regexp.MustCompile(`(?i)esc to cancel|enter to confirm|enter to select|enter continue · esc|^\s*❯?\s*[1-9]\.\s`)
 
 // promptKey fingerprints the open prompt: the lines up to its last choice or footer, so the status bar below does not count.
 func promptKey(screen string) string {

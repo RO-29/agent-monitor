@@ -51,7 +51,7 @@ func firstRune(s string) string {
 	return ""
 }
 
-var rePanePrompt = regexp.MustCompile(`(?i)(enter to select|enter to confirm|↑/↓ to navigate|to navigate|` +
+var rePanePrompt = regexp.MustCompile(`(?i)(enter to select|enter to confirm|enter continue · esc|↑/↓ to navigate|to navigate|` +
 	`do you want to proceed|do you want to create|❯\s*[1-9]\.\s|(?:^|\n)\s*[1-9]\.\s+(yes|no|allow|don't|do not)|` +
 	// Codex approval prompts (interactive; not logged as JSONL events):
 	`allow codex|allow command|allow this|approve (command|this|the|patch)|apply patch\?|run (this )?command\?|\[y/n\]|\(y/n\))`)
@@ -126,7 +126,7 @@ func sessionEnded(id string) bool {
 // parsedPromptOpen is true only for a prompt agent-monitor can read: the broad pattern also matches output such as "(y/n)".
 func parsedPromptOpen(screen string) bool {
 	return claudePermOptions(screen) != nil || codexPermOptions(screen) != nil ||
-		strings.Contains(screen, "Enter to select") || strings.Contains(screen, "Enter to confirm") || len(planOptionsOnScreen(screen)) > 0
+		strings.Contains(screen, "Enter to select") || strings.Contains(screen, "Enter to confirm") || strings.Contains(screen, "enter continue · esc") || len(planOptionsOnScreen(screen)) > 0
 }
 
 type promptWatchTarget struct{ agentID, target string }

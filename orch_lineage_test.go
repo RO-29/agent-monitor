@@ -18,10 +18,10 @@ import (
 	"time"
 )
 
-// until polls cond for up to 10 s.
+// until polls cond for up to 30 s: the whole suite runs fake agents in parallel, and 10 s was once too short.
 func (e *orchEnv) until(what string, cond func() bool) {
 	e.t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			e.t.Fatalf("timed out waiting for %s", what)

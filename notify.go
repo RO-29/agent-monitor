@@ -620,9 +620,22 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 			URL     string `json:"url"`
 			Waiting bool   `json:"waiting"`
 			Renew   bool   `json:"renew"`
+			Prompts string `json:"prompts"` // bin/prompt-check.sh: the Claude Code version it checked
+			Failed  string `json:"failed"`
 		}
-		if !localCaller(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil || (!in.Waiting && !strings.HasPrefix(in.URL, "https://")) {
+		if !localCaller(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil || (!in.Waiting && in.Prompts == "" && !strings.HasPrefix(in.URL, "https://")) {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "local callers only, with an https url or waiting"})
+			return
+		}
+		if in.Prompts != "" {
+			ev := notifyEvent{Kind: "finished", Title: "Claude Code " + clipString(in.Prompts, 24) + ": prompts still work",
+				Body: "The check on the build Mac read its prompt screens, and the app can see and answer them."}
+			if in.Failed != "" {
+				ev.Kind, ev.Title = "error", "Claude Code "+clipString(in.Prompts, 24)+" changed its prompt screens"
+				ev.Body = clipString(in.Failed, 240) + ". The app may not see or answer its prompts until agent-monitor is updated."
+			}
+			n.deliver(ev)
+			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
 		if in.Waiting { // the build Mac cannot reach the phone: it installs on the next run with the phone near

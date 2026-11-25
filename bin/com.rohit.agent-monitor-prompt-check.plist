@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.rohit.agent-monitor-prompt-check</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>cd "$HOME/am-check" &amp;&amp; git fetch -q origin main &amp;&amp; git checkout -q FETCH_HEAD &amp;&amp; exec bash bin/prompt-check.sh</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>4</integer>
+		<key>Minute</key>
+		<integer>15</integer>
+	</dict>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>StandardOutPath</key>
+	<string>/Users/rohit/Library/Logs/agent-monitor/prompt-check.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/rohit/Library/Logs/agent-monitor/prompt-check.log</string>
+</dict>
+</plist>

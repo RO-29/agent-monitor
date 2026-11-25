@@ -777,7 +777,7 @@ final class AppStore {
         if session {
             Notifier.shared.sessionAsk(sessionID: id, question: question, title: title, body: body)
         } else {
-            Notifier.shared.approvalAsk(id: id, title: title, body: body)
+            Notifier.shared.permissionAsk(id: id, title: title, body: body)
         }
     }
 

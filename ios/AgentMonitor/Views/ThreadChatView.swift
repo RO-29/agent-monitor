@@ -44,6 +44,9 @@ struct ThreadChatView: View {
     /// The first item that arrived after the last visit; a "New" line shows above it.
     @State private var newMark: String?
     @State private var markSet = false
+    @State private var finding = false
+    @State private var findText = ""
+    @State private var findAt = 0
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
     private var thread: V3Thread? { store.thread(threadID) }
@@ -317,6 +320,45 @@ struct ThreadChatView: View {
     }
 
     /// One trailing control for linked agents and details, so the title keeps its width; the badge counts linked agents.
+    /// Items whose text holds the search words, oldest first; the newest is shown first.
+    private var findHits: [String] {
+        let q = findText.trimmingCharacters(in: .whitespaces)
+        guard finding, q.count >= 2 else { return [] }
+        return scriptTree.top.filter { it in
+            [it.text, it.command ?? "", it.output ?? ""].contains { $0.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+        }.map(\.id)
+    }
+
+    private func jump(_ proxy: ScrollViewProxy) {
+        guard findHits.indices.contains(findAt) else { return }
+        withAnimation { proxy.scrollTo(findHits[findAt], anchor: .center) }
+    }
+
+    private var findBar: some View {
+        let hits = findHits
+        return HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Tok.muted)
+                TextField("Find in this chat", text: $findText)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit { if !hits.isEmpty { findAt = (findAt - 1 + hits.count) % hits.count } }
+            }
+            .padding(.horizontal, 10).frame(height: 36)
+            .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 10))
+            Text(hits.isEmpty ? (findText.count >= 2 ? "0" : "") : "\(findAt + 1)/\(hits.count)")
+                .font(.footnote.monospacedDigit()).foregroundStyle(Tok.muted)
+            Button { findAt = (findAt - 1 + hits.count) % max(hits.count, 1) } label: { Image(systemName: "chevron.up") }
+                .disabled(hits.count < 2).accessibilityLabel("Earlier match")
+            Button { findAt = (findAt + 1) % max(hits.count, 1) } label: { Image(systemName: "chevron.down") }
+                .disabled(hits.count < 2).accessibilityLabel("Later match")
+            Button("Done") { withAnimation(.snappy) { finding = false; findText = ""; findAt = 0 } }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Tok.panel)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
     private var threadMenu: some View {
         let n = linked.count
         return Menu {
@@ -331,6 +373,7 @@ struct ThreadChatView: View {
                 Label("Select Messages", systemImage: "checkmark.circle")
             }
             Button { setFullscreen(true) } label: { Label("Read Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") }
+            Button { withAnimation(.snappy) { finding = true } } label: { Label("Find in Chat", systemImage: "magnifyingglass") }
             if sessionID != nil, canRunBash, peer == nil {
                 Button { showHistory = true } label: { Label("Command History", systemImage: "clock.arrow.circlepath") }
                 Button { showScreen = true } label: { Label("Terminal Screen", systemImage: "terminal") }
@@ -438,6 +481,11 @@ struct ThreadChatView: View {
                             if let kids = tree.kids[it.id] { scriptCalls(it.id, kids) }
                         }
                         .id(it.id)
+                        .overlay {
+                            if finding, findHits.indices.contains(findAt), findHits[findAt] == it.id {
+                                RoundedRectangle(cornerRadius: 10).stroke(Tok.accent, lineWidth: 2).padding(-4)
+                            }
+                        }
                         .padding(.top, it.kind == "user" && it.id != sorted.first?.id ? 12 : 0)
                     }
                     ForEach(pending) { p in
@@ -485,6 +533,9 @@ struct ThreadChatView: View {
             }
             .onChange(of: items.count) { _, _ in settlePending() }
             .onChange(of: asks.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+            .onChange(of: findText) { _, _ in findAt = max(findHits.count - 1, 0); jump(proxy) }
+            .onChange(of: findAt) { _, _ in jump(proxy) }
+            .safeAreaInset(edge: .top, spacing: 0) { if finding { findBar } }
             .environment(\.canFillComposer, true)
             .overlay(alignment: .topTrailing) {
                 if !atTop && loaded {
