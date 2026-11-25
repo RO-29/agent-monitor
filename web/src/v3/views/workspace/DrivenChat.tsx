@@ -567,6 +567,8 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const sel = useSelectCtx();
   const fold = useFoldPref();
   const expanded = open ?? (running || !fold || (!!hl && work.some((i) => i.id === hl)));
+  // What the agent said between steps is for the reader: folding hides the tool calls, not the messages.
+  const notes = expanded ? [] : work.filter((i) => i.kind === "agent" && i.text?.trim());
   const start = toMs(run?.startedAt) || toMs(items[0]?.startedAt);
   const end = run?.endedAt ? toMs(run.endedAt) : running ? now : toMs(items[items.length - 1]?.endedAt) || start;
   const took = start && end > start ? fmtDuration(end - start) : "";
@@ -642,6 +644,9 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
           )}
         </div>
       )}
+      {notes.map((n) => (
+        <ItemRow key={n.id} it={n} />
+      ))}
       {bangsBefore.map((b) => (
         <UserShell key={b.id} it={b} />
       ))}
