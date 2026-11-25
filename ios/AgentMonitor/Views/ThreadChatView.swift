@@ -47,6 +47,7 @@ struct ThreadChatView: View {
     @State private var finding = false
     @State private var findText = ""
     @State private var findAt = 0
+    @FocusState private var findFocus: Bool
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
     private var thread: V3Thread? { store.thread(threadID) }
@@ -340,6 +341,8 @@ struct ThreadChatView: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Tok.muted)
                 TextField("Find in this chat", text: $findText)
+                    .focused($findFocus)
+                    .onAppear { findFocus = true }
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .submitLabel(.search)
                     .onSubmit { if !hits.isEmpty { findAt = (findAt - 1 + hits.count) % hits.count } }
@@ -467,6 +470,8 @@ struct ThreadChatView: View {
                         .frame(maxWidth: .infinity).padding(.top, 60)
                     }
                     let tree = scriptTree
+                    let firstID = sorted.first?.id
+                    let curHit = finding && findHits.indices.contains(findAt) ? findHits[findAt] : nil
                     ForEach(tree.top) { it in
                         VStack(alignment: .leading, spacing: 4) {
                             if it.id == newMark { NewLine() }
@@ -482,11 +487,11 @@ struct ThreadChatView: View {
                         }
                         .id(it.id)
                         .overlay {
-                            if finding, findHits.indices.contains(findAt), findHits[findAt] == it.id {
+                            if curHit == it.id {
                                 RoundedRectangle(cornerRadius: 10).stroke(Tok.accent, lineWidth: 2).padding(-4)
                             }
                         }
-                        .padding(.top, it.kind == "user" && it.id != sorted.first?.id ? 12 : 0)
+                        .padding(.top, it.kind == "user" && it.id != firstID ? 12 : 0)
                     }
                     ForEach(pending) { p in
                         PendingBubble(msg: p).onTapGesture { withAnimation { pending.removeAll { $0.id == p.id } } }
@@ -535,6 +540,11 @@ struct ThreadChatView: View {
             .onChange(of: asks.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
             .onChange(of: findText) { _, _ in findAt = max(findHits.count - 1, 0); jump(proxy) }
             .onChange(of: findAt) { _, _ in jump(proxy) }
+            .onChange(of: findHits.count) { _, n in if findAt >= n { findAt = max(n - 1, 0) } }
+            // A streamed reply grows one item: follow its text, not only new ids.
+            .onChange(of: sorted.last.map { $0.text.count + ($0.output?.count ?? 0) } ?? 0) { _, _ in
+                if atBottom || Date().timeIntervalSince(bottomLeftAt) < 0.5 { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
             .safeAreaInset(edge: .top, spacing: 0) { if finding { findBar } }
             .environment(\.canFillComposer, true)
             .overlay(alignment: .topTrailing) {

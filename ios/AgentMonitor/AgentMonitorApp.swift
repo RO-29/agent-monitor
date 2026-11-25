@@ -30,7 +30,8 @@ struct AgentMonitorApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     // Reconnect when returning to foreground; the socket is
                     // often dropped while backgrounded.
-                    if phase == .active { store.connect() } else { store.flushPendingDecisions() }
+                    // Only a real background ends the Undo window; pulling down Control Center is .inactive.
+                    if phase == .active { store.connect() } else if phase == .background { store.flushPendingDecisions() }
                     store.setForeground(phase == .active)
                     if phase == .active { Task { await SigningWatch.tick() } }
                 }

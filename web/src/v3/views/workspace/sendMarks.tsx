@@ -12,7 +12,7 @@ export function usePendingSends(items: OItem[] | undefined, reset: string) {
   useEffect(() => {
     if (!list.length || !items) return;
     const users = items.filter((i) => i.kind === "user");
-    const left = list.filter((p) => !users.some((u) => toMs(u.startedAt) >= p.at - 120_000 && norm(u.text || "") === norm(p.text)));
+    const left = list.filter((p) => !users.some((u) => toMs(u.startedAt) >= p.at - 120_000 && norm(u.text || "").startsWith(norm(p.text))));
     if (left.length !== list.length) setList(left);
   }, [items, list]);
   const add = (text: string, queued: boolean) => {
@@ -34,11 +34,14 @@ export function PendingBubbles({ list, drop }: { list: Pending[]; drop: (id: str
     <>
       {list.map((p) => {
         const late = now - p.at > (p.queued ? 600_000 : 90_000);
-        const st = late ? "Not in the transcript yet. Click to hide." : p.queued ? "Queued: it goes when the turn ends" : "Sending…";
+        const st = late ? "Not in the transcript yet." : p.queued ? "Queued: it goes when the turn ends" : "Sent. Waiting for the transcript…";
         return (
-          <div key={p.id} className="wu-wrap wpend" onClick={() => drop(p.id)} title="Click to hide">
+          <div key={p.id} className="wu-wrap wpend">
             <div className="wu">{p.text}</div>
-            <div className={`wmeta wmeta-u ${late ? "wpend-late" : ""}`}>{st}</div>
+            <div className={`wmeta wmeta-u ${late ? "wpend-late" : ""}`} role="status">
+              {st}
+              <button className="btn sm ghost" onClick={() => drop(p.id)} aria-label="Hide this message">Hide</button>
+            </div>
           </div>
         );
       })}

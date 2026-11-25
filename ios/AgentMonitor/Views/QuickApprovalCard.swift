@@ -35,7 +35,6 @@ struct QuickApprovalCard: View {
         }
         .askCard(tint)
         .disabled(a.sentToTerminal)
-        .onDisappear { store.flushDecision(a.id) }
         .contextMenu {
             Button(action: open) { Label("Open Thread", systemImage: "bubble.left") }
             if let c = a.command {

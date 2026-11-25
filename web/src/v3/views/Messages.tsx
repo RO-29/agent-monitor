@@ -347,7 +347,7 @@ function QuestionBubble({ a }: { a: Approval }) {
                 placeholder="Your answer · Enter sends"
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && text.trim()) void sendDecision(a, { behavior: "allow", answers: { [q.question]: text.trim() } }, setBusy);
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && text.trim()) void sendDecision(a, { behavior: "allow", answers: { [q.question]: text.trim() } }, setBusy);
                   else if (e.key === "Escape") setWriting(null);
                 }}
               />
@@ -392,7 +392,7 @@ function Composer({ sessionId, session }: { sessionId: string; session?: Session
         disabled={!sessionId}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             void send();
           }
@@ -522,7 +522,7 @@ function DrivenComposer({ id, closed, running }: { id: string; closed: boolean; 
         disabled={closed}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             void send();
           }

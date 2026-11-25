@@ -48,7 +48,6 @@ struct HookApprovalCard: View {
             }
         }
         .askCard(accent)
-        .onDisappear { store.flushDecision(a.id) }
         .onAppear(perform: restoreDrafts)
         .sensoryFeedback(trigger: decided) { _, new in
             switch new {

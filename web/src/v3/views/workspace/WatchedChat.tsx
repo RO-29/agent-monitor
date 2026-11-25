@@ -214,7 +214,8 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
 
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
-  const size = (f?.items.length || 0) + asks.length;
+  const lastText = f?.items.length ? f.items[f.items.length - 1].text?.length || 0 : 0;
+  const size = `${f?.items.length || 0}:${asks.length}:${sent.list.length}:${lastText}`;
   useEffect(() => {
     const el = scroller.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;

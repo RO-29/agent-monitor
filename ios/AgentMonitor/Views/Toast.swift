@@ -9,14 +9,19 @@ final class ToastCenter {
     var text: String?
     var icon = "checkmark.circle.fill"
     var seq = 0
+    var isError = false
 
     func show(_ text: String, icon: String = "checkmark.circle.fill") {
         self.text = text
         self.icon = icon
+        // An error icon means a failure: error haptic, longer on screen, and VoiceOver reads it.
+        isError = icon.hasPrefix("exclamationmark") || icon.hasPrefix("xmark")
+        if isError { AccessibilityNotification.Announcement(text).post() }
         seq += 1
         let mine = seq
+        let wait: UInt64 = isError ? 4_500_000_000 : 1_600_000_000
         Task {
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            try? await Task.sleep(nanoseconds: wait)
             if self.seq == mine { withAnimation(.snappy) { self.text = nil } }
         }
     }
@@ -50,7 +55,7 @@ private struct ToastHost: ViewModifier {
                 }
             }
             .animation(.snappy, value: center.text)
-            .sensoryFeedback(.success, trigger: center.seq)
+            .sensoryFeedback(trigger: center.seq) { _, _ in center.isError ? .error : .success }
     }
 }
 

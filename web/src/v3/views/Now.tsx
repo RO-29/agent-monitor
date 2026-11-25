@@ -122,7 +122,11 @@ export default function Now() {
   const [showAll, setShowAll] = useState(false);
   const [sel, setSel] = useState(0);
   const [denyId, setDenyId] = useState<string | null>(null);
-  const queue = asks.flatMap((r) => r.approvals.map((a) => ({ r, a })));
+  // Keys act only on the cards shown: a request past the cap is not on screen.
+  const queue = asks.slice(0, ASK_CAP).flatMap((r) => r.approvals.map((a) => ({ r, a })));
+  useEffect(() => {
+    document.querySelector(".ask.sel")?.scrollIntoView({ block: "nearest" });
+  }, [cur?.a.id]);
   const cur = queue[Math.min(sel, queue.length - 1)];
 
   useEffect(() => {
@@ -341,7 +345,7 @@ function ReplyCard({ r, head }: { r: Row; head: React.ReactNode }) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
-            if (e.key === "Enter") void send();
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) void send();
           }}
         />
         <button className="btn pri" disabled={busy || !text.trim()} onClick={send}>

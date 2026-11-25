@@ -19,6 +19,7 @@ export function useTermQuestion(sessionId: string, on: boolean, machine?: string
   const [tick, setTick] = useState(0);
   const waiting = !!(q?.pending && q.sentAt);
   const live = !!sessionId && (on || waiting);
+  useEffect(() => setQ(null), [sessionId, machine]);
   useEffect(() => {
     if (!live) {
       setQ(null);
@@ -28,7 +29,7 @@ export function useTermQuestion(sessionId: string, on: boolean, machine?: string
     const look = () =>
       p7.termQuestion(sessionId, machine).then(
         (r) => alive && setQ(r),
-        () => alive && setQ(null),
+        () => {}, // a failed poll keeps the card and what was typed; the next poll decides
       );
     void look();
     const t = window.setInterval(look, 3000);
@@ -182,7 +183,7 @@ export function QuestionsBody({ q, busy, canSend, send }: TermBody) {
               }}
               onKeyDown={(e) => {
                 e.stopPropagation();
-                if (e.key === "Enter") submit();
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
               }}
             />
           )}
@@ -221,7 +222,7 @@ export function PlanBody({ q, busy, canSend, send }: TermBody) {
           onChange={(e) => setMsg(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && msg.trim()) void send({ planOption: fb.n, text: msg });
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing && msg.trim()) void send({ planOption: fb.n, text: msg });
           }}
         />
       )}
