@@ -36,16 +36,23 @@ func TestIOSRenewStartsTheJobAtMostOncePerGap(t *testing.T) {
 	oldPeers := iosRenewPeers
 	t.Cleanup(func() { iosRenewPeers = oldPeers })
 	asked := 0
-	iosRenewPeers = func(int64) (string, bool) { asked++; return "", false }
+	iosRenewPeers = func(int64) (string, bool, bool) { asked++; return "", false, false }
 	if got := iosRenew(1, now, false); got["ok"] != false || asked != 1 {
 		t.Fatalf("a Mac with no job and no peer job must say so: %v", got)
 	}
 	if got := iosRenew(1, now, true); got["ok"] != false || asked != 1 {
 		t.Fatalf("a forwarded ask must not go on to peers: %v asked=%d", got, asked)
 	}
-	iosRenewPeers = func(int64) (string, bool) { return "build-mac", true }
+	iosRenewPeers = func(int64) (string, bool, bool) { return "build-mac", true, true }
 	if got := iosRenew(1, now, false); got["ok"] != true || got["peer"] != "build-mac" {
 		t.Fatalf("a peer with the job takes the ask: %v", got)
+	}
+	if got := iosRenew(1, now.Add(time.Minute), false); got["started"] != false {
+		t.Fatalf("a forwarded ask also waits the gap: %v", got)
+	}
+	iosRenewState.last = time.Time{}
+	if got := iosRenew(now.Add(9*24*time.Hour).UnixMilli(), now, false); got["ok"] != false {
+		t.Fatalf("an end far ahead is refused: %v", got)
 	}
 	if _, err := os.Stat(iosRenewFlag()); !os.IsNotExist(err) {
 		t.Fatal("the flag must go when no job can use it")

@@ -46,33 +46,48 @@ func registerIOSRenewRoutes(mux *http.ServeMux) {
 	})
 }
 
+// iosRenewMaxAhead bounds the reported end: a free-team profile lasts 7 days, so a later end is not real.
+const iosRenewMaxAhead = 8 * 24 * time.Hour
+
 func iosRenew(expires int64, now time.Time, via bool) map[string]any {
+	if expires > now.Add(iosRenewMaxAhead).UnixMilli() {
+		return map[string]any{"ok": false, "error": "expires is more than 8 days ahead"}
+	}
 	iosRenewState.Lock()
-	defer iosRenewState.Unlock()
+	if !iosRenewState.last.IsZero() && now.Sub(iosRenewState.last) < iosRenewGap {
+		iosRenewState.Unlock()
+		return map[string]any{"ok": true, "started": false}
+	}
+	iosRenewState.last = now // also limits how often a Mac with no job asks its peers
 	flag := iosRenewFlag()
 	_ = os.MkdirAll(filepath.Dir(flag), 0o755)
 	if err := os.WriteFile(flag, []byte(strconv.FormatInt(expires, 10)+"\n"), 0o644); err != nil {
+		iosRenewState.last = time.Time{}
+		iosRenewState.Unlock()
 		return map[string]any{"ok": false, "error": err.Error()}
 	}
-	if !iosRenewState.last.IsZero() && now.Sub(iosRenewState.last) < iosRenewGap {
-		return map[string]any{"ok": true, "started": false}
+	if err := iosKick(); err == nil {
+		iosRenewState.Unlock()
+		return map[string]any{"ok": true, "started": true}
 	}
-	if err := iosKick(); err != nil {
-		_ = os.Remove(flag)
-		// The phone talks to this Mac; the build job may run on a peer. A forwarded request goes no further.
-		if !via {
-			if name, ok := iosRenewPeers(expires); ok {
-				return map[string]any{"ok": true, "started": true, "peer": name}
-			}
+	_ = os.Remove(flag)
+	iosRenewState.Unlock()
+	// The phone talks to this Mac; the build job may run on a peer. A forwarded request goes no further.
+	if !via {
+		if name, started, ok := iosRenewPeers(expires); ok {
+			return map[string]any{"ok": true, "started": started, "peer": name}
 		}
-		return map[string]any{"ok": false, "error": "this Mac has no iPhone build job (" + iosResignLabel + ")"}
 	}
-	iosRenewState.last = now
-	return map[string]any{"ok": true, "started": true}
+	iosRenewState.Lock()
+	if iosRenewState.last.Equal(now) {
+		iosRenewState.last = time.Time{}
+	}
+	iosRenewState.Unlock()
+	return map[string]any{"ok": false, "error": "this Mac has no iPhone build job (" + iosResignLabel + ")"}
 }
 
-// iosRenewPeers passes the request to each peer machine until one has the build job; it returns that peer.
-var iosRenewPeers = func(expires int64) (string, bool) {
+// iosRenewPeers passes the request to each peer machine until one has the build job; it runs without the lock.
+var iosRenewPeers = func(expires int64) (name string, started, ok bool) {
 	peerStore.Lock()
 	loadPeersLocked()
 	ps := slices.Clone(peerStore.peers)
@@ -94,13 +109,14 @@ var iosRenewPeers = func(expires int64) (string, bool) {
 			continue
 		}
 		var out struct {
-			OK bool `json:"ok"`
+			OK      bool `json:"ok"`
+			Started bool `json:"started"`
 		}
 		_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&out)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK && out.OK {
-			return p.Name, true
+			return p.Name, out.Started, true
 		}
 	}
-	return "", false
+	return "", false, false
 }

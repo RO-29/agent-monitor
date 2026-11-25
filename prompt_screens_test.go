@@ -44,3 +44,14 @@ func TestClaudePromptScreens(t *testing.T) {
 		t.Errorf("plan options %+v", o)
 	}
 }
+
+func TestCursorMenuSkipsWrappedLines(t *testing.T) {
+	scr := " Pick one\n ❯ No, exit and lose the\n     unsaved work\n   Yes, keep going\n Enter to confirm · Esc to cancel\n"
+	if k := cursorMenuKeys(scr, "Yes"); !slices.Equal(k, []string{"Down", "Enter"}) {
+		t.Fatalf("a wrapped line is not a choice: %v", k)
+	}
+	up := " Pick one\n   Yes, keep going\n ❯ No, exit\n Enter to confirm\n"
+	if k := cursorMenuKeys(up, "Yes"); !slices.Equal(k, []string{"Up", "Enter"}) {
+		t.Fatalf("choice above the cursor: %v", k)
+	}
+}

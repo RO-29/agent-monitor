@@ -537,7 +537,9 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const running = run?.status === "running" || items.some((i) => i.status === "started" && !i.bg);
   const allUsers = items.filter((i) => i.kind === "user" && (i.text || i.attachments?.length));
   // Messages typed while the agent worked show where they came, not folded into the steps.
-  const firstPrompt = allUsers.find((i) => i.by !== "schedule");
+  // Only a prompt before any agent work opens the turn; a turn opened by / or ! has none.
+  const firstWork = items.findIndex((i) => i.kind !== "user" && i.by !== "user");
+  const firstPrompt = allUsers.find((i) => i.by !== "schedule" && (firstWork < 0 || items.indexOf(i) < firstWork));
   const users = allUsers.filter((i) => i.by === "schedule" || i === firstPrompt);
   const later = allUsers.filter((i) => !users.includes(i));
   // A slash command that opened the turn shows above its prompt; later user commands follow the answer.

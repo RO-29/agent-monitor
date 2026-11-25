@@ -70,23 +70,51 @@ func cursorMenuKeys(screen, want string) []string {
 		return nil
 	}
 	// Read the choices upward from the footer, then put them in screen order.
-	var rows []string
+	// A choice starts in the column of the label after ❯; wrapped or description lines sit deeper and are skipped.
+	type row struct {
+		text string
+		col  int
+	}
+	labelCol := func(ln string) int {
+		n := 0
+		for _, r := range ln {
+			if r != ' ' && r != '❯' && r != '\u00a0' {
+				break
+			}
+			n++
+		}
+		return n
+	}
+	var all []row
 	curFromEnd := -1
 	for i := end - 1; i >= 0; i-- {
 		ln := lines[i]
-		if strings.TrimSpace(ln) == "" && len(rows) == 0 {
+		if strings.TrimSpace(ln) == "" && len(all) == 0 {
 			continue
 		}
 		if m := reMenuCur.FindStringSubmatch(ln); m != nil && curFromEnd < 0 {
-			curFromEnd = len(rows)
-			rows = append(rows, m[1])
+			curFromEnd = len(all)
+			all = append(all, row{m[1], labelCol(ln)})
 			continue
 		}
 		if m := reMenuRow.FindStringSubmatch(ln); m != nil {
-			rows = append(rows, m[1])
+			all = append(all, row{m[1], labelCol(ln)})
 			continue
 		}
 		break
+	}
+	if curFromEnd < 0 {
+		return nil
+	}
+	col := all[curFromEnd].col
+	var rows []string
+	for k, r := range all {
+		if r.col == col {
+			if k == curFromEnd {
+				curFromEnd = len(rows)
+			}
+			rows = append(rows, r.text)
+		}
 	}
 	slices.Reverse(rows)
 	cur := -1

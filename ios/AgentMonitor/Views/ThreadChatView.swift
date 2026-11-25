@@ -440,7 +440,9 @@ struct ThreadChatView: View {
                         .id(it.id)
                         .padding(.top, it.kind == "user" && it.id != sorted.first?.id ? 12 : 0)
                     }
-                    ForEach(pending) { p in PendingBubble(msg: p) }
+                    ForEach(pending) { p in
+                        PendingBubble(msg: p).onTapGesture { withAnimation { pending.removeAll { $0.id == p.id } } }
+                    }
                     if running {
                         HStack(spacing: 10) { WorkingPulse(); Text("Working").font(.subheadline) }
                             .foregroundStyle(Tok.muted)
@@ -472,11 +474,13 @@ struct ThreadChatView: View {
                 // Follow new output only while the reader is at the bottom.
                 if atBottom { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
                 markSeen()
+                settlePending()
             }
             .onChange(of: atBottom) { _, _ in markSeen() }
             .onReceive(NotificationCenter.default.publisher(for: .chatSent)) { n in
                 guard let sid = n.userInfo?["sid"] as? String, sid == sessionID, let text = n.userInfo?["text"] as? String else { return }
                 pending.append(PendingMsg(text: text, queued: n.userInfo?["queued"] as? Bool ?? false))
+                settlePending() // a poll may have brought the message before this notice
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .onChange(of: items.count) { _, _ in settlePending() }
@@ -563,7 +567,8 @@ struct ThreadChatView: View {
         guard !pending.isEmpty else { return }
         let users = items.values.filter { $0.kind == "user" }
         pending.removeAll { p in
-            let since = Int64(p.at.timeIntervalSince1970 * 1000) - 10_000
+            // Wide window: the send can take a while, and the phone and Mac clocks can differ.
+            let since = Int64(p.at.timeIntervalSince1970 * 1000) - 120_000
             return users.contains { $0.startedAt >= since && PendingMsg.norm($0.text).hasPrefix(PendingMsg.norm(p.text)) }
         }
     }
@@ -597,6 +602,7 @@ struct ThreadChatView: View {
     /// First read retries every 2 s (a new session writes its transcript late); then reads after the cursor.
     private func feedLoop(_ sid: String) async {
         items = [:]; prior = [:]; priorSID = nil; cursor = 0; earlier = nil; loaded = false; feedError = nil
+        pending = []; newMark = nil; markSet = false
         #if DEBUG
         if DebugRoute.sample { items = DebugRoute.sampleItems(); loaded = true; return }
         #endif
@@ -647,6 +653,7 @@ struct ThreadChatView: View {
 
     private func drivenLoop(_ id: String) async {
         items = [:]; prior = [:]; priorSID = nil; earlier = nil; loaded = false; feedError = nil
+        pending = []; newMark = nil; markSet = false
         var hasStream = true
         var wait: UInt64 = 1
         while !Task.isCancelled {
@@ -758,7 +765,7 @@ struct PendingBubble: View {
     let msg: PendingMsg
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { ctx in
-            let late = !msg.queued && ctx.date.timeIntervalSince(msg.at) > 90
+            let late = ctx.date.timeIntervalSince(msg.at) > (msg.queued ? 600 : 90)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(msg.text)
                     .font(.body).foregroundStyle(Tok.fg).lineSpacing(2)
@@ -766,7 +773,7 @@ struct PendingBubble: View {
                     .background(Tok.panel3.opacity(0.6), in: UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 4, topTrailingRadius: 14))
                     .overlay(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 4, topTrailingRadius: 14)
                         .stroke(late ? Tok.err : Tok.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
-                Label(late ? "Not in the transcript yet. Check the terminal." : msg.queued ? "Queued in the terminal" : "Sent to the terminal",
+                Label(late ? "Not in the transcript yet. Check the terminal. Tap to hide." : msg.queued ? "Queued in the terminal" : "Sent to the terminal",
                       systemImage: late ? "exclamationmark.triangle" : msg.queued ? "tray.and.arrow.down" : "paperplane")
                     .font(.caption2).foregroundStyle(late ? Tok.err : Tok.muted)
             }
