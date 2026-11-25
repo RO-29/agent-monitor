@@ -39,6 +39,11 @@ struct ThreadChatView: View {
     @State private var showHistory = false
     @State private var showScreen = false
     @State private var confirmEnd = false
+    /// Messages sent from the app that the transcript does not show yet.
+    @State private var pending: [PendingMsg] = []
+    /// The first item that arrived after the last visit; a "New" line shows above it.
+    @State private var newMark: String?
+    @State private var markSet = false
     private var sessionLive: Bool { [.running, .awaitingInput, .awaitingPermission, .idle].contains(session?.state ?? .unknown) }
 
     private var thread: V3Thread? { store.thread(threadID) }
@@ -421,6 +426,7 @@ struct ThreadChatView: View {
                     let tree = scriptTree
                     ForEach(tree.top) { it in
                         VStack(alignment: .leading, spacing: 4) {
+                            if it.id == newMark { NewLine() }
                             ChatItemView(item: it, expanded: expanded.contains(it.id), agent: agent,
                                          selecting: selecting, selected: selected.contains(it.id)) {
                                 withAnimation(.snappy(duration: 0.2)) {
@@ -434,6 +440,7 @@ struct ThreadChatView: View {
                         .id(it.id)
                         .padding(.top, it.kind == "user" && it.id != sorted.first?.id ? 12 : 0)
                     }
+                    ForEach(pending) { p in PendingBubble(msg: p) }
                     if running {
                         HStack(spacing: 10) { WorkingPulse(); Text("Working").font(.subheadline) }
                             .foregroundStyle(Tok.muted)
@@ -464,7 +471,15 @@ struct ThreadChatView: View {
             .onChange(of: sorted.last?.id) { _, _ in
                 // Follow new output only while the reader is at the bottom.
                 if atBottom { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+                markSeen()
             }
+            .onChange(of: atBottom) { _, _ in markSeen() }
+            .onReceive(NotificationCenter.default.publisher(for: .chatSent)) { n in
+                guard let sid = n.userInfo?["sid"] as? String, sid == sessionID, let text = n.userInfo?["text"] as? String else { return }
+                pending.append(PendingMsg(text: text, queued: n.userInfo?["queued"] as? Bool ?? false))
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            .onChange(of: items.count) { _, _ in settlePending() }
             .onChange(of: asks.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
             .environment(\.canFillComposer, true)
             .overlay(alignment: .topTrailing) {
@@ -539,6 +554,32 @@ struct ThreadChatView: View {
                 }
             }
         }
+    }
+
+    // MARK: pending sends
+
+    /// Drops each pending message once a user item with its text appears in the transcript.
+    private func settlePending() {
+        guard !pending.isEmpty else { return }
+        let users = items.values.filter { $0.kind == "user" }
+        pending.removeAll { p in
+            let since = Int64(p.at.timeIntervalSince1970 * 1000) - 10_000
+            return users.contains { $0.startedAt >= since && PendingMsg.norm($0.text).hasPrefix(PendingMsg.norm(p.text)) }
+        }
+    }
+
+    // MARK: seen
+
+    /// Sets the "New" line once from the last visit, then records what the reader has seen at the bottom.
+    private func markSeen() {
+        guard loaded, let last = sorted.last else { return }
+        let key = "chat.seen:" + threadID
+        let seen = Int64(UserDefaults.standard.double(forKey: key))
+        if !markSet {
+            markSet = true
+            if seen > 0 { newMark = scriptTree.top.first { $0.startedAt > seen }?.id }
+        }
+        if atBottom, last.startedAt > seen { UserDefaults.standard.set(Double(last.startedAt), forKey: key) }
     }
 
     // MARK: feed
@@ -704,6 +745,50 @@ struct ThreadChatView: View {
 
 // MARK: - One chat item
 
+struct PendingMsg: Identifiable {
+    let id = UUID()
+    let text: String
+    let queued: Bool
+    let at = Date()
+    static func norm(_ s: String) -> String { s.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+}
+
+/// A sent message the transcript does not show yet: where it is, and a warning when it does not arrive.
+struct PendingBubble: View {
+    let msg: PendingMsg
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { ctx in
+            let late = !msg.queued && ctx.date.timeIntervalSince(msg.at) > 90
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(msg.text)
+                    .font(.body).foregroundStyle(Tok.fg).lineSpacing(2)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(Tok.panel3.opacity(0.6), in: UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 4, topTrailingRadius: 14))
+                    .overlay(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 4, topTrailingRadius: 14)
+                        .stroke(late ? Tok.err : Tok.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                Label(late ? "Not in the transcript yet. Check the terminal." : msg.queued ? "Queued in the terminal" : "Sent to the terminal",
+                      systemImage: late ? "exclamationmark.triangle" : msg.queued ? "tray.and.arrow.down" : "paperplane")
+                    .font(.caption2).foregroundStyle(late ? Tok.err : Tok.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.leading, 40)
+        }
+    }
+}
+
+/// The line above the first message that arrived since the last visit.
+struct NewLine: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Rectangle().fill(Tok.accent).frame(height: 1)
+            Text("New").font(.caption.weight(.semibold)).foregroundStyle(Tok.accent)
+            Rectangle().fill(Tok.accent).frame(height: 1)
+        }
+        .padding(.vertical, 4)
+        .accessibilityLabel("New messages start here")
+    }
+}
+
 /// Pulsing run dot (`.d-run`).
 struct WorkingPulse: View {
     @State private var on = false
@@ -747,14 +832,17 @@ struct ChatItemView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 if !att.isEmpty {
                     ForEach(att.filter { $0.mime.hasPrefix("image/") && $0.mime != "image/heic" }) { a in
-                        UploadThumb(att: a)
+                        OpenAttachment(att: a) { UploadThumb(att: a) }.allowsHitTesting(!selecting)
                     }
                     ForEach(att.filter { !$0.mime.hasPrefix("image/") || $0.mime == "image/heic" }) { a in
-                        Label(a.name ?? "Attachment", systemImage: attachmentIcon(a.mime))
-                            .font(.footnote.weight(.medium)).foregroundStyle(Tok.fg2).lineLimit(1)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Tok.panel2, in: Capsule())
-                            .overlay(Capsule().stroke(Tok.line, lineWidth: 0.5))
+                        OpenAttachment(att: a) {
+                            Label(a.name ?? "Attachment", systemImage: attachmentIcon(a.mime))
+                                .font(.footnote.weight(.medium)).foregroundStyle(Tok.fg2).lineLimit(1)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(Tok.panel2, in: Capsule())
+                                .overlay(Capsule().stroke(Tok.line, lineWidth: 0.5))
+                        }
+                        .allowsHitTesting(!selecting)
                     }
                 }
                 if !shown.isEmpty {

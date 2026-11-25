@@ -24,6 +24,8 @@ struct AgentMonitorApp: App {
                     Notifier.shared.requestAuthorization()
                     #endif
                     store.start()
+                    // A cold launch can open already active, so the phase change below never fires.
+                    Task { await SigningWatch.tick() }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     // Reconnect when returning to foreground; the socket is

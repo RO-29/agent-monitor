@@ -1,0 +1,62 @@
+ ▐▛███▛█   Claude Code v2.1.332
+▝▜██████▀  Haiku 5.5 · Claude Team
+ ▝▝   ▝▝   /private/tmp/am-prompts/repo
+
+
+❯ Use the Bash tool to run exactly: rm a.txt
+
+⏺ Bash(rm a.txt)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ Ask me which color I like with the AskUserQuestion tool, options red and blue. Do nothing else.
+
+⏺ Answered Claude's questions:
+  ⎿  · Which color do you like? → Red
+
+⏺ You like red. I didn't do anything else, and a.txt is still there because the rm a.txt was rejected.
+
+✻ Cogitated for 1s · done 4:44 PM
+
+❯ Create a file named notes.txt containing the word hello, using the Write tool.
+
+⏺ Write(notes.txt)
+  ⎿  Wrote 1 line to notes.txt
+      1 hello
+
+⏺ I created /private/tmp/am-prompts/repo/notes.txt containing hello. a.txt is still in place.
+
+✻ Sautéed for 1s · done 4:44 PM
+
+❯ Use the Edit tool to change hello to bye in notes.txt.
+
+⏺ Update(notes.txt)
+  ⎿  Added 1 line, removed 1 line
+      1 -hello
+        \ No newline at end of file
+      1 +bye
+        \ No newline at end of file
+
+⏺ I changed hello to bye in /private/tmp/am-prompts/repo/notes.txt. a.txt is still there.
+
+✻ Sautéed for 1s · done 4:44 PM
+
+❯ Use WebFetch to fetch https://example.com and tell me its title.
+
+⏺ Fetch(https://example.com)
+  ⎿  Fetching…
+     (ctrl+b ctrl+b (twice) to run in background)
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Fetch · from the web-fetch agent
+ Claude wants to fetch content from example.com
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ url: https://example.com/
+ │ prompt: Return the exact text content of the page's <title> element, verbatim, and nothing else.
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Do you want to allow Claude to fetch this content?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for example.com
+   3. No, and tell Claude what to do differently (esc)
+
+
+

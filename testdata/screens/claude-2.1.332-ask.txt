@@ -1,0 +1,62 @@
+ ▐▛███▛█   Claude Code v2.1.332
+▝▜██████▀  Haiku 5.5 · Claude Team
+ ▝▝   ▝▝   /private/tmp/am-prompts/repo
+
+
+❯ Use the Bash tool to run exactly: rm a.txt
+
+⏺ Bash(rm a.txt)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ Ask me which color I like with the AskUserQuestion tool, options red and blue. Do nothing else.
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ Color
+
+Which color do you like?
+
+❯ 1. Red
+     Choose red
+  2. Blue
+     Choose blue
+  3. Type something.
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

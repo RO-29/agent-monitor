@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -47,8 +48,73 @@ func promptAnswerKeys(screen, answer string) []string {
 	if o := codexPermOptions(screen); o != nil && o[0].Key != "" {
 		return []string{o[0].Key}
 	}
+	return cursorMenuKeys(screen, "Yes")
+}
+
+var (
+	reMenuFooter = regexp.MustCompile(`(?i)enter to (confirm|select)`)
+	reMenuCur    = regexp.MustCompile(`^\s{0,2}❯\s+(\S.*?)\s*$`)
+	reMenuRow    = regexp.MustCompile(`^\s{3,}(\S.*?)\s*$`)
+)
+
+// cursorMenuKeys moves the ❯ of a menu with no numbers (Claude Code's folder trust) to the choice that starts with want.
+func cursorMenuKeys(screen, want string) []string {
+	lines := strings.Split(lastLines(screen, 24), "\n")
+	end := -1
+	for i, ln := range lines {
+		if reMenuFooter.MatchString(ln) {
+			end = i
+		}
+	}
+	if end < 0 {
+		return nil
+	}
+	// Read the choices upward from the footer, then put them in screen order.
+	var rows []string
+	curFromEnd := -1
+	for i := end - 1; i >= 0; i-- {
+		ln := lines[i]
+		if strings.TrimSpace(ln) == "" && len(rows) == 0 {
+			continue
+		}
+		if m := reMenuCur.FindStringSubmatch(ln); m != nil && curFromEnd < 0 {
+			curFromEnd = len(rows)
+			rows = append(rows, m[1])
+			continue
+		}
+		if m := reMenuRow.FindStringSubmatch(ln); m != nil {
+			rows = append(rows, m[1])
+			continue
+		}
+		break
+	}
+	slices.Reverse(rows)
+	cur := -1
+	if curFromEnd >= 0 {
+		cur = len(rows) - 1 - curFromEnd
+	}
+	if cur < 0 || len(rows) < 2 {
+		return nil
+	}
+	for i, r := range rows {
+		if reMenuNum.MatchString(r) {
+			return nil // a numbered menu takes digits
+		}
+		if strings.HasPrefix(r, want) {
+			var keys []string
+			for ; i > cur; i-- {
+				keys = append(keys, "Down")
+			}
+			for ; i < cur; i++ {
+				keys = append(keys, "Up")
+			}
+			return append(keys, "Enter")
+		}
+	}
 	return nil
 }
+
+var reMenuNum = regexp.MustCompile(`^[1-9]\.\s`)
 
 // answerPrompt types yes or no into the prompt a card showed, after checking that the screen still shows it.
 func answerPrompt(id, answer, key string) (int, error) {

@@ -467,6 +467,10 @@ struct Composer: View {
             } else if let sid = sessionID {
                 let sent = try await api.cliSendFull(sid, text: body, attachments: ids)
                 status = sent.queued ? "\(cliName) is busy and queued the message." : nil
+                if !body.isEmpty, !body.hasPrefix("/"), !body.hasPrefix("!") {
+                    NotificationCenter.default.post(name: .chatSent, object: nil,
+                                                    userInfo: ["sid": sid, "text": body, "queued": sent.queued || busyCLI])
+                }
                 if !sent.panel.isEmpty {
                     slashPanel = SlashPanel(command: String(body.split(separator: " ").first ?? ""), text: sent.panel, menu: sent.menu)
                 }
@@ -775,4 +779,9 @@ struct SlashPanel: Identifiable {
     let command: String
     let text: String
     let menu: Bool
+}
+
+extension Notification.Name {
+    /// A message the composer typed into a terminal; the chat shows it as pending until the transcript has it.
+    static let chatSent = Notification.Name("am.chatSent")
 }

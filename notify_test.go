@@ -504,3 +504,37 @@ func recvNote(t *testing.T, ch <-chan ONotification) ONotification {
 	}
 	return ONotification{}
 }
+
+func TestNotifyInstallWaiting(t *testing.T) {
+	n := newTestNotifier(t, &NotifySettings{BatchSec: intPtr(0)})
+	mux := http.NewServeMux()
+	n.routes(mux)
+	live, cancel := n.subscribe()
+	defer cancel()
+	post := func(body string) int {
+		r := httptest.NewRequest("POST", "/api/notify/install", strings.NewReader(body))
+		r.RemoteAddr = "127.0.0.1:5000"
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, r)
+		return w.Code
+	}
+	if code := post(`{"build":"abc1234"}`); code != 400 {
+		t.Fatalf("no url and not waiting: %d", code)
+	}
+	for _, c := range []struct{ body, kind, title string }{
+		{`{"build":"abc1234","waiting":true}`, "finished", "Agent Monitor abc1234 waits for your iPhone"},
+		{`{"build":"abc1234","waiting":true,"renew":true}`, "needs-you", "Agent Monitor needs a new build to keep opening"},
+	} {
+		if code := post(c.body); code != 200 {
+			t.Fatalf("%s: %d", c.body, code)
+		}
+		select {
+		case got := <-live:
+			if got.Kind != c.kind || got.Title != c.title {
+				t.Fatalf("got %+v", got)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("no notification")
+		}
+	}
+}

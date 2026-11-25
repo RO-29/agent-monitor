@@ -88,6 +88,12 @@ PY
 read -r DEVICE UDID <<<"$DEVICE"
 if [[ -z "$DEVICE" ]]; then
   log "no reachable paired iPhone (same Wi-Fi or USB needed)"
+  # Tell the phone once per build that an update (or a renewal) waits for it.
+  if [[ "$(cat "$STAMP" 2>/dev/null)" != "$HEAD" || -f "$RENEW" ]] && [[ "$(cat "$STATE/waiting" 2>/dev/null)" != "$HEAD" ]]; then
+    renew=false; [[ -f "$RENEW" ]] && renew=true
+    curl -sf -X POST -H 'Content-Type: application/json' "http://127.0.0.1:${AGENT_MONITOR_PORT:-7777}/api/notify/install" \
+      -d "{\"build\":\"$HEAD\",\"waiting\":true,\"renew\":$renew}" >/dev/null && echo "$HEAD" > "$STATE/waiting" && log "told the iPhone that $HEAD waits"
+  fi
   # iOS downloads but does not install a free-team build over the internet; set AM_IOS_OTA=1 with a paid team.
   [[ "${AM_IOS_OTA:-0}" == "1" ]] && ota_fallback
   exit 0
@@ -123,5 +129,6 @@ fi
 log "install on $DEVICE"
 xcrun devicectl device install app --device "$DEVICE" "$APP"
 echo "$HEAD" > "$STAMP"
+rm -f "$STATE/waiting"
 if [[ -f "$RENEW" ]] && (( $(epoch "$END") * 1000 > $(tr -dc 0-9 <"$RENEW") )); then rm -f "$RENEW"; log "renew: done"; fi
 log "done; profile expires ${END:-unknown}"

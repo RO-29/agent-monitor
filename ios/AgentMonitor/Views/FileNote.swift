@@ -1,6 +1,8 @@
 import ImageIO
+import QuickLook
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 // Reads the "Attached files" note (and older @path lines) that agent-monitor appends for terminal sessions.
 enum FileNote {
@@ -83,5 +85,60 @@ struct UploadThumb: View {
                                      kCGImageSourceThumbnailMaxPixelSize: 300]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
         return UIImage(cgImage: cg)
+    }
+}
+
+/// Tap to open an attachment in Quick Look (image, video, audio, PDF, Office); it downloads to a temporary file first.
+struct OpenAttachment<Content: View>: View {
+    let att: OAttachment
+    @ViewBuilder var content: () -> Content
+    @State private var file: URL?
+    @State private var loading = false
+    @State private var failed = false
+
+    var body: some View {
+        Button { Task { await open() } } label: {
+            content()
+                .overlay { if loading { ProgressView().controlSize(.small) } }
+                .overlay(alignment: .topTrailing) {
+                    if failed { Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Tok.err).padding(4) }
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(loading)
+        .quickLookPreview($file)
+        .accessibilityHint("Opens the file")
+    }
+
+    private func open() async {
+        guard var req = try? URLRequest(url: APIClient.shared.url(att.url)) else { failed = true; return }
+        APIClient.authorize(&req)
+        loading = true
+        failed = false
+        defer { loading = false }
+        do {
+            let (tmp, resp) = try await URLSession.shared.download(for: req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { failed = true; return }
+            let fm = FileManager.default
+            let dir = fm.temporaryDirectory.appendingPathComponent("att-" + att.id, isDirectory: true)
+            try? fm.removeItem(at: dir)
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let dest = dir.appendingPathComponent(Self.fileName(att))
+            try fm.moveItem(at: tmp, to: dest)
+            file = dest
+        } catch {
+            failed = true
+        }
+    }
+
+    /// The original name without path parts; Quick Look needs an extension to pick a viewer.
+    static func fileName(_ a: OAttachment) -> String {
+        var n = (a.name ?? "").components(separatedBy: CharacterSet(charactersIn: "/\\:")).last ?? ""
+        n = n.trimmingCharacters(in: .whitespacesAndNewlines)
+        if n.isEmpty || n.hasPrefix(".") { n = "attachment" + n }
+        if (n as NSString).pathExtension.isEmpty, let ext = UTType(mimeType: a.mime)?.preferredFilenameExtension {
+            n += "." + ext
+        }
+        return n
     }
 }

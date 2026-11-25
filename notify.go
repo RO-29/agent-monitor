@@ -616,11 +616,23 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 	// ios/resign.sh posts here when a new iPhone build waits on the install page; only this Mac may call it.
 	mux.HandleFunc("POST /api/notify/install", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Build string `json:"build"`
-			URL   string `json:"url"`
+			Build   string `json:"build"`
+			URL     string `json:"url"`
+			Waiting bool   `json:"waiting"`
+			Renew   bool   `json:"renew"`
 		}
-		if !localCaller(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil || !strings.HasPrefix(in.URL, "https://") {
-			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "local callers only, with an https url"})
+		if !localCaller(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil || (!in.Waiting && !strings.HasPrefix(in.URL, "https://")) {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "local callers only, with an https url or waiting"})
+			return
+		}
+		if in.Waiting { // the build Mac cannot reach the phone: it installs on the next run with the phone near
+			ev := notifyEvent{Kind: "finished", Title: "Agent Monitor " + clipString(in.Build, 12) + " waits for your iPhone",
+				Body: "Connect the iPhone to the build Mac's Wi-Fi or USB. The build Mac installs the update within 3 hours."}
+			if in.Renew {
+				ev.Kind, ev.Title = "needs-you", "Agent Monitor needs a new build to keep opening"
+			}
+			n.deliver(ev)
+			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
 		n.deliver(notifyEvent{Kind: "finished", Title: "Agent Monitor " + in.Build + " is ready", Body: "Tap to open the install page, then tap Install.", URL: in.URL})
