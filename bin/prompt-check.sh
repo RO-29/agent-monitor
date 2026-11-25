@@ -37,7 +37,7 @@ wait_for() { # pattern, seconds
   return 1
 }
 
-fail=""
+fail="" nologin=false
 if wait_for "trust this folder|Do you trust" 40; then
   cp "$OUT/.screen" "$OUT/trust.txt"
   if grep -Eq "❯.*Yes" "$OUT/trust.txt"; then tmux send-keys -t "$S" Enter; else tmux send-keys -t "$S" Down Enter; fi
@@ -57,6 +57,7 @@ if [[ -z "$fail" ]]; then
   else
     cp "$OUT/.screen" "$OUT/last-screen.txt"
     fail="the Bash permission prompt did not show in 150 s"
+    grep -Eq "Not logged in|Login expired|Please run /login" "$OUT/.screen" && nologin=true
   fi
 fi
 
@@ -70,6 +71,13 @@ if [[ -z "$fail" ]]; then
 fi
 [[ -n "$fail" ]] && log "claude $VER: $fail"
 
+# Logged out is not a screen change: say so once per version and try again the next night.
+if $nologin; then
+  [[ -f "$STATE/nologin-$VER" ]] && exit 0
+  body="{\"prompts\":\"$VER\",\"nologin\":true}"
+  curl -sf -X POST -H 'Content-Type: application/json' "http://127.0.0.1:${AGENT_MONITOR_PORT:-7777}/api/notify/install" -d "$body" >/dev/null && touch "$STATE/nologin-$VER"
+  exit 0
+fi
 body=$(VER="$VER" FAIL="$fail" /usr/bin/python3 -c 'import json,os; print(json.dumps({"prompts": os.environ["VER"], "failed": os.environ["FAIL"]}))')
 if curl -sf -X POST -H 'Content-Type: application/json' "http://127.0.0.1:${AGENT_MONITOR_PORT:-7777}/api/notify/install" -d "$body" >/dev/null; then
   echo "$VER" > "$STATE/version"

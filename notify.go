@@ -622,6 +622,7 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 			Renew   bool   `json:"renew"`
 			Prompts string `json:"prompts"` // bin/prompt-check.sh: the Claude Code version it checked
 			Failed  string `json:"failed"`
+			NoLogin bool   `json:"nologin"`
 		}
 		if !localCaller(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil || (!in.Waiting && in.Prompts == "" && !strings.HasPrefix(in.URL, "https://")) {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "local callers only, with an https url or waiting"})
@@ -630,7 +631,10 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 		if in.Prompts != "" {
 			ev := notifyEvent{Kind: "finished", Title: "Claude Code " + clipString(in.Prompts, 24) + ": prompts still work",
 				Body: "The check on the build Mac read its prompt screens, and the app can see and answer them."}
-			if in.Failed != "" {
+			if in.NoLogin {
+				ev.Kind, ev.Title = "needs-you", "Log in to Claude Code on the build Mac"
+				ev.Body = "The nightly prompt check cannot run while Claude Code there is logged out. Run claude, then /login."
+			} else if in.Failed != "" {
 				ev.Kind, ev.Title = "error", "Claude Code "+clipString(in.Prompts, 24)+" changed its prompt screens"
 				ev.Body = clipString(in.Failed, 240) + ". The app may not see or answer its prompts until agent-monitor is updated."
 			}

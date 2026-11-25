@@ -526,6 +526,7 @@ func TestNotifyInstallWaiting(t *testing.T) {
 		{`{"build":"abc1234","waiting":true,"renew":true}`, "needs-you", "Agent Monitor needs a new build to keep opening"},
 		{`{"prompts":"2.1.340"}`, "finished", "Claude Code 2.1.340: prompts still work"},
 		{`{"prompts":"2.1.340","failed":"trust: not seen"}`, "error", "Claude Code 2.1.340 changed its prompt screens"},
+		{`{"prompts":"2.1.340","nologin":true}`, "needs-you", "Log in to Claude Code on the build Mac"},
 	} {
 		if code := post(c.body); code != 200 {
 			t.Fatalf("%s: %d", c.body, code)
