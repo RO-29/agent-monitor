@@ -134,9 +134,12 @@ func promptNotifyTick(items []NeedsYouItem) {
 			continue
 		}
 		fp := it.PromptKey
-		now[it.Key] = fp
 		old, had := turnWatch.prompts[it.Key]
-		if !turnWatch.primed || had && (old == fp || fp == "") {
+		if fp == "" && had {
+			fp = old // a screen read failed this tick: not a new prompt
+		}
+		now[it.Key] = fp
+		if !turnWatch.primed || had && (old == fp || old == "") {
 			continue
 		}
 		if had {

@@ -77,6 +77,30 @@ func TestPromptNotifierAnnouncesNewPromptsAndSettlesClosedOnes(t *testing.T) {
 	}
 }
 
+func TestPromptNotifierAlertsANewPromptOfTheSameSession(t *testing.T) {
+	got := captureTurnNotices(t)
+	promptNotifyTick(nil)
+	a := NeedsYouItem{Kind: "prompt", Key: "tp:claude:a", SessionID: "claude:a", Title: "A", Message: "Edit x.go?", PromptKey: "k1"}
+	promptNotifyTick([]NeedsYouItem{a})
+	promptNotifyTick([]NeedsYouItem{a})
+	if len(*got) != 1 {
+		t.Fatalf("one prompt alerts once: %+v", *got)
+	}
+	b := a
+	b.Message, b.PromptKey = "Edit y.go?", "k2"
+	promptNotifyTick([]NeedsYouItem{b})
+	if len(*got) != 3 || (*got)[1].Kind != "resolved" || (*got)[2].Body != "Edit y.go?" {
+		t.Fatalf("prompt B after A in one tick settles A and alerts B: %+v", *got)
+	}
+	c := b
+	c.PromptKey = ""
+	promptNotifyTick([]NeedsYouItem{c})
+	promptNotifyTick([]NeedsYouItem{b})
+	if len(*got) != 3 {
+		t.Fatalf("a tick with no fingerprint is not a new prompt: %+v", *got)
+	}
+}
+
 func TestEndingQuestion(t *testing.T) {
 	cases := map[string]string{
 		"Done.":                              "",
