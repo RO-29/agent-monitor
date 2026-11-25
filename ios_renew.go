@@ -2,11 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,17 +35,18 @@ func iosRenewFlag() string { return filepath.Join(stateDir(), "ios-resign", "ren
 func registerIOSRenewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/ios/renew", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Expires int64 `json:"expires"`
+			Expires int64  `json:"expires"`
+			Via     string `json:"via"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&in) != nil || in.Expires <= 0 {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "expires (Unix ms) is required"})
 			return
 		}
-		writeJSON(w, iosRenew(in.Expires, time.Now()))
+		writeJSON(w, iosRenew(in.Expires, time.Now(), in.Via != ""))
 	})
 }
 
-func iosRenew(expires int64, now time.Time) map[string]any {
+func iosRenew(expires int64, now time.Time, via bool) map[string]any {
 	iosRenewState.Lock()
 	defer iosRenewState.Unlock()
 	flag := iosRenewFlag()
@@ -54,8 +59,48 @@ func iosRenew(expires int64, now time.Time) map[string]any {
 	}
 	if err := iosKick(); err != nil {
 		_ = os.Remove(flag)
+		// The phone talks to this Mac; the build job may run on a peer. A forwarded request goes no further.
+		if !via {
+			if name, ok := iosRenewPeers(expires); ok {
+				return map[string]any{"ok": true, "started": true, "peer": name}
+			}
+		}
 		return map[string]any{"ok": false, "error": "this Mac has no iPhone build job (" + iosResignLabel + ")"}
 	}
 	iosRenewState.last = now
 	return map[string]any{"ok": true, "started": true}
+}
+
+// iosRenewPeers passes the request to each peer machine until one has the build job; it returns that peer.
+var iosRenewPeers = func(expires int64) (string, bool) {
+	peerStore.Lock()
+	loadPeersLocked()
+	ps := slices.Clone(peerStore.peers)
+	peerStore.Unlock()
+	host, _ := os.Hostname()
+	body := fmt.Sprintf(`{"expires":%d,"via":%q}`, expires, firstOf(host, "peer"))
+	for _, p := range ps {
+		if _, err := peerURLAllowed(p.URL); err != nil {
+			continue
+		}
+		req, err := http.NewRequest(http.MethodPost, p.URL+"/api/ios/renew", strings.NewReader(body))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+p.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := peerClient.Do(req)
+		if err != nil {
+			continue
+		}
+		var out struct {
+			OK bool `json:"ok"`
+		}
+		_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&out)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK && out.OK {
+			return p.Name, true
+		}
+	}
+	return "", false
 }

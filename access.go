@@ -113,7 +113,7 @@ var accessRules = []accessRule{
 	{"POST", "/api/orch/uploads$", "", LevelControl},
 	{"GET", "/api/orch/uploads/", "", LevelControl},
 	{"POST", "/api/orch/threads", "", LevelControl},
-	{"POST", "/api/ios/renew$", "", LevelControl}, // starts ios/resign.sh, at most once per 30 min
+	{"POST", "/api/ios/renew$", "", LevelView}, // starts ios/resign.sh at most once per 30 min; view lets a peer pass the phone's ask on
 
 	// Reading what agents do and ask.
 	{"GET HEAD", "/ws$", "", LevelView},
