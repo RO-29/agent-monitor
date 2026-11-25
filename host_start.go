@@ -156,7 +156,9 @@ func startTerminal(in terminalStart) (*terminalStarted, error) {
 		go func() {
 			if err := typeWhenReadyFn(id, in.Prompt); err != nil {
 				log.Printf("terminal %s: first prompt not sent: %v", id, err)
-				orchMgr.notify(notifyEvent{Kind: "error", Title: "The first prompt did not reach " + in.Agent, Body: "Open the terminal and send it again: " + err.Error()})
+				if orchMgr != nil {
+					orchMgr.notify(notifyEvent{Kind: "error", Title: "The first prompt did not reach " + in.Agent, Body: "Open the terminal and send it again: " + err.Error()})
+				}
 			} else {
 				log.Printf("terminal %s: first prompt sent", id)
 			}

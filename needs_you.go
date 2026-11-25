@@ -91,7 +91,8 @@ func needsYouSession(s *Session) (NeedsYouItem, bool) {
 	it.Answerable = pane.Sendable
 	if !it.Answerable {
 		it.Why = "agent-monitor cannot reach this terminal. Answer it in the terminal on the Mac, or dismiss this card if it is already answered."
-	} else if scr, err := targetCapture(pane.Target(), 0, true); err == nil {
+	} else if scr, err := targetCapture(pane.Target(), 0, true); err == nil && promptAnswerKeys(scr, "yes") != nil {
+		// A menu with no Yes row (a Codex start menu) gets no key, so no surface offers Yes for it.
 		it.PromptKey = promptKey(scr)
 	}
 	if it.Answerable && it.PromptKey == "" {

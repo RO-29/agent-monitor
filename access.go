@@ -131,6 +131,7 @@ var accessRules = []accessRule{
 	{"GET HEAD", "/api/orch/threads", "", LevelView},
 	{"GET HEAD", "/api/queue/", "", LevelView},
 	{"GET HEAD", "/api/notify", "", LevelView},
+	{"POST", "/api/notify/read$", "", LevelView},   // read marks only: a paired phone clears its own unread count
 	{"POST", "/api/push/presence$", "", LevelView}, // only delays lock-screen alerts while the app shows them
 	{"GET HEAD", "/api/session/", "", LevelView},
 }

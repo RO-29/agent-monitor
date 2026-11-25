@@ -80,6 +80,9 @@ func TestOrchUploadFileTypes(t *testing.T) {
 		{"clip.mov", "video/quicktime", []byte("\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00"), "video/quicktime", ".mov"},
 		{"tool", "", []byte{0xca, 0xfe, 0xba, 0xbe, 0, 1}, "application/octet-stream", ".bin"},
 		{"data.parquet", "", []byte("PAR1\x00\x01"), "application/octet-stream", ".parquet"},
+		{"note.txt", "", []byte("\xff\xfeh\x00i\x00"), "application/octet-stream", ".bin"},
+		{"pic.avif", "", []byte("\x00\x00\x00\x1cftypavif\x00\x00\x00\x00"), "application/octet-stream", ".avif"},
+		{"clip.mp4", "", []byte("\x00\x00\x00\x1cftypisom\x00\x00\x00\x00"), "video/mp4", ".mp4"},
 	} {
 		code, out := uploadTyped(t, srv.URL, c.name, c.ctype, c.data)
 		if code != 201 || out["mime"] != c.mime || !strings.HasSuffix(out["path"].(string), c.ext) {

@@ -375,18 +375,22 @@ func (n *Notifier) unread() int {
 // Resolve marks the alert for an ended approval read and resolved, and drops it if still held in a batch.
 func (n *Notifier) Resolve(key string) {
 	n.mu.Lock()
+	dropped := false
 	for _, b := range n.batches {
 		kept := b.held[:0]
 		for _, e := range b.held {
 			if !(len(e.Keys) == 1 && e.Keys[0] == key) {
 				kept = append(kept, e)
+			} else {
+				dropped = true
 			}
 		}
 		b.held = kept
 	}
 	id, ok := n.keyOf[key]
 	delete(n.keyOf, key)
-	if !ok {
+	// "gone" catches an alert stored after its approval ended; a session key repeats for each prompt, so it never applies.
+	if !ok && !dropped && !strings.HasPrefix(key, "tp:") {
 		if len(n.gone) > 1000 {
 			n.gone = map[string]bool{}
 		}
@@ -643,7 +647,11 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 				ev.Kind, ev.Title = "error", "Claude Code "+clipString(in.Prompts, 24)+" changed its prompt screens"
 				ev.Body = clipString(in.Failed, 240) + ". The app may not see or answer its prompts until agent-monitor is updated."
 			}
-			n.deliver(ev)
+			if ev.Kind == "finished" {
+				n.Emit(ev) // "still works" follows the Finished setting; a failure always shows
+			} else {
+				n.deliver(ev)
+			}
 			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
@@ -657,7 +665,7 @@ func (n *Notifier) routes(mux *http.ServeMux) {
 			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
-		n.deliver(notifyEvent{Kind: "finished", Title: "Agent Monitor " + in.Build + " is ready", Body: "Tap to open the install page, then tap Install.", URL: in.URL})
+		n.deliver(notifyEvent{Kind: "finished", Title: "Agent Monitor " + clipString(in.Build, 12) + " is ready", Body: "Tap to open the install page, then tap Install.", URL: in.URL})
 		writeJSON(w, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("POST /api/notify/test", func(w http.ResponseWriter, r *http.Request) {

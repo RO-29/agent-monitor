@@ -48,14 +48,18 @@ func sniffBinary(head []byte, ext string) string {
 			return m
 		}
 		return "application/octet-stream"
+	case has(0, "\xff\xfe") || has(0, "\xfe\xff"):
+		return "application/octet-stream" // UTF-16 text: its BOM looks like an MPEG frame header
 	case has(4, "ftyp"):
 		switch {
 		case has(8, "qt  "):
 			return "video/quicktime"
 		case has(8, "M4A ") || has(8, "M4B "):
 			return "audio/mp4"
+		case has(8, "isom") || has(8, "iso2") || has(8, "mp41") || has(8, "mp42") || has(8, "avc1") || has(8, "M4V ") || has(8, "3gp") || has(8, "dash"):
+			return "video/mp4"
 		}
-		return "video/mp4"
+		return "application/octet-stream"
 	case has(0, "\x1a\x45\xdf\xa3"):
 		if ext == ".mkv" {
 			return "video/x-matroska"

@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // statusRefused is a refusal that leaves the request open (423); 409 means another surface or the terminal answered first.
@@ -152,6 +154,13 @@ func answerPrompt(id, answer, key string) (int, error) {
 	if answer != "yes" && answer != "no" {
 		return http.StatusBadRequest, errors.New(`answer must be "yes", "no" or "dismiss"`)
 	}
+	// Two answers to one prompt (banner and card) must not both send: the second would hit the next prompt.
+	sentKey := id + "\x00" + key
+	promptAnswerMu.Lock()
+	defer promptAnswerMu.Unlock()
+	if at, ok := promptAnswered[sentKey]; ok && key != "" && time.Since(at) < 10*time.Second {
+		return http.StatusConflict, errors.New("an answer to this prompt was already sent")
+	}
 	code := http.StatusOK
 	_, rcode, err := withTerminal(id, func(t string) error {
 		scr, err := targetCapture(t, 0, true)
@@ -182,8 +191,19 @@ func answerPrompt(id, answer, key string) (int, error) {
 		}
 		return code, err
 	}
+	for k, at := range promptAnswered {
+		if time.Since(at) > time.Minute {
+			delete(promptAnswered, k)
+		}
+	}
+	promptAnswered[sentKey] = time.Now()
 	return http.StatusOK, nil
 }
+
+var (
+	promptAnswerMu sync.Mutex
+	promptAnswered = map[string]time.Time{}
+)
 
 // dismissPrompt clears a prompt card the user answered elsewhere; a prompt still on a watched screen comes back.
 func dismissPrompt(id string) (int, error) {
