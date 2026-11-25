@@ -13,7 +13,7 @@ struct RootView: View {
 
             PermissionsView()
                 .tabItem { Label("Approvals", systemImage: "checkmark.shield") }
-                .badge(store.approvalsCount)
+                .badge(store.approvalsCount + store.remoteNeedCount)
                 .tag(AppTab.approvals)
 
             AlertsView()
@@ -61,7 +61,7 @@ struct ConnectionChip: View {
                 }
             }
             .padding(.horizontal, 4)
-            .frame(minHeight: 32)
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -58,6 +58,10 @@ final class AppStore {
     var machines: [Machine] = Machines.all
     var remoteNeeds: [String: [NeedsYouItem]] = [:]
     var remoteDown: [String: String] = [:]
+    /// When each machine first failed in the current outage.
+    var remoteDownSince: [String: Date] = [:]
+    /// Bumped when a "tell me when done" bell turns off by itself, so views redraw it.
+    var doneWatchTick = 0
     @ObservationIgnored var remoteSeen: Set<String> = []
     @ObservationIgnored var remotePoll: Task<Void, Never>?
     #if DEBUG
@@ -459,6 +463,20 @@ final class AppStore {
         }
     }
 
+    /// When the app went to the background; nil while it has not.
+    var backgroundAt: Date?
+
+    /// Back in the foreground: a short trip (Control Center, a banner) keeps the socket and refreshes only.
+    func resume() {
+        let away = backgroundAt.map { Date().timeIntervalSince($0) } ?? 0
+        backgroundAt = nil
+        if connection == .connected, live != nil, away < 30 {
+            Task { await loadNeedsYou(); await refreshThreadsIfStale(); await loadAlerts() }
+        } else {
+            connect()
+        }
+    }
+
     func connect() {
         live?.stop()
         if needsYouSupported == false { needsYouSupported = nil }
@@ -484,7 +502,8 @@ final class AppStore {
             async let t = APIClient.shared.talks()
             async let pn = APIClient.shared.panes()
             let (sessions, perms, talks, panes) = try await (s, p, t, pn)
-            for x in sessions { sessionsByID[x.id] = x }
+            // A full list: ended sessions go, so none lingers as "awaiting".
+            sessionsByID = Dictionary(sessions.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
             permissionsByID = Dictionary(uniqueKeysWithValues: perms.map { ($0.id, $0) })
             talksByID = Dictionary(uniqueKeysWithValues: talks.map { ($0.id, $0) })
             panesByID = Dictionary(uniqueKeysWithValues: panes.map { ($0.id, $0) })
@@ -706,12 +725,14 @@ final class AppStore {
         if alerts.count > 300 { alerts.removeLast(alerts.count - 300) }
         // Alert only for fresh needs-you items; a reconnect replays older ones.
         let fresh = Int64(Date().timeIntervalSince1970 * 1000) - a.at < 120_000
+        let watched = fresh && a.kind == "finished" && takeDoneWatch(a.threadId)
         if !(a.quiet ?? false), !(a.resolved ?? false), fresh, !showsChat(a.threadId), !(a.kind == "needs-you" && bannerShown(a.threadId)) {
             var kind = NotifyKind.from(alertKind: a.kind)
             if kind == .needsYou, let t = a.threadId, approvals.contains(where: { threadID(of: $0) == resolveThreadID(t) && $0.kind == "question" }) {
                 kind = .question
             }
-            Notifier.shared.alert(id: a.id, kind: kind, title: a.title, body: a.body ?? "", threadId: a.threadId, url: a.url)
+            Notifier.shared.alert(id: a.id, kind: kind, title: a.title, body: a.body ?? "", threadId: a.threadId, url: a.url,
+                                  prompt: a.prompt ?? false, force: watched)
         }
     }
 
@@ -801,7 +822,7 @@ final class AppStore {
     private func apply(_ ev: WSEvent) {
         switch ev {
         case .snapshot(let list):
-            for s in list { sessionsByID[s.id] = s }
+            sessionsByID = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
             Task { await loadApprovals() }
             soonThreads()
             soonNeedsYou()

@@ -16,7 +16,7 @@ struct RemoteNeedsSection: View {
                     }
                     .foregroundStyle(Tok.fg2)
                     if let e = store.remoteDown[m.id] {
-                        Label("Cannot reach \(m.name): \(e)", systemImage: "wifi.exclamationmark")
+                        Label("Cannot reach \(m.name), \(store.offlineSince(m.id) ?? "offline"): \(e)", systemImage: "wifi.exclamationmark")
                             .font(Typo.sm).foregroundStyle(Tok.err)
                     }
                     ForEach(items) { RemoteNeedCard(machine: m, item: $0) }

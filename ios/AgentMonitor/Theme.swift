@@ -32,6 +32,8 @@ enum Tok {
     static let idle = Color(light: 0xcfcac0, dark: 0x4a4943)
     static let read = Color(light: 0x4f7fd6, dark: 0x86a3ff)
     static let onOk = Color(light: 0xffffff, dark: 0x0d2316)
+    /// Text and icons on the accent or a coloured tile: white in light mode, near black on the light dark-mode colours.
+    static let onAccent = Color(light: 0xffffff, dark: 0x14161c)
 
     /// The agent colour token (--claude, --codex, ...); unknown agents use --muted.
     static func agent(_ a: String) -> Color {

@@ -339,6 +339,7 @@ struct ThreadChatView: View {
     }
     fileprivate var findState: (on: Bool, text: String, at: Int, hits: Int) { (finding, findText, findAt, findHits.count) }
     fileprivate var findBarView: some View { findBar }
+    fileprivate var chatAPI: APIClient { api }
 
     fileprivate func jump(_ proxy: ScrollViewProxy) {
         guard findHits.indices.contains(findAt) else { return }
@@ -361,9 +362,9 @@ struct ThreadChatView: View {
             .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 10))
             Text(hits.isEmpty ? (findText.count >= 2 ? "0" : "") : "\(findAt + 1)/\(hits.count)")
                 .font(.footnote.monospacedDigit()).foregroundStyle(Tok.muted)
-            Button { findAt = (findAt - 1 + hits.count) % max(hits.count, 1) } label: { Image(systemName: "chevron.up") }
+            Button { findAt = (findAt - 1 + hits.count) % max(hits.count, 1) } label: { Image(systemName: "chevron.up").frame(width: 36, height: 44).contentShape(Rectangle()) }
                 .disabled(hits.count < 2).accessibilityLabel("Earlier match")
-            Button { findAt = (findAt + 1) % max(hits.count, 1) } label: { Image(systemName: "chevron.down") }
+            Button { findAt = (findAt + 1) % max(hits.count, 1) } label: { Image(systemName: "chevron.down").frame(width: 36, height: 44).contentShape(Rectangle()) }
                 .disabled(hits.count < 2).accessibilityLabel("Later match")
             Button("Done") { withAnimation(.snappy) { finding = false; findText = ""; findAt = 0 } }
         }
@@ -387,6 +388,7 @@ struct ThreadChatView: View {
             }
             Button { setFullscreen(true) } label: { Label("Read Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") }
             Button { withAnimation(.snappy) { finding = true } } label: { Label("Find in Chat", systemImage: "magnifyingglass") }
+            DoneBellItem(threadID: threadID)
             if sessionID != nil, canRunBash, peer == nil {
                 Button { showHistory = true } label: { Label("Command History", systemImage: "clock.arrow.circlepath") }
                 Button { showScreen = true } label: { Label("Terminal Screen", systemImage: "terminal") }
@@ -429,8 +431,19 @@ struct ThreadChatView: View {
     }
 
     /// Two-line title: thread name, then a status dot with the agent and repo.
+    /// Ms of the last thing the agent wrote; a working agent silent for minutes may be stuck.
+    private var lastActive: Int64 { session?.lastActivityAt ?? thread?.lastAt ?? 0 }
+
     private var titleView: some View {
-        let status: (String, Color)? = !asks.isEmpty ? ("Needs you", Tok.need) : running ? ("Working", Tok.run) : nil
+        TimelineView(.periodic(from: .now, by: 30)) { tl in titleBody(now: tl.date) }
+            .frame(maxWidth: 270)
+            .accessibilityElement(children: .combine)
+    }
+
+    private func titleBody(now: Date) -> some View {
+        let quietMin = running && lastActive > 0 ? Int((now.timeIntervalSince1970 * 1000 - Double(lastActive)) / 60_000) : 0
+        let work = quietMin >= 2 ? "Working · quiet \(quietMin) m" : "Working"
+        let status: (String, Color)? = !asks.isEmpty ? ("Needs you", Tok.need) : running ? (work, quietMin >= 2 ? Tok.need : Tok.run) : nil
         return VStack(spacing: 1) {
             Text(title).font(.headline).foregroundStyle(Tok.fg).lineLimit(1).minimumScaleFactor(0.85)
             HStack(spacing: 5) {
@@ -445,8 +458,6 @@ struct ThreadChatView: View {
             .font(.caption.weight(.medium))
             .foregroundStyle(Tok.muted)
         }
-        .frame(maxWidth: 270)
-        .accessibilityElement(children: .combine)
     }
 
     private func chat(_ target: ChatTarget) -> some View {
@@ -1019,6 +1030,13 @@ struct ChatItemView: View {
         }
     }
 
+    /// What VoiceOver reads for a tool row: kind, state and the line, never the glyph.
+    private func spokenRow(_ r: (icon: String, color: Color, label: String, detail: String, meta: String)) -> String {
+        let kind = item.kind == "command" ? "Command" : item.kind == "fileChange" ? "File edit" : r.label.isEmpty ? "Step" : r.label
+        let state = running ? "running" : item.failed ? "failed" : "done"
+        return [kind, state, r.detail, r.meta == "running" ? "" : r.meta].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
     private var detail: String {
         var parts: [String] = []
         if item.kind == "command", let c = item.command, c.contains("\n") || c.count > 60 { parts.append("$ " + c) }
@@ -1069,6 +1087,7 @@ struct ChatItemView: View {
             Button(action: toggle) {
                 HStack(spacing: 8) {
                     Text(r.icon).font(.footnote.weight(.bold)).foregroundStyle(r.color).frame(width: 16)
+                        .accessibilityHidden(true)
                     HStack(spacing: 5) {
                         if !r.label.isEmpty { Text(r.label).font(.footnote.weight(.semibold)) }
                         if !r.detail.isEmpty {
@@ -1092,6 +1111,8 @@ struct ChatItemView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(RowPress())
+            .accessibilityLabel(spokenRow(r))
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             .background(isSubagent ? Tok.subSoft : .clear, in: RoundedRectangle(cornerRadius: Radius.row))
             .contextMenu { copyMenu }
             if expanded, isSubagent, let o = item.output, !o.isEmpty {
@@ -1149,6 +1170,7 @@ struct ChatItemView: View {
             Button(action: toggle) {
                 HStack(spacing: 8) {
                     Text("✻").font(.footnote).foregroundStyle(running ? Tok.run : Tok.claude).frame(width: 16)
+                        .accessibilityHidden(true)
                     (Text(running ? "Thinking " : "Thought ").foregroundColor(Tok.muted)
                         + Text(expanded ? "" : first).foregroundColor(Tok.fg2))
                         .font(.footnote).italic().lineLimit(1)
@@ -1163,6 +1185,7 @@ struct ChatItemView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             if expanded {
                 Text(item.text.isEmpty ? "No text" : item.text)
                     .font(.subheadline).foregroundStyle(Tok.fg2).lineSpacing(3)
@@ -1178,7 +1201,7 @@ struct ChatItemView: View {
         let done = todos.filter { $0.status == "completed" }.count
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text("☰").foregroundStyle(Tok.muted)
+                Text("☰").foregroundStyle(Tok.muted).accessibilityHidden(true)
                 Text("Plan").foregroundStyle(Tok.fg2)
                 Spacer()
                 Text("\(done)/\(todos.count) done").font(Typo.mono(11.5)).foregroundStyle(Tok.muted)
@@ -1315,5 +1338,43 @@ private struct FindFollow: ViewModifier {
             // A streamed reply grows one item: follow its text, not only new ids.
             .onChange(of: view.lastLen) { _, _ in view.follow(proxy) }
             .safeAreaInset(edge: .top, spacing: 0) { if f.on { view.findBarView } }
+            .environment(\.chatAPI, view.chatAPI)
+    }
+}
+
+/// Thread menu item: alert once when this thread's turn ends, even with "Finished" alerts off.
+struct DoneBellItem: View {
+    @Environment(AppStore.self) private var store
+    let threadID: String
+    var body: some View {
+        let on = store.doneWatchTick >= 0 && DoneWatch.has(threadID)
+        Button {
+            DoneWatch.set(threadID, !on)
+            store.doneWatchTick += 1
+        } label: {
+            Label(on ? "Stop Alert When Done" : "Alert Me When Done", systemImage: on ? "bell.slash" : "bell.badge")
+        }
+    }
+}
+
+/// Composer chip: the same bell, shown while the agent works.
+struct DoneBellChip: View {
+    @Environment(AppStore.self) private var store
+    let threadID: String
+    var body: some View {
+        let on = store.doneWatchTick >= 0 && DoneWatch.has(threadID)
+        Button {
+            DoneWatch.set(threadID, !on)
+            store.doneWatchTick += 1
+        } label: {
+            Label(on ? "Alert when done: on" : "Alert me when done", systemImage: on ? "bell.fill" : "bell")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(on ? Tok.accent : Tok.fg2)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: on)
+        .accessibilityValue(on ? "On" : "Off")
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct WorkspaceView: View {
     @Environment(AppStore.self) private var store
     @State private var query = ""
+    @State private var settledLimit = 100
 
     var body: some View {
         @Bindable var store = store
@@ -46,7 +47,12 @@ struct WorkspaceView: View {
                     FoldSection(ThreadGroup.settled.label, key: "home.settled", foldedByDefault: true, forceOpen: searching) {
                         Text("\(settled.count)")
                     } content: {
-                        ForEach(settled.prefix(100)) { t in row(t, .settled) }
+                        ForEach(settled.prefix(settledLimit)) { t in row(t, .settled) }
+                        if settled.count > settledLimit {
+                            Button("Show older (\(settled.count - settledLimit) more)") { settledLimit += 100 }
+                                .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+                                .listRowBackground(Tok.bg)
+                        }
                     }
                 }
                 // In the list, not an overlay, so it never covers the Usage section.
@@ -72,6 +78,9 @@ struct WorkspaceView: View {
                     .listRowBackground(Tok.bg)
                     .listRowSeparator(.hidden)
                 }
+                if searching {
+                    MessageSearchRows(query: query)
+                }
                 if !searching {
                     FoldSection("Usage", key: "home.usage") {
                         UsageStrip()
@@ -83,11 +92,7 @@ struct WorkspaceView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Tok.bg)
-            .overlay {
-                if !query.isEmpty && noMatches {
-                    ContentUnavailableView.search(text: query)
-                }
-            }
+
             .searchable(text: $query, prompt: "Search threads")
             .navigationTitle("Threads")
             .toolbar {
@@ -139,11 +144,18 @@ struct WorkspaceView: View {
         let cards = store.approvals
         let waiting = store.threads(in: .need).filter { store.approvals(forThread: $0).isEmpty }
         let other = store.permissions.count
-        if !cards.isEmpty || !waiting.isEmpty || other > 0 {
+        let remote = store.remoteForHome.flatMap { m in (store.remoteNeeds[m.id] ?? []).map { (m, $0) } }
+        if !cards.isEmpty || !waiting.isEmpty || other > 0 || !remote.isEmpty {
             FoldSection(ThreadGroup.need.label, key: "home.need", tint: Tok.need) {
                 // The Approvals tab count, but never fewer than the cards shown (the server list can lag).
-                Text("\(max(store.approvalsCount, cards.count + waiting.count + other))")
+                Text("\(max(store.approvalsCount, cards.count + waiting.count + other) + remote.count)")
             } content: {
+                ForEach(remote, id: \.1.id) { m, it in
+                    RemoteNeedCard(machine: m, item: it)
+                        .listRowBackground(Tok.bg)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                }
                 ForEach(cards) { a in
                     QuickApprovalCard(a: a)
                         .listRowBackground(Tok.bg)
@@ -207,7 +219,9 @@ struct WorkspaceView: View {
     private func filtered(_ rows: [V3Thread]) -> [V3Thread] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return rows }
-        return rows.filter { $0.name.lowercased().contains(q) || $0.repoName.lowercased().contains(q) }
+        return rows.filter { t in
+            [t.name, t.repoName, t.ref ?? "", t.agent, t.machine ?? ""].contains { $0.lowercased().contains(q) }
+        }
     }
 }
 
@@ -345,5 +359,55 @@ struct ThreadRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityValue(group.label)
+    }
+}
+
+/// Home search, below the thread matches: prompts that hold the words, each opening its thread.
+private struct MessageSearchRows: View {
+    @Environment(AppStore.self) private var store
+    let query: String
+    @State private var hits: [PromptRun] = []
+    @State private var state = "idle"
+
+    var body: some View {
+        Section {
+            if state == "idle" {
+                Button { Task { await run() } } label: {
+                    Label("Search messages for \u{201C}\(query)\u{201D}", systemImage: "text.magnifyingglass")
+                        .frame(minHeight: 44)
+                }
+            } else if state == "busy" {
+                HStack(spacing: 8) { ProgressView(); Text("Searching messages").foregroundStyle(Tok.muted) }.frame(minHeight: 44)
+            } else if hits.isEmpty {
+                Text(state == "error" ? "Could not search messages." : "No message holds \u{201C}\(query)\u{201D}.")
+                    .font(.subheadline).foregroundStyle(Tok.muted).frame(minHeight: 44)
+            } else {
+                ForEach(hits) { h in
+                    Button { if let s = h.sessionId { store.openThread(s) } } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(h.text).font(.subheadline).foregroundStyle(Tok.fg).lineLimit(3)
+                            Text(((h.cwd ?? "") as NSString).lastPathComponent + (h.at.map { " · " + relativeTime($0) } ?? ""))
+                                .font(.caption).foregroundStyle(Tok.muted)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(h.sessionId == nil)
+                }
+            }
+        } header: {
+            Text("Messages")
+        }
+        .listRowBackground(Tok.bg)
+        .onChange(of: query) { _, _ in state = "idle"; hits = [] }
+    }
+
+    private func run() async {
+        state = "busy"
+        do {
+            hits = try await APIClient.shared.prompts(query: query, limit: 40)
+            state = "done"
+        } catch {
+            state = "error"
+        }
     }
 }
