@@ -108,6 +108,7 @@ function DiffBody({ f, wrap, onRevert }: { f: ODiffFile; wrap: boolean; onRevert
     fill(`${f.path}:${note.line}${note.old ? " (removed line)" : ""}: ${note.text.trim()}`, "text");
     showToast("Comment added to the message", "It goes to the agent with your next message.");
     setNote(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(".wdiff")?.focus());
   };
   const lineBtn = (key: string, line: number | undefined, old?: boolean) =>
     line != null && fill ? (
@@ -309,13 +310,19 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
   const box = useRef<HTMLDivElement>(null);
   const pathKey = nav.paths?.join("\n") || "";
   const [reload, setReload] = useState(0);
+  const lastReload = useRef(reload);
 
   useEffect(() => {
     let off = false;
+    // A reload after a revert keeps the old diff on screen, so the reader keeps the place.
+    const soft = lastReload.current !== reload;
+    lastReload.current = reload;
     setLoading(true);
     setErr("");
-    setDiff(null);
-    setSingle(null);
+    if (!soft) {
+      setDiff(null);
+      setSingle(null);
+    }
     loadDiff(threadId, nav.run != null ? { run: nav.run } : { from: nav.from, to: nav.to, path: pathKey || undefined })
       .then((d) => !off && setDiff(d))
       .catch((e) => {
@@ -398,6 +405,8 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
       setReload((n) => n + 1);
     } catch (e) {
       gitErrorToast("Could not revert the block", e);
+      // The file probably changed: read it again so the next try has the new hash.
+      setReload((n) => n + 1);
     }
   };
   const toggleWrap = () => {

@@ -57,8 +57,12 @@ extension AppStore {
 
     /// Alerts once per new item; the first load after launch only records what is already there.
     private func notifyRemote(_ m: Machine, _ items: [NeedsYouItem], first: Bool) {
+        // Keys repeat ("tp:<session>" for each prompt): forget the ones that closed, so the next one alerts.
+        let prefix = "m-\(m.id)-"
+        let now = Set(items.map { prefix + $0.key })
+        remoteSeen = remoteSeen.filter { !$0.hasPrefix(prefix) || now.contains($0) }
         for it in items {
-            let id = "m-\(m.id)-\(it.key)"
+            let id = prefix + it.key
             guard remoteSeen.insert(id).inserted, !first else { continue }
             let who = agentName(it.agent ?? "")
             Notifier.shared.approvalAsk(id: id, title: "[\(m.name)] \(it.kind == "question" ? "\(who) is asking" : "\(who) needs you")",

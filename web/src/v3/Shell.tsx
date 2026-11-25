@@ -259,10 +259,14 @@ export default function V3Shell() {
         : p === "settings"
           ? path.startsWith("/settings")
           : path === "/more" || [...LOOKS, ...VIEWS].some((v) => path.startsWith(v.to)) || path.startsWith("/threads") || path.startsWith("/t/");
-  const toggleNotify = () => {
+  const toggleNotify = async () => {
     if (!notifyOn && typeof Notification !== "undefined") {
-      if (Notification.permission === "default") void Notification.requestPermission();
-      else if (Notification.permission === "denied") showToast("Desktop alerts are blocked", "Allow notifications for this site in the browser settings.", { kind: "alert" });
+      // "Alerts on" must mean alerts come: turn it on only with the permission granted.
+      const p = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      if (p !== "granted") {
+        showToast("Desktop alerts are blocked", "Allow notifications for this site in the browser settings.", { kind: "alert" });
+        return;
+      }
     }
     setNotify(!notifyOn);
   };

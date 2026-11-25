@@ -478,6 +478,8 @@ final class AppStore {
     }
 
     func connect() {
+        // Items that came while away are already in Notification Center: hydrate marks them seen first.
+        notifsReady = false
         live?.stop()
         if needsYouSupported == false { needsYouSupported = nil }
         connection = .connecting
@@ -695,6 +697,7 @@ final class AppStore {
             let r = try await APIClient.shared.alerts()
             let list = (r.items ?? []).sorted { $0.at > $1.at }
             alerts = list
+            settleDoneWatches(list)
             lastAlertID = max(lastAlertID, list.compactMap { Int64($0.id) }.max() ?? 0)
             alertsError = nil
         } catch {
@@ -725,8 +728,11 @@ final class AppStore {
         if alerts.count > 300 { alerts.removeLast(alerts.count - 300) }
         // Alert only for fresh needs-you items; a reconnect replays older ones.
         let fresh = Int64(Date().timeIntervalSince1970 * 1000) - a.at < 120_000
-        let watched = fresh && a.kind == "finished" && takeDoneWatch(a.threadId)
-        if !(a.quiet ?? false), !(a.resolved ?? false), fresh, !showsChat(a.threadId), !(a.kind == "needs-you" && bannerShown(a.threadId)) {
+        let looking = showsChat(a.threadId)
+        let canShow = !(a.quiet ?? false) && !(a.resolved ?? false) && fresh && !looking
+        // The bell is spent only when its banner shows or the user already looks at the chat.
+        let watched = (canShow || (fresh && looking)) && a.kind == "finished" && takeDoneWatch(a.threadId)
+        if canShow, !(a.kind == "needs-you" && bannerShown(a.threadId)) {
             var kind = NotifyKind.from(alertKind: a.kind)
             if kind == .needsYou, let t = a.threadId, approvals.contains(where: { threadID(of: $0) == resolveThreadID(t) && $0.kind == "question" }) {
                 kind = .question

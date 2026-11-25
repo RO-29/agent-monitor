@@ -148,6 +148,11 @@ export function SearchView({ onBack }: { onBack?: () => void }) {
   const [ask, setAsk] = useState<{ q: string; res?: AskResponse; err?: string; busy?: boolean } | null>(null);
 
   useEffect(() => inRef.current?.focus(), [mode]);
+  // "Open in Search" from the thread list changes ?q= while this page stays mounted.
+  const urlQ = sp.get("q") || "";
+  useEffect(() => {
+    if (urlQ) setText((t) => (t.trim() === urlQ.trim() ? t : urlQ));
+  }, [urlQ]);
   // Keep ?q= in the address so a search can be shared or reopened.
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -233,7 +238,8 @@ export function SearchView({ onBack }: { onBack?: () => void }) {
           onSubmit={(e) => {
             e.preventDefault();
             if (mode === "ask") runAsk();
-            else if (groups[0]) nav(hitHref(groups[0].hits[0], terms, v.threadOf));
+            // Results of an older query are still on screen during the delay and the fetch.
+            else if (groups[0] && ts.q === text.trim() && !ts.loading) nav(hitHref(groups[0].hits[0], terms, v.threadOf));
           }}
         >
           <input

@@ -14,9 +14,9 @@ final class ToastCenter {
     func show(_ text: String, icon: String = "checkmark.circle.fill") {
         self.text = text
         self.icon = icon
-        // An error icon means a failure: error haptic, longer on screen, and VoiceOver reads it.
+        // An error icon means a failure: error haptic and longer on screen. VoiceOver reads every toast.
         isError = icon.hasPrefix("exclamationmark") || icon.hasPrefix("xmark")
-        if isError { AccessibilityNotification.Announcement(text).post() }
+        AccessibilityNotification.Announcement(text).post()
         seq += 1
         let mine = seq
         let wait: UInt64 = isError ? 4_500_000_000 : 1_600_000_000

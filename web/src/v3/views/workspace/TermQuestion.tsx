@@ -26,10 +26,12 @@ export function useTermQuestion(sessionId: string, on: boolean, machine?: string
       return;
     }
     let alive = true;
+    let fails = 0;
     const look = () =>
       p7.termQuestion(sessionId, machine).then(
-        (r) => alive && setQ(r),
-        () => {}, // a failed poll keeps the card and what was typed; the next poll decides
+        (r) => alive && ((fails = 0), setQ(r)),
+        // One failed poll keeps the card and what was typed; five in a row (15 s) close it.
+        () => alive && ++fails >= 5 && setQ(null),
       );
     void look();
     const t = window.setInterval(look, 3000);

@@ -144,7 +144,7 @@ export default function Now() {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();
         setDenyId(cur.a.id);
-      } else if (e.key === "Enter" && cur) nav(threadHref(cur.r.id, cur.r.thread));
+      } else if (e.key === "Enter" && cur && !(e.target as Element | null)?.closest?.("button, a, summary, [role=button]")) nav(threadHref(cur.r.id, cur.r.thread));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

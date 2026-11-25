@@ -26,6 +26,7 @@ struct AgentMonitorApp: App {
                     #endif
                     store.start()
                     // A cold launch can open already active, so the phase change below never fires.
+                    if scenePhase == .active { store.setForeground(true) }
                     Task { await SigningWatch.tick() }
                 }
                 .onChange(of: scenePhase) { _, phase in
@@ -39,7 +40,8 @@ struct AgentMonitorApp: App {
                         store.backgroundAt = Date()
                         store.flushPendingDecisions()
                     }
-                    store.setForeground(phase == .active)
+                    // .inactive (Control Center, a banner pull) is no change: keep presence and the polls.
+                    if phase != .inactive { store.setForeground(phase == .active) }
                     if phase == .active { Task { await SigningWatch.tick() } }
                 }
                 // Bark pushes open agentmonitor://thread/<id>, agentmonitor://approvals or agentmonitor://alerts.

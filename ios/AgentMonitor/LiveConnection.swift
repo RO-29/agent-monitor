@@ -92,9 +92,15 @@ final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     private func schedulePing(_ t: URLSessionWebSocketTask) {
         DispatchQueue.global().asyncAfter(deadline: .now() + 20) { [weak self] in
             guard let self, self.isCurrent(t) else { return }
+            let pong = PongFlag()
             t.sendPing { [weak self] err in
+                pong.set()
                 if let err { self?.handleDrop(t, err.localizedDescription); return }
                 self?.schedulePing(t)
+            }
+            // A half-open link never answers the ping, and the dot would stay green on a dead socket.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 10) { [weak self] in
+                if !pong.done { t.cancel(with: .goingAway, reason: nil); self?.handleDrop(t, "no answer to ping in 10 s") }
             }
         }
     }
@@ -135,4 +141,11 @@ final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
 
     private func emitEvent(_ ev: WSEvent) { DispatchQueue.main.async { self.onEvent(ev) } }
     private func emitState(_ st: ConnectionState) { DispatchQueue.main.async { self.onState(st) } }
+}
+
+private final class PongFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var on = false
+    func set() { lock.lock(); on = true; lock.unlock() }
+    var done: Bool { lock.lock(); defer { lock.unlock() }; return on }
 }

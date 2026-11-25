@@ -9,7 +9,13 @@ enum DoneWatch {
         var s = ids
         if on { s.insert(id) } else { s.remove(id) }
         UserDefaults.standard.set(Array(s), forKey: key)
+        var at = UserDefaults.standard.dictionary(forKey: atKey) ?? [:]
+        at[id] = on ? Date().timeIntervalSince1970 * 1000 : nil
+        UserDefaults.standard.set(at, forKey: atKey)
     }
+    private static let atKey = "alert.doneThreadsAt"
+    /// When the bell was armed, in ms; 0 for a bell armed before this was kept.
+    static func armedAt(_ id: String) -> Double { UserDefaults.standard.dictionary(forKey: atKey)?[id] as? Double ?? 0 }
 }
 
 extension AppStore {
@@ -30,5 +36,16 @@ extension AppStore {
             return true
         }
         return false
+    }
+
+    /// A turn that ended while the app was away turns its bell off, so a later turn does not alert for it.
+    func settleDoneWatches(_ list: [AlertItem]) {
+        for a in list where a.kind == "finished" {
+            guard let t = a.threadId else { continue }
+            for id in [resolveThreadID(t), t] where DoneWatch.has(id) && Double(a.at) > DoneWatch.armedAt(id) {
+                DoneWatch.set(id, false)
+                doneWatchTick += 1
+            }
+        }
     }
 }

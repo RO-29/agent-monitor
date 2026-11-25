@@ -909,7 +909,6 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
     try {
       if (queueing) {
         await queueApi.add(t.id, body, { attachments: att.ids });
-        sent.add(body, true);
         setText(clearSent(body));
         att.clear();
         return;
@@ -985,7 +984,8 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
 
   const fillBox = (raw: string, lang: string) => {
     setText((cur: string) => insertFor(raw, lang, false, cur));
-    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".wchat textarea")?.focus());
+    // The open diff is a modal: keep the focus in it, or its keys type into the hidden box.
+    if (!document.querySelector(".wdiff")) requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".wchat textarea")?.focus());
   };
   return (
     <FillCtx.Provider value={fillBox}>

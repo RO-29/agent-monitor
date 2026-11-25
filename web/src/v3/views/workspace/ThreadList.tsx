@@ -366,7 +366,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
               e.preventDefault();
               const first = GROUPS.map((g) => (shown.top.get(g.key) || [])[0]).find(Boolean);
               if (first && withoutChips(q)) nav(`/w/${encodeURIComponent(first.id)}`);
-              else if (groups[0]) nav(hrefOf(groups[0]));
+              else if (groups[0] && ts.q === q.trim() && !ts.loading) nav(hrefOf(groups[0]));
               else if (first) nav(`/w/${encodeURIComponent(first.id)}`);
             }
           }}

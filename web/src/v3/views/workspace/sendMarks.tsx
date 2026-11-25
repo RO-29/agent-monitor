@@ -12,7 +12,13 @@ export function usePendingSends(items: OItem[] | undefined, reset: string) {
   useEffect(() => {
     if (!list.length || !items) return;
     const users = items.filter((i) => i.kind === "user");
-    const left = list.filter((p) => !users.some((u) => toMs(u.startedAt) >= p.at - 120_000 && norm(u.text || "").startsWith(norm(p.text))));
+    // Each transcript message clears one bubble, so two quick "continue" sends keep the second.
+    const used = new Set<OItem>();
+    const left = list.filter((p) => {
+      const u = users.find((u) => !used.has(u) && toMs(u.startedAt) >= p.at - 120_000 && norm(u.text || "").startsWith(norm(p.text)));
+      if (u) used.add(u);
+      return !u;
+    });
     if (left.length !== list.length) setList(left);
   }, [items, list]);
   const add = (text: string, queued: boolean) => {
@@ -61,11 +67,15 @@ export function useNewMark(key: string, items: OItem[] | undefined, atBottom: bo
   };
   const [seenAtOpen, setSeenAtOpen] = useState(read);
   const keyRef = useRef(key);
+  // The newest item at the first load: turns that arrive while the chat is open are not "new".
+  const openLast = useRef(0);
   if (keyRef.current !== key) {
     keyRef.current = key;
+    openLast.current = 0;
     setSeenAtOpen(read());
   }
   const last = useMemo(() => (items || []).reduce((m, i) => Math.max(m, toMs(i.startedAt)), 0), [items]);
+  if (!openLast.current && last) openLast.current = last;
   useEffect(() => {
     if (!atBottom || !last) return;
     try {
@@ -76,7 +86,7 @@ export function useNewMark(key: string, items: OItem[] | undefined, atBottom: bo
   }, [atBottom, last, sk]); // eslint-disable-line react-hooks/exhaustive-deps
   return useMemo(() => {
     if (!seenAtOpen || !items) return "";
-    const first = [...items].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt)).find((i) => i.kind !== "user" && toMs(i.startedAt) > seenAtOpen);
+    const first = [...items].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt)).find((i) => i.kind !== "user" && toMs(i.startedAt) > seenAtOpen && toMs(i.startedAt) <= openLast.current);
     return first ? first.runId || "_" : "";
   }, [items, seenAtOpen]);
 }

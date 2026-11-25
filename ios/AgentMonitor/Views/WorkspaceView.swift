@@ -403,11 +403,15 @@ private struct MessageSearchRows: View {
 
     private func run() async {
         state = "busy"
+        let q = query
         do {
-            hits = try await APIClient.shared.prompts(query: query, limit: 40)
+            let r = try await APIClient.shared.prompts(query: q, limit: 40)
+            // The user typed on while this ran: these hits are for older words.
+            guard q == query else { return }
+            hits = r
             state = "done"
         } catch {
-            state = "error"
+            if q == query { state = "error" }
         }
     }
 }

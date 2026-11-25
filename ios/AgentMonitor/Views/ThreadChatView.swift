@@ -516,6 +516,8 @@ struct ThreadChatView: View {
                     }
                     ForEach(pending) { p in
                         PendingBubble(msg: p).onTapGesture { withAnimation { pending.removeAll { $0.id == p.id } } }
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityHint("Hides this message until the transcript shows it")
                     }
                     if running {
                         HStack(spacing: 10) { WorkingPulse(); Text("Working").font(.subheadline) }

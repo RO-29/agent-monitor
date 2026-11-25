@@ -191,8 +191,11 @@ struct Composer: View {
                 .font(.footnote).padding(.horizontal, 6)
             }
             HStack(alignment: .bottom, spacing: 6) {
-                AttachButton(tray: tray)
-                    .disabled(!reachable)
+                // The peer proxy passes JSON only, so files cannot reach another Mac.
+                if api.via == nil {
+                    AttachButton(tray: tray)
+                        .disabled(!reachable)
+                }
                 HStack(alignment: .bottom, spacing: 0) {
                     TextField(placeholder, text: $text, axis: .vertical)
                         .font(bashMode ? .body.monospaced() : .body)
@@ -283,7 +286,15 @@ struct Composer: View {
             focused = true
         }
         .onChange(of: tray.ids) { _, _ in saveDraft() }
+        // A status line is news, not state: the queue panel keeps what stays true.
+        .task(id: status) {
+            guard status != nil else { return }
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            if !Task.isCancelled { status = nil }
+        }
         .task(id: target) {
+            status = nil
+            error = nil
             tray.threadID = drivenID
             #if DEBUG
             if DebugRoute.sample {
@@ -592,6 +603,10 @@ struct TermQuestionCard: View {
         }
         .sheet(isPresented: $showScreen) { TerminalScreen(sessionID: sessionID) }
         .sensoryFeedback(.success, trigger: answered)
+        // A new question must not inherit the choices, text or error of the one before it.
+        .onChange(of: q?.toolUseId) { _, _ in
+            picked = [:]; other = [:]; feedback = ""; error = nil; sentFor = nil; reopened = nil
+        }
         .task(id: sessionID) {
             guard item == nil else { return }
             while !Task.isCancelled {

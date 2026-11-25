@@ -336,7 +336,8 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
 
   const fillBox = (raw: string, lang: string) => {
     setText((cur: string) => insertFor(raw, lang, bashOk, cur));
-    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".wchat textarea")?.focus());
+    // The open diff is a modal: keep the focus in it, or its keys type into the hidden box.
+    if (!document.querySelector(".wdiff")) requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".wchat textarea")?.focus());
   };
   return (
     <FillCtx.Provider value={fillBox}>
