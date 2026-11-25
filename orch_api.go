@@ -250,6 +250,7 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 	m.agentRoutes(mux)
 	m.gitRoutes(mux)
 	m.fixRoutes(mux)
+	m.hunkRoutes(mux)
 	m.spendRoutes(mux)
 	m.queueRoutes(mux)
 	mux.HandleFunc("GET /api/orch/stream", func(w http.ResponseWriter, r *http.Request) {

@@ -279,6 +279,7 @@ export interface ODiffFile {
   binary: boolean;
   patch: string;
   truncated?: boolean;
+  hash?: string;
 }
 export interface ODiff {
   from: string;
@@ -304,6 +305,7 @@ export interface GitApi {
   pr: (id: string, b: OPrBody) => Promise<{ ok: boolean; url?: string }>;
   open: (id: string, target: OOpenTarget) => Promise<{ ok: boolean }>;
   removeWorktree: (id: string, force?: boolean) => Promise<{ ok: boolean; thread?: OThread }>;
+  revertHunk: (b: { thread?: string; cwd?: string; path: string; hunk: string; hash: string }) => Promise<{ ok: boolean; hash?: string }>;
 }
 
 // Epoch ms per the v3 convention; tolerate RFC3339 strings in case the Go side sends time.Time.
@@ -473,6 +475,7 @@ export const realGitApi: GitApi = {
   pr: (id, b) => req("POST", `${gitBase(id)}/pr`, b),
   open: (id, target) => req("POST", `${gitBase(id)}/open`, { target }),
   removeWorktree: (id, force) => req("POST", `${gitBase(id)}/worktree/remove`, force ? { force: true } : {}),
+  revertHunk: (b) => req("POST", "/api/orch/git/revert-hunk", b),
 };
 export let mockGitApi: GitApi | null = null;
 export function setMockGitApi(g: GitApi) {
@@ -480,7 +483,7 @@ export function setMockGitApi(g: GitApi) {
 }
 /** The live git API, or the dev mock under ?mock=1 (never posts to the daemon then). */
 const notReady = () => Promise.reject(new ApiError(503, "sample data is still loading"));
-const mockPending: GitApi = { git: notReady, diff: notReady, cwdGit: notReady, cwdDiff: notReady, restore: notReady, commit: notReady, push: notReady, pr: notReady, open: notReady, removeWorktree: notReady };
+const mockPending: GitApi = { git: notReady, diff: notReady, cwdGit: notReady, cwdDiff: notReady, restore: notReady, commit: notReady, push: notReady, pr: notReady, open: notReady, removeWorktree: notReady, revertHunk: notReady };
 export const gitApi = (): GitApi => (s.mock ? mockGitApi || mockPending : realGitApi);
 
 // ---- store ----

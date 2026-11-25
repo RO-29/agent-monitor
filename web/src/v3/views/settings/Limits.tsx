@@ -5,6 +5,7 @@ import type { OSpendStatus } from "../../api/orch";
 import { DEFAULT_SPEND, settingsApi, type CodexRate, type SpendSettings } from "../../api/settings";
 import { SpendBar } from "../../components/Spend";
 import { UsagePanel } from "../../components/Usage";
+import { NearLimitWarning, SpendTodayBox } from "../../components/SpendBits";
 import { ErrorState, Loading } from "../../components/ui";
 import { SettingsTabs } from "./Tabs";
 import "../../styles/settings.css";
@@ -85,6 +86,8 @@ export default function Limits() {
         </div>
       </div>
       <div className="sx-col usx">
+        <NearLimitWarning />
+        <SpendTodayBox />
         <UsagePanel />
       </div>
       <h3 className="usx-h">Spend caps</h3>

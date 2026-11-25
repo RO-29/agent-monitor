@@ -1,10 +1,12 @@
 // Diff view: overlay over the chat column with a file list and a unified diff renderer (no dependency).
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { FillCtx } from "../../components/Markdown";
+import { showToast } from "../../../app/toast";
 import { gitApi, type ODiff, type ODiffFile } from "../../api/orch";
 import { gitErrorToast, shortSha, type DiffNav } from "./git";
 
 type Row =
-  | { t: "hunk"; text: string }
+  | { t: "hunk"; text: string; h: number }
   | { t: "ctx" | "add" | "del"; o?: number; n?: number; text: string }
   | { t: "note"; text: string }
   | { t: "fold"; id: number; rows: Row[] };
@@ -20,6 +22,7 @@ export function parsePatch(patch: string): Row[] {
   let inHunk = false;
   let ctx: Row[] = [];
   let fid = 0;
+  let hid = 0;
   const flush = (end: boolean) => {
     if (ctx.length > CTX_FOLD + (end ? 0 : CTX_KEEP)) {
       const head = out.length && out[out.length - 1].t !== "hunk" ? ctx.slice(0, CTX_KEEP) : [];
@@ -35,7 +38,7 @@ export function parsePatch(patch: string): Row[] {
       o = +h[1];
       n = +h[2];
       inHunk = true;
-      out.push({ t: "hunk", text: line });
+      out.push({ t: "hunk", text: line, h: hid++ });
       continue;
     }
     if (!inHunk) continue; // diff --git, index, ---, +++ headers
@@ -59,6 +62,17 @@ export function parsePatch(patch: string): Row[] {
   return out;
 }
 
+/** The raw text of each hunk, header included, in patch order: what a revert sends back to the daemon. */
+export function rawHunks(patch: string): string[] {
+  const out: string[] = [];
+  for (const line of patch.split("\n")) {
+    if (/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(line)) out.push(line + "\n");
+    else if (out.length && /^[ +\-\\]/.test(line)) out[out.length - 1] += line + "\n";
+    else if (out.length && line === "") out[out.length - 1] += "\n";
+  }
+  return out.map((h) => h.replace(/\n+$/, "\n"));
+}
+
 const STATUS: Record<string, { l: string; cls: string; name: string }> = {
   added: { l: "A", cls: "a", name: "added" },
   untracked: { l: "A", cls: "a", name: "new" },
@@ -74,18 +88,75 @@ export function statusInfo(s: string) {
   return STATUS[k] || STATUS.modified;
 }
 
-function DiffBody({ f, wrap }: { f: ODiffFile; wrap: boolean }) {
+function DiffBody({ f, wrap, onRevert }: { f: ODiffFile; wrap: boolean; onRevert?: (hunk: string) => Promise<void> }) {
   const rows = useMemo(() => (f.binary ? [] : parsePatch(f.patch || "")), [f]);
+  const hunks = useMemo(() => rawHunks(f.patch || ""), [f]);
   const [open, setOpen] = useState<Set<number>>(new Set());
-  useEffect(() => setOpen(new Set()), [f]);
+  const [armed, setArmed] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ key: string; line: number; old?: boolean; text: string } | null>(null);
+  const fill = useContext(FillCtx);
+  useEffect(() => {
+    setOpen(new Set());
+    setArmed(null);
+    setNote(null);
+  }, [f]);
   const st = statusInfo(f.status);
+  const canRevert = !!onRevert && f.status === "modified" && !!f.hash && !f.truncated;
+  const saveNote = () => {
+    if (!note || !note.text.trim() || !fill) return;
+    fill(`${f.path}:${note.line}${note.old ? " (removed line)" : ""}: ${note.text.trim()}`, "text");
+    showToast("Comment added to the message", "It goes to the agent with your next message.");
+    setNote(null);
+  };
+  const lineBtn = (key: string, line: number | undefined, old?: boolean) =>
+    line != null && fill ? (
+      <button className="ln lnc" onClick={() => setNote({ key, line, old, text: "" })} title={`Comment on line ${line}`} aria-label={`Comment on line ${line}`}>
+        {line}
+      </button>
+    ) : (
+      <span className="ln">{line ?? ""}</span>
+    );
   const renderRow = (r: Row, i: number): React.ReactNode => {
     if (r.t === "hunk") {
       return (
         <div key={i} className="dl hk">
           <span className="ln" />
           <span className="ln" />
-          <span className="tx">{r.text}</span>
+          <span className="tx">
+            {r.text}
+            {canRevert && hunks[r.h] && (
+              <span className="dhk-a">
+                {armed === r.h ? (
+                  <>
+                    <span>Revert this block in the file?</span>
+                    <button
+                      className="btn sm deny"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await onRevert!(hunks[r.h]);
+                          setArmed(null);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      {busy ? "Reverting…" : "Revert"}
+                    </button>
+                    <button className="btn sm ghost" onClick={() => setArmed(null)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn sm ghost" onClick={() => setArmed(r.h)} title="Undo only this block of changes in the working tree">
+                    Revert block
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
         </div>
       );
     }
@@ -108,15 +179,46 @@ function DiffBody({ f, wrap }: { f: ODiffFile; wrap: boolean }) {
         </button>
       );
     }
+    const key = `${r.o ?? ""}:${r.n ?? ""}`;
     return (
-      <div key={i} className={`dl ${r.t}`}>
-        <span className="ln">{r.o ?? ""}</span>
-        <span className="ln">{r.n ?? ""}</span>
-        <span className="tx">
-          <i aria-hidden>{r.t === "add" ? "+" : r.t === "del" ? "-" : " "}</i>
-          {r.text}
-        </span>
-      </div>
+      <Fragment key={i}>
+        <div className={`dl ${r.t}`}>
+          {r.t === "del" ? lineBtn(key, r.o, true) : <span className="ln">{r.o ?? ""}</span>}
+          {lineBtn(key, r.n)}
+          <span className="tx">
+            <i aria-hidden>{r.t === "add" ? "+" : r.t === "del" ? "-" : " "}</i>
+            {r.text}
+          </span>
+        </div>
+        {note?.key === key && (
+          <div className="dnote-c">
+            <textarea
+              autoFocus
+              rows={2}
+              value={note.text}
+              placeholder={`Comment on ${f.path}:${note.line} for the agent`}
+              onChange={(e) => setNote({ ...note, text: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setNote(null);
+                } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  saveNote();
+                }
+              }}
+            />
+            <div className="dnote-c-a">
+              <button className="btn sm" disabled={!note.text.trim()} onClick={saveNote}>
+                Add to message
+              </button>
+              <button className="btn sm ghost" onClick={() => setNote(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Fragment>
     );
   };
   return (
@@ -206,6 +308,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
   const right = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const pathKey = nav.paths?.join("\n") || "";
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let off = false;
@@ -224,7 +327,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
     return () => {
       off = true;
     };
-  }, [threadId, nav.from, nav.to, nav.run, pathKey]);
+  }, [threadId, nav.from, nav.to, nav.run, pathKey, reload]);
 
   const files = diff?.files || [];
   const cur = single && single.path === nav.file ? single : files.find((f) => f.path === nav.file) || (nav.file ? undefined : files[0]);
@@ -284,6 +387,19 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   });
+  // One hunk back out of the work tree file; the daemon refuses when the file changed since this diff was read.
+  const revert = async (hunk: string) => {
+    if (!cur?.hash) return;
+    const where = threadId.startsWith("cwd:") ? { cwd: threadId.slice(4) } : { thread: threadId };
+    try {
+      await gitApi().revertHunk({ ...where, path: cur.path, hunk, hash: cur.hash });
+      showToast("Block reverted", `${cur.path} no longer has that change.`);
+      setSingle(null);
+      setReload((n) => n + 1);
+    } catch (e) {
+      gitErrorToast("Could not revert the block", e);
+    }
+  };
   const toggleWrap = () => {
     setWrap((w) => {
       try {
@@ -357,7 +473,7 @@ export function DiffView({ threadId, nav, onClose, onFile }: { threadId: string;
           </nav>
           <div className="dright" ref={right}>
             {cur ? (
-              <DiffBody f={cur} wrap={wrap} />
+              <DiffBody f={cur} wrap={wrap} onRevert={diff?.to === "worktree" ? revert : undefined} />
             ) : (
               <div className="state">
                 <b>{nav.file} is not in this diff</b>

@@ -1,5 +1,6 @@
 import { ScrollJump } from "./ScrollJump";
 import { FillCtx } from "../../components/Markdown";
+import { CostBadge } from "../../components/SpendBits";
 import { insertFor } from "../../../lib/insert";
 import { drivenNeedIds, useNeedsYou } from "../../api/needsYou";
 // Chat for a driven (orchestrator) thread: items grouped per run, inline approvals, composer.
@@ -1003,6 +1004,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         </div>
         {stCls !== "ok" || closed ? <span className={`wstat ${closed ? "mute" : stCls}`}>{label}</span> : null}
         <LinkedChip list={linked} page={`/w/${encodeURIComponent(t.id)}/linked`} />
+        <CostBadge cost={detail.runs.reduce((n, r) => n + (r.usage?.costUsd || 0), 0)} />
         <span className="sp" />
         <div className="wbar-a">
           <button className="btn sm ghost wbar-diff" disabled={noGit} title={noGit ? (git.status === "missing" ? "This daemon has no git routes yet" : "Not a git repository") : "Everything this thread changed, from its start to the working tree"} onClick={() => dnav.open({ from: "base", to: "worktree", label: "Thread" })}>

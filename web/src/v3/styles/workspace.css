@@ -872,3 +872,11 @@
 .v3 .ws .wnewline{display:flex;align-items:center;gap:8px;color:var(--accent);font-size:11.5px;font-weight:600;margin:6px auto}
 .v3 .ws .wnewline::before,.v3 .ws .wnewline::after{content:"";flex:1;height:1px;background:var(--accent);opacity:.45}
 @media (pointer:coarse){.v3 input,.v3 textarea,.v3 select{font-size:16px}}
+.v3 .ws .dhk-a{display:inline-flex;align-items:center;gap:6px;margin-left:12px;color:var(--fg-2);white-space:normal}
+.v3 .ws .dl .lnc{background:none;border:0;border-right:1px solid var(--line);font:inherit;font-size:11px;cursor:pointer;color:var(--muted)}
+.v3 .ws .dl .lnc:hover,.v3 .ws .dl .lnc:focus-visible{color:var(--accent);background:var(--accent-soft)}
+.v3 .ws .dnote-c{display:flex;flex-direction:column;gap:6px;padding:8px 10px 8px 96px;background:var(--panel-2,var(--panel));border-block:1px solid var(--line)}
+.v3 .ws .dnote-c textarea{width:100%;min-height:52px;resize:vertical;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+.v3 .ws .dnote-c-a{display:flex;gap:6px}
+@media (max-width:640px){.v3 .ws .dnote-c{padding-left:10px}}
+.v3 .ws .wcost{font-size:11.5px;color:var(--fg-2);padding:2px 7px;border:1px solid var(--line);border-radius:10px;white-space:nowrap}
