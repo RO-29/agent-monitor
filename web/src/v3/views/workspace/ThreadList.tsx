@@ -7,6 +7,7 @@ import { showToast } from "../../../app/toast";
 import { fmtAgo } from "../../../lib/format";
 import { pinThread, settleThread, snoozeThread } from "../../api/orch";
 import { typing } from "../../ctx";
+import { overlayOpen } from "../../keys";
 import { GROUPS, type WRow, type WTree } from "./rows";
 import { agentKey } from "../../components/AgentIcon";
 import { useV3 } from "../../live";
@@ -32,12 +33,27 @@ export type RowAction = "pin" | "settle" | "snooze1h" | "snoozeTomorrow" | "unsn
 export async function rowAction(r: WRow, a: RowAction) {
   const t = r.driven;
   if (!t) return;
+  const settle = settleLabel(r) === "Settle";
+  const was = r.snoozedUntil || 0;
   try {
-    if (a === "pin") await pinThread(t.id, !t.pinned);
-    else if (a === "settle") await settleThread(t.id, settleLabel(r) === "Settle");
-    else if (a === "snooze1h") await snoozeThread(t.id, Date.now() + HOUR);
-    else if (a === "snoozeTomorrow") await snoozeThread(t.id, tomorrowAt9());
-    else await snoozeThread(t.id, 0);
+    let done: string, undo: () => Promise<unknown>;
+    if (a === "pin") {
+      await pinThread(t.id, !t.pinned);
+      done = t.pinned ? "Unpinned" : "Pinned";
+      undo = () => pinThread(t.id, !!t.pinned);
+    } else if (a === "settle") {
+      await settleThread(t.id, settle);
+      done = settle ? "Settled" : "Unsettled";
+      undo = () => settleThread(t.id, !settle);
+    } else {
+      const until = a === "snooze1h" ? Date.now() + HOUR : a === "snoozeTomorrow" ? tomorrowAt9() : 0;
+      await snoozeThread(t.id, until);
+      done = until ? `Snoozed until ${fmtUntil(until)}` : "Unsnoozed";
+      undo = () => snoozeThread(t.id, was);
+    }
+    showToast(`${done}: ${r.title}`, "Click to undo", {
+      onClick: () => void undo().catch((e: Error) => showToast("Could not undo", e.message, { kind: "alert" })),
+    });
   } catch (e) {
     showToast("Could not update the thread", (e as Error).message, { kind: "alert" });
   }
@@ -311,7 +327,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   // e settles, p pins, z snoozes the selected driven row for 1 hour (z again clears it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (typing(e) || e.metaKey || e.ctrlKey || e.altKey || !["e", "p", "z"].includes(e.key)) return;
+      if (typing(e) || overlayOpen() || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !["e", "p", "z"].includes(e.key)) return;
       const r = rows.find((x) => x.id === sel);
       if (!r?.driven) return;
       e.preventDefault();

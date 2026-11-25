@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../api/client";
 import type { Settings } from "../../../api/types";
 import { fmtUsd } from "../../../lib/format";
+import { showToast } from "../../../app/toast";
 import { ApiError, v3 } from "../../api/client";
 import type { AskResponse, Chip, Hit } from "../../api/types";
 import { AgentIcon } from "../../components/AgentIcon";
@@ -169,7 +170,23 @@ export function SearchView({ onBack }: { onBack?: () => void }) {
   };
   const res = ts.res;
   const chips = res?.query.chips || [];
-  const groups = useMemo(() => groupHits(res?.hits || [], v.threadOf), [res, v.threadOf]);
+  // Hits past the first 200, fetched by offset; they belong to one query only.
+  const [more, setMore] = useState<{ q: string; hits: Hit[]; busy: boolean }>({ q: "", hits: [], busy: false });
+  const extra = useMemo(() => (res && more.q === ts.q ? more.hits : []), [res, more, ts.q]);
+  const allHits = useMemo(() => [...(res?.hits || []), ...extra], [res, extra]);
+  const groups = useMemo(() => groupHits(allHits, v.threadOf), [allHits, v.threadOf]);
+  const loadMore = () => {
+    const q = ts.q;
+    setMore({ q, hits: extra, busy: true });
+    v3.search({ q, limit: 200, offset: allHits.length }).then(
+      (r) => setMore((m) => (m.q === q ? { q, hits: [...m.hits, ...r.hits], busy: false } : m)),
+      (e) => {
+        setMore((m) => ({ ...m, busy: false }));
+        showToast("Could not load more results", (e as Error).message, { kind: "alert" });
+      },
+    );
+  };
+  const clearFilters = () => setText(chips.reduce((t, c) => removeChip(t, c), text));
   const terms = useMemo(() => markedTerms(res?.hits || [], 6), [res]);
   const pick = (k: string, val: string, cur?: Chip) => setText(cur ? (cur.source === "inferred" ? removeChip(text, cur) : setChip(text, k, "")) : setChip(text, k, val));
   const sinceCur = chips.find((c) => c.key === "since")?.value || "";
@@ -284,13 +301,33 @@ export function SearchView({ onBack }: { onBack?: () => void }) {
         {res && (
           <div className="wsr-meta" aria-live="polite">
             {groups.length} {groups.length === 1 ? "session" : "sessions"} · {res.total} matching {res.total === 1 ? "line" : "lines"}
-            {res.total > res.hits.length ? ` (best ${res.hits.length} shown)` : ""}
+            {res.total > allHits.length ? ` (best ${allHits.length} shown)` : ""}
             {ts.loading ? " · updating" : ""}
+          </div>
+        )}
+        {res && res.total === 0 && !ts.loading && (
+          <div className="state">
+            <b>No matches</b>
+            {chips.length > 0 ? (
+              <>
+                <div>Filters: {chips.map((c) => `${c.key}:${c.value}`).join(", ")}. A filter can hide the line you want.</div>
+                <button className="btn sm" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <div>Try fewer or shorter words, or another spelling.</div>
+            )}
           </div>
         )}
         {groups.map((g) => (
           <ResultCard key={g.session} g={g} title={titleOf(g)} terms={terms} threadOf={v.threadOf} />
         ))}
+        {res && res.total > allHits.length && (
+          <button className="btn wearlier" disabled={more.busy} onClick={loadMore}>
+            {more.busy ? "Loading…" : `Load ${Math.min(200, res.total - allHits.length)} more`}
+          </button>
+        )}
       </div>
     </section>
   );

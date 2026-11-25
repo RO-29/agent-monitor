@@ -324,7 +324,9 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
     const el = scroller.current;
     if (el && tqShown && pinned.current) el.scrollTop = el.scrollHeight;
   }, [tqShown]);
-  const status = asks.length || waitingInTerm || tqShown ? { cls: "need", l: "Needs you" } : running ? { cls: "run", l: "Working" } : null;
+  // A turn with no output for 2 min may be stuck: say how long it has been quiet.
+  const quietMin = running && session?.lastActivityAt ? Math.floor((now - session.lastActivityAt) / 60_000) : 0;
+  const status = asks.length || waitingInTerm || tqShown ? { cls: "need", l: "Needs you" } : running ? { cls: "run", l: quietMin >= 2 ? `Working · quiet ${quietMin} m` : "Working" } : null;
   const linked = useMemo<LinkedEntry[]>(() => {
     const out = sessionLinks(curTab, kids?.children || []);
     if (continued) out.unshift({ key: "cont:" + continued.id, group: "Threads", label: "thread", title: continued.title, sub: "continued in agent-monitor", href: `/w/${encodeURIComponent(continued.id)}` });
@@ -351,7 +353,13 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
             {row.title}
           </b>
         </div>
-        {status && <span className={`wstat ${status.cls}`}>{status.l}</span>}
+        {status && (quietMin >= 2 && session && owned ? (
+          <button className={`wstat ${status.cls} wstat-btn`} onClick={() => shell.openPane(session)} title={`No output since ${new Date(session.lastActivityAt).toLocaleTimeString()}. Open the pane to look.`}>
+            {status.l}
+          </button>
+        ) : (
+          <span className={`wstat ${status.cls}`}>{status.l}</span>
+        ))}
         <LinkedChip list={linked} page={`/w/${encodeURIComponent(row.id)}/linked`} />
         <span className="sp" />
         <div className="wbar-a">

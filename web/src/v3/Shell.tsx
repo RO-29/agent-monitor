@@ -4,7 +4,8 @@ import type { Session } from "../api/types";
 import { Boundary } from "./components/Boundary";
 import { useNotifications } from "../app/notify";
 import { KEYS, useBoolPref, useTheme } from "../app/prefs";
-import { dismissToast, useToasts } from "../app/toast";
+import { dismissToast, showToast, useToasts } from "../app/toast";
+import { setNeedCount } from "../lib/title";
 import PaneBridge from "../components/bridge/PaneBridge";
 import { titleFor } from "../lib/format";
 import { useLive } from "../lib/ws";
@@ -249,6 +250,7 @@ export default function V3Shell() {
     return () => window.removeEventListener("mousedown", off);
   }, [menu]);
   const need = ny.status === "loading" ? c["needs-you"] : ny.count;
+  useEffect(() => setNeedCount(need || 0), [need]);
   const placeOn = (p: "work" | "alerts" | "settings" | "more") =>
     p === "alerts"
       ? path.startsWith("/notifications")
@@ -258,7 +260,10 @@ export default function V3Shell() {
           ? path.startsWith("/settings")
           : path === "/more" || [...LOOKS, ...VIEWS].some((v) => path.startsWith(v.to)) || path.startsWith("/threads") || path.startsWith("/t/");
   const toggleNotify = () => {
-    if (!notifyOn && typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
+    if (!notifyOn && typeof Notification !== "undefined") {
+      if (Notification.permission === "default") void Notification.requestPermission();
+      else if (Notification.permission === "denied") showToast("Desktop alerts are blocked", "Allow notifications for this site in the browser settings.", { kind: "alert" });
+    }
     setNotify(!notifyOn);
   };
   const menuBody = <MenuBody path={path} theme={theme} onTheme={toggleTheme} notifyOn={notifyOn} onNotify={toggleNotify} />;

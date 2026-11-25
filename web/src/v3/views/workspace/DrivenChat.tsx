@@ -8,7 +8,8 @@ import { splitFileNote } from "../../../lib/fileNote";
 import { clearSent, useDraft } from "../../../lib/draft";
 import { useDocTitle } from "../../../lib/title";
 import { usd } from "../../components/Spend";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { NewLine, PendingBubbles, useNewMark, usePendingSends } from "./sendMarks";
 import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
@@ -823,6 +824,9 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const [busy, setBusy] = useState(false);
 
   const blocks = useMemo(() => blocksOf(detail.items, detail.runs), [detail.items, detail.runs]);
+  const [atBottom, setAtBottom] = useState(true);
+  const sent = usePendingSends(detail.items, t.id);
+  const newMark = useNewMark(t.id, detail.items, atBottom);
 
   // A continued session: its earlier conversation, read-only, and who owns the session now.
   const lv = useLive();
@@ -877,7 +881,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
 
   // Stick to the bottom while new content arrives, unless the reader scrolled up.
   const pinned = useRef(true);
-  const lastLen = detail.items.reduce((n, i) => n + (i.text?.length || 0), 0) + detail.items.length + asks.length + pastBlocks.length;
+  const lastLen = detail.items.reduce((n, i) => n + (i.text?.length || 0), 0) + detail.items.length + asks.length + pastBlocks.length + sent.list.length;
   useEffect(() => {
     const el = feed.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
@@ -904,11 +908,13 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
     try {
       if (queueing) {
         await queueApi.add(t.id, body, { attachments: att.ids });
+        sent.add(body, true);
         setText(clearSent(body));
         att.clear();
         return;
       }
       await sendMessage(t.id, body, att.ids);
+      sent.add(body, false);
       setText(clearSent(body));
       att.clear();
       pinned.current = true;
@@ -1077,6 +1083,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         onScroll={(e) => {
           const el = e.currentTarget;
           pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          if (pinned.current !== atBottom) setAtBottom(pinned.current);
         }}
       >
         {parent && (
@@ -1108,9 +1115,13 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
           ) : ho.terminal ? null : (
             <div className="state">{ho.sid ? "Send a message to continue this session." : "Send a message to start."}</div>
           ))}
-        {blocks.map((b) => (
-          <RunBlock key={b.key} run={b.run} items={b.items.filter((i) => !isReviewItem(i))} now={now} after={b.run ? <>{cardFor(b.run.id)}{reviewInBlock && b.run.id === reviewRun && reviewCard}</> : undefined} diff={b.run && git.status === "ok" ? runDiff(cps, b.run, b.items.some((i) => i.kind === "fileChange" && i.status === "completed")) : null} onDiff={dnav.open} />
+        {blocks.map((b, bi) => (
+          <Fragment key={b.key}>
+          {b.key === newMark && bi > 0 && <NewLine />}
+          <RunBlock run={b.run} items={b.items.filter((i) => !isReviewItem(i))} now={now} after={b.run ? <>{cardFor(b.run.id)}{reviewInBlock && b.run.id === reviewRun && reviewCard}</> : undefined} diff={b.run && git.status === "ok" ? runDiff(cps, b.run, b.items.some((i) => i.kind === "fileChange" && i.status === "completed")) : null} onDiff={dnav.open} />
+          </Fragment>
         ))}
+        <PendingBubbles list={sent.list} drop={sent.drop} />
         {[...cards.keys()].filter((k) => !usedCards.has(k)).map((k) => (
           <SubagentCard key={k} list={cards.get(k)!} kids={kids} needIds={needIds} now={now} />
         ))}
