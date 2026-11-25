@@ -541,3 +541,23 @@ func TestNotifyInstallWaiting(t *testing.T) {
 		}
 	}
 }
+
+func TestNotifyMarksTerminalPrompts(t *testing.T) {
+	n := newTestNotifier(t, &NotifySettings{BatchSec: intPtr(0)})
+	live, cancel := n.subscribe()
+	defer cancel()
+	for _, c := range []struct {
+		key  string
+		want bool
+	}{{"tp:claude:a", true}, {"ap_1", false}} {
+		n.deliver(notifyEvent{Kind: "needs-you", ThreadID: "claude:a", Title: "A needs you", Keys: []string{c.key}})
+		select {
+		case got := <-live:
+			if got.Prompt != c.want {
+				t.Fatalf("%s: prompt=%v", c.key, got.Prompt)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("no notification")
+		}
+	}
+}

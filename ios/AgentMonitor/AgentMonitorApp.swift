@@ -18,6 +18,7 @@ struct AgentMonitorApp: App {
                 .tint(Tok.accent)
                 .task {
                     Notifier.shared.onRoute = { [store] r in store.open(r) }
+                    NotifyAction.replyTarget = { [store] id in store.replyTarget(id) }
                     #if DEBUG
                     if DebugRoute.screen == nil { Notifier.shared.requestAuthorization() }
                     #else
@@ -31,7 +32,13 @@ struct AgentMonitorApp: App {
                     // Reconnect when returning to foreground; the socket is
                     // often dropped while backgrounded.
                     // Only a real background ends the Undo window; pulling down Control Center is .inactive.
-                    if phase == .active { store.connect() } else if phase == .background { store.flushPendingDecisions() }
+                    if phase == .active {
+                        store.resume()
+                        Task { await Notifier.shared.refreshAuthorization() }
+                    } else if phase == .background {
+                        store.backgroundAt = Date()
+                        store.flushPendingDecisions()
+                    }
                     store.setForeground(phase == .active)
                     if phase == .active { Task { await SigningWatch.tick() } }
                 }

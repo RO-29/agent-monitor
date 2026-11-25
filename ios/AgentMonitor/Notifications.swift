@@ -140,6 +140,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Reads the iOS permission again: the user can turn alerts on or off in Settings while the app runs.
+    @discardableResult
+    func refreshAuthorization() async -> UNAuthorizationStatus {
+        let st = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        authorized = st == .authorized || st == .provisional || st == .ephemeral
+        return st
+    }
+
     private func post(id: String, kind: NotifyKind, title: String, body: String, info: [String: String], force: Bool = false, category: String? = nil) {
         guard authorized || force, force || NotifyPrefs.on(kind) else { return }
         let content = UNMutableNotificationContent()
@@ -176,13 +184,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// An alert from the daemon's notification centre; a tap opens its thread, else Approvals.
-    func alert(id: String, kind: NotifyKind, title: String, body: String, threadId: String?, url: String? = nil) {
+    func alert(id: String, kind: NotifyKind, title: String, body: String, threadId: String?, url: String? = nil,
+               prompt: Bool = false, force: Bool = false) {
         var info: [String: String] = [:]
         if let t = threadId, !t.isEmpty { info["threadId"] = t } else { info["alerts"] = "1" }
         if let u = url, u.hasPrefix("https://") { info["url"] = u }
-        // A thread alert gets Reply; a "needs you" one also Yes and No for a terminal prompt.
-        let category = (threadId ?? "").isEmpty || kind == .spend ? nil : kind == .needsYou ? NotifyAction.needs : NotifyAction.reply
-        post(id: "alert-\(id)", kind: kind, title: title, body: body, info: info, category: category)
+        // A thread alert gets Reply; one about a terminal prompt also gets Yes and No.
+        let category = (threadId ?? "").isEmpty || kind == .spend ? nil : prompt ? NotifyAction.needs : NotifyAction.reply
+        post(id: "alert-\(id)", kind: kind, title: title, body: body, info: info, force: force, category: category)
     }
 
     /// The app's signing profile ends soon; SigningWatch sends it once per end date.
@@ -190,16 +199,26 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(id: "signing", kind: .needsYou, title: title, body: body, info: [:], force: true)
     }
 
-    /// Settings test: a sample of this kind with its current sound, even when the kind is off.
-    func test(_ kind: NotifyKind, threadId: String?) {
-        let go = { [self] in
-            post(id: "test-\(kind.rawValue)-\(Date().timeIntervalSince1970)", kind: kind, title: "Test: \(kind.label)",
-                 body: "This is how a \(kind.label.lowercased()) alert sounds.", info: threadId.map { ["threadId": $0] } ?? [:], force: true)
+    /// Settings test: a sample of this kind with its current sound, even when the kind is off. False when iOS blocks alerts.
+    func test(_ kind: NotifyKind, threadId: String?) async -> Bool {
+        if await refreshAuthorization() == .notDetermined {
+            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+            await refreshAuthorization()
         }
-        if authorized { go(); return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            Task { @MainActor in self.authorized = granted; if granted { go() } }
-        }
+        guard authorized else { return false }
+        post(id: "test-\(kind.rawValue)-\(Date().timeIntervalSince1970)", kind: kind, title: "Test: \(kind.label)",
+             body: "This is how a \(kind.label.lowercased()) alert sounds.", info: threadId.map { ["threadId": $0] } ?? [:], force: true)
+        return true
+    }
+
+    /// Replaces a banner after its action worked, with no sound, so the user sees the answer went.
+    func actionDone(id: String, title: String, body: String, info: [AnyHashable: Any]) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.interruptionLevel = .passive
+        content.threadIdentifier = (info["threadId"] as? String) ?? (info["sessionId"] as? String) ?? "done"
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 
     func clearAlert(id: String) {
@@ -226,7 +245,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let action = response.actionIdentifier
         if action != UNNotificationDefaultActionIdentifier, action != UNNotificationDismissActionIdentifier {
             let text = (response as? UNTextInputNotificationResponse)?.userText
-            await NotifyAction.run(action, info: info, text: text)
+            await NotifyAction.run(action, info: info, text: text, bannerID: response.notification.request.identifier,
+                                   title: response.notification.request.content.title)
             return
         }
         guard let r = NotifyRoute(info) else { return }
@@ -254,14 +274,19 @@ enum NotifyAction {
         ])
     }
 
-    static func run(_ action: String, info: [AnyHashable: Any], text: String?) async {
+    /// Maps a thread id to the session a reply should go to; the app sets it from the store.
+    @MainActor static var replyTarget: ((String) -> String)?
+
+    static func run(_ action: String, info: [AnyHashable: Any], text: String?, bannerID: String, title: String) async {
         let thread = (info["sessionId"] as? String) ?? (info["threadId"] as? String)
         let api = APIClient.shared
+        var done = ""
         do {
             switch action {
             case allow, deny:
                 guard let id = info["approvalId"] as? String else { return }
                 try await api.respondPermission(id, allow: action == allow)
+                done = action == allow ? "Allowed" : "Denied"
             case yes, no:
                 guard let sid = thread else { return }
                 // The daemon answers only the prompt the card saw: take its fingerprint first.
@@ -275,19 +300,27 @@ enum NotifyAction {
                     return
                 }
                 try await api.answerPrompt(sid, yes: action == yes, key: key)
+                done = action == yes ? "Answered Yes" : "Answered No"
             case send:
                 let body = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard let id = thread, !body.isEmpty else { return }
+                guard let raw = thread, !body.isEmpty else { return }
+                // A resumed thread has a newer session than the one the banner named.
+                let id = await MainActor.run { replyTarget?(raw) ?? raw }
                 if id.contains(":") {
                     _ = try await api.cliSendFull(id, text: body, attachments: [])
                 } else {
                     try await api.drivenSend(id, text: body, attachments: [])
                 }
+                done = "Sent: " + String(body.prefix(80))
             default:
                 return
             }
         } catch {
             await fail(error.localizedDescription, thread)
+            return
+        }
+        if !done.isEmpty {
+            await MainActor.run { Notifier.shared.actionDone(id: bannerID, title: done, body: title, info: info) }
         }
     }
 

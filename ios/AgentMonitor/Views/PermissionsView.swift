@@ -246,6 +246,7 @@ struct SessionApprovalCard: View {
     @State private var polling = true
     /// After Up or Down, Yes confirms the choice the user moved to, not choice 1.
     @State private var movedCursor = false
+    @State private var tapped = 0
     @FocusState private var replyFocused: Bool
 
     private var sid: String { item.sessionId ?? "" }
@@ -281,15 +282,9 @@ struct SessionApprovalCard: View {
                 promptBox(capture.isEmpty ? (item.message ?? "…") : cleanTail(capture, 16), mono: !capture.isEmpty)
 
                 // A digit picks and confirms an option, so no Enter follows it.
-                HStack(spacing: 8) {
-                    ForEach(1...4, id: \.self) { n in
-                        Button("\(n)") { Task { await onKeys(["\(n)"]) } }
-                            .font(Typo.mono(14, .semibold))
-                            .buttonStyle(.am(full: true))
-                            .accessibilityLabel("Option \(n)")
-                    }
-                }
-                .disabled(working)
+                optionButtons
+                    .disabled(working)
+                    .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
 
                 HStack(spacing: 8) {
                     Button { movedCursor = true; Task { await onKeys(["Up"]) } } label: { Image(systemName: "chevron.up") }
@@ -325,6 +320,34 @@ struct SessionApprovalCard: View {
         .task(id: sid) { if item.answerable && !sid.isEmpty { await pollCapture() } }
         .onChange(of: item.promptKey) { movedCursor = false } // a new prompt starts at choice 1
         .onDisappear { polling = false }
+    }
+
+    /// The numbered choices on screen, with their words; plain 1 to 4 when the screen shows none.
+    @ViewBuilder private var optionButtons: some View {
+        let opts = terminalOptions(capture)
+        if opts.isEmpty {
+            HStack(spacing: 8) {
+                ForEach(1...4, id: \.self) { n in
+                    Button("\(n)") { tapped += 1; Task { await onKeys(["\(n)"]) } }
+                        .font(Typo.mono(14, .semibold))
+                        .buttonStyle(.am(big: true, full: true))
+                        .accessibilityLabel("Option \(n)")
+                }
+            }
+        } else {
+            VStack(spacing: 6) {
+                ForEach(opts, id: \.0) { n, label in
+                    Button { tapped += 1; Task { await onKeys(["\(n)"]) } } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\(n)").font(Typo.mono(14, .bold)).foregroundStyle(Tok.muted)
+                            Text(label).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .buttonStyle(.am(big: true, full: true))
+                    .accessibilityLabel("Option \(n): \(label)")
+                }
+            }
+        }
     }
 
     private func promptBox(_ text: String, mono: Bool) -> some View {
@@ -412,4 +435,18 @@ struct ErrorNeedCard: View {
         }
         .askCard(Tok.err)
     }
+}
+
+/// Numbered choices at the bottom of a terminal prompt ("❯ 1. Yes", "  2. No, and tell Claude"), up to 9.
+func terminalOptions(_ screen: String) -> [(Int, String)] {
+    var out: [(Int, String)] = []
+    for raw in screen.split(separator: "\n").suffix(14) {
+        let line = raw.replacingOccurrences(of: "❯", with: " ").trimmingCharacters(in: .whitespaces)
+        guard line.count > 3, let d = line.first, let n = Int(String(d)), n > 0,
+              line.dropFirst().hasPrefix(". ") else { continue }
+        let label = line.dropFirst(3).trimmingCharacters(in: .whitespaces)
+        guard !label.isEmpty else { continue }
+        if n == out.count + 1 { out.append((n, label)) } else if n == 1 { out = [(1, label)] }
+    }
+    return out.count >= 2 ? out : []
 }

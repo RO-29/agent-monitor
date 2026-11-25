@@ -105,7 +105,7 @@ struct SettingsView: View {
                         ForEach(VoiceCleanup.allCases) { Text($0.label).tag($0.rawValue) }
                     } label: {
                         Label { Text("Clean up dictation") } icon: {
-                            Image(systemName: "wand.and.stars").font(.footnote.weight(.semibold)).foregroundStyle(.white)
+                            Image(systemName: "wand.and.stars").font(.footnote.weight(.semibold)).foregroundStyle(Tok.onAccent)
                                 .frame(width: 28, height: 28).background(Tok.accent, in: RoundedRectangle(cornerRadius: 7))
                         }
                     }
@@ -174,7 +174,7 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Tok.onAccent)
                 .frame(width: 28, height: 28)
                 .background(color, in: RoundedRectangle(cornerRadius: 7))
             Text(title)

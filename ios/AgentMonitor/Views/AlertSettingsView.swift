@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// Settings, Alerts: a master switch, then per kind on/off, sound and a test; optional quiet hours.
 struct AlertSettingsView: View {
@@ -7,9 +8,22 @@ struct AlertSettingsView: View {
     @AppStorage("notify.quiet") private var quiet = false
     @AppStorage("notify.quietFrom") private var quietFrom = 22
     @AppStorage("notify.quietTo") private var quietTo = 7
+    @State private var osStatus: UNAuthorizationStatus?
+    @Environment(\.scenePhase) private var phase
 
     var body: some View {
         Form {
+            if let st = osStatus, st == .denied {
+                Section {
+                    Label("Notifications are off in iOS Settings", systemImage: "bell.slash").foregroundStyle(Tok.err)
+                    Button("Open Settings") {
+                        if let u = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(u) }
+                    }
+                } footer: {
+                    Text("The switches below do nothing until iOS allows alerts for Agent Monitor.")
+                }
+                .listRowBackground(Tok.panel)
+            }
             Section {
                 Toggle("Alerts", isOn: $allOn)
                 NavigationLink {
@@ -42,6 +56,7 @@ struct AlertSettingsView: View {
         .background(Tok.bg)
         .navigationTitle("Alerts")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: phase) { osStatus = await Notifier.shared.refreshAuthorization() }
     }
 
     private func hour(_ h: Int) -> String { String(format: "%02d:00", h) }
@@ -73,8 +88,13 @@ private struct KindSection: View {
                     ForEach(NotifySound.allCases) { s in Text(s.label).tag(s.rawValue) }
                 }
                 Button {
-                    Notifier.shared.test(kind, threadId: threadID)
-                    ToastCenter.shared.show("Test alert sent", icon: "bell.badge")
+                    Task {
+                        if await Notifier.shared.test(kind, threadId: threadID) {
+                            ToastCenter.shared.show("Test alert sent", icon: "bell.badge")
+                        } else {
+                            ToastCenter.shared.show("iOS blocks alerts for this app", icon: "exclamationmark.triangle.fill")
+                        }
+                    }
                 } label: { Label("Send a test", systemImage: "bell.badge") }
             }
         }

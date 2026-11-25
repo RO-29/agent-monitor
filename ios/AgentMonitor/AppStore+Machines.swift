@@ -9,6 +9,7 @@ extension AppStore {
         let ids = Set(machines.map(\.id))
         remoteNeeds = remoteNeeds.filter { ids.contains($0.key) }
         remoteDown = remoteDown.filter { ids.contains($0.key) }
+        remoteDownSince = remoteDownSince.filter { ids.contains($0.key) }
         setRemoteForeground(true)
     }
 
@@ -21,16 +22,20 @@ extension AppStore {
             for m in list { Task { _ = try? await m.client.post("/api/push/presence", body: ["active": false]) } }
             return
         }
+        // One awaited loop per machine: a slow Mac never piles up requests, and never delays the others.
         remotePoll = Task { [weak self] in
-            var tick = 0
-            while !Task.isCancelled {
-                guard let self else { return }
-                for m in self.machines {
-                    let presence = tick % 6 == 0
-                    Task { await self.loadRemote(m, presence: presence) }
+            guard let self else { return }
+            await withTaskGroup(of: Void.self) { g in
+                for m in list {
+                    g.addTask { @MainActor in
+                        var tick = 0
+                        while !Task.isCancelled {
+                            await self.loadRemote(m, presence: tick % 6 == 0)
+                            tick += 1
+                            try? await Task.sleep(for: .seconds(5))
+                        }
+                    }
                 }
-                tick += 1
-                try? await Task.sleep(for: .seconds(5))
             }
         }
     }
@@ -43,8 +48,10 @@ extension AppStore {
             notifyRemote(m, items, first: remoteNeeds[m.id] == nil)
             remoteNeeds[m.id] = items
             remoteDown[m.id] = nil
+            remoteDownSince[m.id] = nil
         } catch {
             remoteDown[m.id] = error.localizedDescription
+            if remoteDownSince[m.id] == nil { remoteDownSince[m.id] = Date() }
         }
     }
 
@@ -76,5 +83,19 @@ extension AppStore {
         }
         remoteNeeds[m.id]?.removeAll { $0.key == it.key }
         await loadRemote(m)
+    }
+}
+
+extension AppStore {
+    /// Machines whose requests Home shows: all of them, or the one the machine filter picks.
+    var remoteForHome: [Machine] {
+        let only = manyMachines && machines.contains { $0.name == machineFilter } ? machineFilter : ""
+        return machines.filter { only.isEmpty || $0.name == only }
+    }
+
+    /// "offline since 14:02" for a machine that failed, else nil.
+    func offlineSince(_ id: String) -> String? {
+        guard let d = remoteDownSince[id] else { return nil }
+        return "offline since " + d.formatted(date: .omitted, time: .shortened)
     }
 }

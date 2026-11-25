@@ -113,6 +113,9 @@ struct Composer: View {
             if !tray.isEmpty {
                 AttachmentChips(tray: tray).padding(.horizontal, 4)
             }
+            if busyCLI, let t = draftID, reachable {
+                DoneBellChip(threadID: t).padding(.horizontal, 6)
+            }
             DictationBar(dictation: dictation, text: $text)
             if bashMode || (focused && (text.isEmpty || histIdx >= 0)) {
                 HStack(spacing: 8) {
@@ -224,10 +227,10 @@ struct Composer: View {
                     ZStack {
                         Circle().fill(canSend ? Tok.accent : Tok.panel3)
                         if sending {
-                            ProgressView().controlSize(.small).tint(.white)
+                            ProgressView().controlSize(.small).tint(Tok.onAccent)
                         } else {
                             Image(systemName: "arrow.up").font(.system(size: 17, weight: .bold))
-                                .foregroundStyle(canSend ? .white : Tok.muted)
+                                .foregroundStyle(canSend ? Tok.onAccent : Tok.muted)
                         }
                     }
                     .frame(width: 36, height: 36)
@@ -399,7 +402,7 @@ struct Composer: View {
                         // A sent ! command is only forgotten here; a queued message is removed from the CLI queue.
                         Button { Task { await act(it.kind == "bash" ? "forget" : "remove", it.id) } } label: {
                             Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Tok.muted)
-                                .frame(width: 24, height: 24)
+                                .frame(width: 44, height: 44).contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(acting)
@@ -574,6 +577,11 @@ struct TermQuestionCard: View {
     @State private var busy = false
     @State private var sentFor: String?
     @State private var error: String?
+    @State private var sentAtLocal: Int64 = 0
+    @State private var showScreen = false
+    @State private var answered = 0
+    /// The question the user chose to answer again after it was not taken.
+    @State private var reopened: String?
 
     var body: some View {
         Group {
@@ -582,6 +590,8 @@ struct TermQuestionCard: View {
                 card(q)
             }
         }
+        .sheet(isPresented: $showScreen) { TerminalScreen(sessionID: sessionID) }
+        .sensoryFeedback(.success, trigger: answered)
         .task(id: sessionID) {
             guard item == nil else { return }
             while !Task.isCancelled {
@@ -592,7 +602,7 @@ struct TermQuestionCard: View {
     }
 
     private func card(_ q: TermQuestion) -> some View {
-        let sent = (q.sentAt ?? 0) > 0 || (sentFor != nil && sentFor == q.toolUseId)
+        let sent = reopened != (q.toolUseId ?? "?") && ((q.sentAt ?? 0) > 0 || (sentFor != nil && sentFor == q.toolUseId))
         let canSend = item?.answerable ?? (q.sendable && q.onScreen)
         let why = item?.why ?? q.why
         let off = busy || sent || !canSend
@@ -614,6 +624,7 @@ struct TermQuestionCard: View {
             if sent {
                 Text("Sent to the terminal. This card closes when \(agentName(item?.agent ?? "claude")) takes the answer.")
                     .font(Typo.ui(12.5)).foregroundStyle(Tok.ok)
+                SentLate(sentAt: q.sentAt ?? sentAtLocal, retry: { reopened = q.toolUseId ?? "?"; sentFor = nil }, look: { showScreen = true })
             } else if !canSend {
                 Text(whyText(why))
                     .font(Typo.ui(12.5)).foregroundStyle(Tok.fg2)
@@ -738,6 +749,9 @@ struct TermQuestionCard: View {
                 try await api.answerTerm(sessionID, b)
                 DraftStore.shared.clear(prefix: "term:\(sessionID):\(q.toolUseId ?? ""):")
                 sentFor = q.toolUseId
+                sentAtLocal = Int64(Date().timeIntervalSince1970 * 1000)
+                answered += 1
+                reopened = nil
                 error = nil
             } catch let e as APIError where e.status == 409 {
                 error = "Answered elsewhere."
@@ -784,4 +798,23 @@ struct SlashPanel: Identifiable {
 extension Notification.Name {
     /// A message the composer typed into a terminal; the chat shows it as pending until the transcript has it.
     static let chatSent = Notification.Name("am.chatSent")
+}
+
+/// After 20 s with the answer not taken: unlock the card to send again, or look at the terminal.
+private struct SentLate: View {
+    let sentAt: Int64
+    let retry: () -> Void
+    let look: () -> Void
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { tl in
+            if sentAt > 0, tl.date.timeIntervalSince1970 * 1000 - Double(sentAt) > 20_000 {
+                HStack(spacing: 8) {
+                    Text("Not taken yet.").font(Typo.ui(12.5)).foregroundStyle(Tok.fg2)
+                    Spacer()
+                    Button("Terminal", action: look).buttonStyle(.am(.ghost))
+                    Button("Answer again", action: retry).buttonStyle(.am(.ghost))
+                }
+            }
+        }
+    }
 }

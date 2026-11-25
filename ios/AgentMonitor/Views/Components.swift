@@ -222,7 +222,8 @@ struct AMButton: ButtonStyle {
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.snappy(duration: 0.15), value: configuration.isPressed)
-            .contentShape(RoundedRectangle(cornerRadius: r))
+            // A small button keeps its look; its tap area grows to 44 pt.
+            .contentShape(Rectangle().inset(by: big ? 0 : -4))
     }
 
     private var fg: Color {
@@ -230,7 +231,7 @@ struct AMButton: ButtonStyle {
         case .pri: return Tok.panel
         case .allow: return Tok.onOk
         case .deny: return Tok.err
-        case .accent: return .white
+        case .accent: return Tok.onAccent
         case .ghost: return Tok.fg2
         case .normal: return Tok.fg
         }

@@ -34,6 +34,7 @@ enum FileNote {
 // A thumbnail for an uploaded image, loaded with the daemon credential and kept in a shared cache by upload id.
 struct UploadThumb: View {
     let att: OAttachment
+    @Environment(\.chatAPI) private var api
     @State private var image: UIImage?
     @State private var failed = false
 
@@ -49,7 +50,10 @@ struct UploadThumb: View {
                 Image(uiImage: img).resizable().scaledToFill()
             } else {
                 Tok.panel2.overlay {
-                    Image(systemName: failed ? "photo.badge.exclamationmark" : "photo").foregroundStyle(Tok.muted)
+                    VStack(spacing: 4) {
+                        Image(systemName: failed ? "photo.badge.exclamationmark" : "photo").foregroundStyle(failed ? Tok.err : Tok.muted)
+                        if failed { Text("Not loaded. Tap to open.").font(.caption2).foregroundStyle(Tok.fg2) }
+                    }
                 }
             }
         }
@@ -63,8 +67,8 @@ struct UploadThumb: View {
     private func load() async {
         let key = att.id as NSString
         if let hit = Self.cache.object(forKey: key) { image = hit; return }
-        guard var req = try? URLRequest(url: APIClient.shared.url(att.url)) else { return }
-        APIClient.authorize(&req)
+        guard var req = try? URLRequest(url: api.url(att.url)) else { failed = true; return }
+        api.authorize(&req)
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200,
@@ -92,6 +96,7 @@ struct UploadThumb: View {
 struct OpenAttachment<Content: View>: View {
     let att: OAttachment
     @ViewBuilder var content: () -> Content
+    @Environment(\.chatAPI) private var api
     @State private var file: URL?
     @State private var loading = false
     @State private var failed = false
@@ -100,8 +105,13 @@ struct OpenAttachment<Content: View>: View {
         Button { Task { await open() } } label: {
             content()
                 .overlay { if loading { ProgressView().controlSize(.small) } }
-                .overlay(alignment: .topTrailing) {
-                    if failed { Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Tok.err).padding(4) }
+                .overlay(alignment: .bottomLeading) {
+                    if failed {
+                        Label("Could not open. Tap to try again.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption2.weight(.semibold)).foregroundStyle(Tok.err)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.regularMaterial, in: Capsule()).padding(4)
+                    }
                 }
         }
         .buttonStyle(.plain)
@@ -111,8 +121,8 @@ struct OpenAttachment<Content: View>: View {
     }
 
     private func open() async {
-        guard var req = try? URLRequest(url: APIClient.shared.url(att.url)) else { failed = true; return }
-        APIClient.authorize(&req)
+        guard var req = try? URLRequest(url: api.url(att.url)) else { failed = true; return }
+        api.authorize(&req)
         loading = true
         failed = false
         defer { loading = false }
@@ -140,5 +150,17 @@ struct OpenAttachment<Content: View>: View {
             n += "." + ext
         }
         return n
+    }
+}
+
+/// The server a chat's attachments come from: the thread's own Mac, through the primary's proxy for a peer.
+private struct ChatAPIKey: EnvironmentKey {
+    static let defaultValue: APIClient = .shared
+}
+
+extension EnvironmentValues {
+    var chatAPI: APIClient {
+        get { self[ChatAPIKey.self] }
+        set { self[ChatAPIKey.self] = newValue }
     }
 }

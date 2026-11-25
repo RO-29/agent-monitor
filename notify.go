@@ -48,6 +48,8 @@ type ONotification struct {
 	Quiet bool `json:"quiet,omitempty"`
 	// Resolved: every approval it was about ended, wherever it was answered.
 	Resolved bool `json:"resolved,omitempty"`
+	// Prompt: it is about a terminal prompt, so the phone offers Yes and No on it.
+	Prompt bool `json:"prompt,omitempty"`
 }
 
 // NotifySettings: nil booleans mean the default (on).
@@ -245,6 +247,9 @@ func (n *Notifier) deliver(ev notifyEvent) {
 	}
 	if ev.ThreadID == "" && ev.Kind == "spend" {
 		no.URL = "/settings/limits"
+	}
+	for _, k := range ev.Keys {
+		no.Prompt = no.Prompt || strings.HasPrefix(k, "tp:")
 	}
 	no.Quiet = cfg.quiet(now) && !(ev.Kind == "needs-you" && onOr(cfg.QuietAllowsNeedsYou))
 	b, _ := json.Marshal(no)
