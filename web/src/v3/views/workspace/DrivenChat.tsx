@@ -24,7 +24,7 @@ import { gitKey, isLoopback, runDiff, useDiffNav, useGit, type DiffNav } from ".
 import { openIn } from "./GitBox";
 import { drivenTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
 import { Composer, extOf, useAttachments, type PickCommand } from "./Composer";
-import { IMAGE_TYPES } from "../../api/p7";
+import { IMAGE_TYPES, PLAYABLE } from "../../api/p7";
 import { LinkedChip, LinkedPage, type LinkedEntry } from "./linked";
 import { NewThreadBtn } from "./NewThread";
 import { queueApi, useQueue } from "../../api/queue";
@@ -550,7 +550,12 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
           <div className="wu">
             {u.attachments && u.attachments.length > 0 && (
               <span className="wu-att">
-                {u.attachments.map((x) => (
+                {u.attachments.map((x) => PLAYABLE(x.mime) ? (
+                  <span key={x.id} className="wu-media" title={x.name || x.mime}>
+                    {x.mime.startsWith("video/") ? <video src={x.url} controls preload="metadata" /> : <audio src={x.url} controls preload="metadata" />}
+                    <a href={x.url} target="_blank" rel="noopener" className="trunc">{x.name || "media"}</a>
+                  </span>
+                ) : (
                   <a key={x.id} href={x.url} target="_blank" rel="noopener" title={x.name || x.mime} className={IMAGE_TYPES.includes(x.mime) ? "" : "wu-file"}>
                     {IMAGE_TYPES.includes(x.mime) ? <img src={x.url} alt={x.name || "attached image"} /> : <><b>{extOf(x.name || `.${x.mime.split("/")[1] || ""}`)}</b><span className="trunc">{x.name || "file"}</span></>}
                   </a>

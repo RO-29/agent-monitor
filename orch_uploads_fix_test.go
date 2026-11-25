@@ -205,7 +205,7 @@ func TestUploadTooLargeMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, r)
 	io.Copy(io.Discard, pr)
-	if w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "25 MB") {
+	if w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "100 MB") {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 }

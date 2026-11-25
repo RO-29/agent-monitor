@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	mimetype "mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,8 +21,10 @@ import (
 	"unicode/utf8"
 )
 
+// orchUploadMax caps one file (a var for tests).
+var orchUploadMax int64 = 100 << 20
+
 const (
-	orchUploadMax      = 25 << 20
 	orchAttachmentsMax = 10
 	orchUploadMaxAge   = 30 * 24 * time.Hour
 	// orchModelImageMax is the largest image sent inline as an image block; larger ones go as a path.
@@ -31,7 +34,7 @@ const (
 
 // orchUploadQuota caps the bytes kept under uploads/ (a var for tests).
 var (
-	orchUploadQuota int64 = 500 << 20
+	orchUploadQuota int64 = 2 << 30
 	orchUploadMu    sync.Mutex
 	// orchUploadSlots caps uploads in flight; a caller waits up to orchUploadWait for one, then gets 429.
 	orchUploadSlots = make(chan struct{}, 3)
@@ -120,8 +123,6 @@ var (
 	orchModelImage = map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true, "image/gif": true}
 )
 
-const orchUploadTypes = "png, jpeg, webp, gif or heic images, pdf, and text files: txt, md, csv, json, html, xml, yaml, logs and source code"
-
 // orchTextExt are text files kept as text/plain: markup and source code, never served as a page or run.
 var orchTextExt = map[string]bool{}
 
@@ -152,6 +153,10 @@ type OAttachment struct {
 type orchImage struct {
 	OAttachment
 	Path string
+}
+
+func uploadTooLarge() error {
+	return &orchHTTPError{http.StatusRequestEntityTooLarge, fmt.Sprintf("file is larger than %d MB", orchUploadMax>>20)}
 }
 
 func (m *OrchManager) uploadsDir() string { return filepath.Join(m.stateDir, "uploads") }
@@ -376,7 +381,7 @@ func (m *OrchManager) SaveUploadCtx(ctx context.Context, scope, name, declared s
 	}
 	size := scan.size
 	if size > orchUploadMax {
-		return nil, &orchHTTPError{http.StatusRequestEntityTooLarge, "file is larger than 25 MB"}
+		return nil, uploadTooLarge()
 	}
 	if size == 0 {
 		return nil, orchBadRequest("empty file")
@@ -385,8 +390,11 @@ func (m *OrchManager) SaveUploadCtx(ctx context.Context, scope, name, declared s
 	if mime == "application/json" && !jsonFileValid(tmpPath) {
 		mime = "text/plain"
 	}
+	ext := orchUploadExt[mime]
 	if mime == "" {
-		return nil, &orchHTTPError{http.StatusUnsupportedMediaType, "only " + orchUploadTypes + " files are accepted"}
+		// Not an image, pdf or text: kept as it is (zip, Office, video, audio, anything else).
+		mime = sniffBinary(scan.head, filepath.Ext(name))
+		ext = binaryExt(mime, name)
 	}
 	orchUploadMu.Lock()
 	defer orchUploadMu.Unlock()
@@ -398,7 +406,7 @@ func (m *OrchManager) SaveUploadCtx(ctx context.Context, scope, name, declared s
 		return nil, err
 	}
 	id := orchID("up_")
-	path := filepath.Join(dir, id+orchUploadExt[mime])
+	path := filepath.Join(dir, id+ext)
 	if err := os.Rename(tmpPath, path); err != nil {
 		return nil, err
 	}
@@ -430,7 +438,10 @@ func (m *OrchManager) Upload(id string) (*orchImage, error) {
 		st, _ := f.Stat()
 		f.Close()
 		mime := sniffUpload(head[:n], filepath.Ext(p))
-		if mime == "" || st == nil || orchUploadExt[mime] != filepath.Ext(p) {
+		if mime == "" || orchUploadExt[mime] != filepath.Ext(p) {
+			mime = binaryReadBack(head[:n], filepath.Ext(p))
+		}
+		if mime == "" || st == nil {
 			continue
 		}
 		name, _ := os.ReadFile(strings.TrimSuffix(p, filepath.Ext(p)) + ".name")
@@ -615,7 +626,7 @@ func (m *OrchManager) uploadRoutes(mux *http.ServeMux) {
 			if err != nil {
 				var mbe *http.MaxBytesError
 				if errors.As(err, &mbe) {
-					orchWriteErr(w, &orchHTTPError{http.StatusRequestEntityTooLarge, "file is larger than 25 MB"})
+					orchWriteErr(w, uploadTooLarge())
 					return
 				}
 				orchWriteErr(w, orchBadRequest("multipart body has no file part"))
@@ -633,7 +644,7 @@ func (m *OrchManager) uploadRoutes(mux *http.ServeMux) {
 			if err != nil {
 				var mbe *http.MaxBytesError
 				if errors.As(err, &mbe) {
-					err = &orchHTTPError{http.StatusRequestEntityTooLarge, "file is larger than 25 MB"}
+					err = uploadTooLarge()
 				}
 				orchWriteErr(w, err)
 				return
@@ -667,10 +678,14 @@ func (m *OrchManager) uploadRoutes(mux *http.ServeMux) {
 		if ct != "application/pdf" {
 			w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox") // the browser PDF viewer refuses a sandbox
 		}
-		if ct == "image/heic" {
-			w.Header().Set("Content-Disposition", "attachment")
+		if _, known := orchUploadExt[img.Mime]; ct == "image/heic" || !known && !playableMime(ct) {
+			w.Header().Set("Content-Disposition", mimetype.FormatMediaType("attachment", map[string]string{"filename": firstOf(img.Name, img.ID)}))
 		}
 		w.Header().Set("Cache-Control", "private, max-age=86400")
-		_, _ = io.Copy(w, f)
+		var mod time.Time
+		if st, err := f.Stat(); err == nil {
+			mod = st.ModTime()
+		}
+		http.ServeContent(w, r, "", mod, f) // Range requests, so video and audio can seek
 	})
 }

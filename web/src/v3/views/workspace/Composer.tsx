@@ -1,8 +1,7 @@
 // Composer with @ file, $ skill and / command pickers, and file attachments (picker, paste, drop, upload progress).
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePromptHistory } from "./prompts";
-import { showToast } from "../../../app/toast";
-import { FILE_ACCEPT, fileAccepted, IMAGE_TYPES, MAX_FILE, p7, uploadImage, type OFileHit, type OSkill, type OUpload } from "../../api/p7";
+import { IMAGE_TYPES, MAX_FILE, MAX_FILE_LABEL, p7, uploadImage, type OFileHit, type OSkill, type OUpload } from "../../api/p7";
 import { CleanChip, MicButton, useDictation } from "../../../lib/voice";
 import { HistoryButton, type CmdHistory } from "./bash";
 import { copyWithToast } from "../../components/CopyBtn";
@@ -99,15 +98,14 @@ export function useAttachments(threadId: string, scope = threadId) {
   }, []);
   const add = useCallback(
     (files: File[]) => {
-      const ok = files.filter(fileAccepted);
-      if (ok.length < files.length) showToast("Some files were not attached", "Images (PNG, JPEG, WebP, GIF, HEIC), PDF, and text files (TXT, MD, CSV, JSON, HTML, XML, YAML, logs and source code) attach, up to 25 MB each.");
+      const ok = files;
       const fresh: Att[] = [];
       for (const f of ok) {
         const key = `a${++attKey}`;
         const name = f.name && f.name !== "image.png" ? f.name : `pasted-${attKey}.${f.type.split("/")[1] || "png"}`;
         const a: Att = { key, name, url: URL.createObjectURL(f), image: IMAGE_TYPES.includes(f.type), size: f.size, progress: 0 };
         if (f.size > MAX_FILE) {
-          fresh.push({ ...a, error: "larger than 25 MB" });
+          fresh.push({ ...a, error: `larger than ${MAX_FILE_LABEL}` });
           continue;
         }
         const named = f.name === name ? f : new File([f], name, { type: f.type });
@@ -177,7 +175,6 @@ export function AttachButton({ a, disabled }: { a: Attachments; disabled?: boole
         ref={inp}
         type="file"
         multiple
-        accept={FILE_ACCEPT}
         hidden
         onChange={(e) => {
           const files = [...(e.target.files || [])];

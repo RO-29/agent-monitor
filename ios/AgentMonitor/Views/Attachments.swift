@@ -19,11 +19,9 @@ final class AttachmentTray {
         var started = false
     }
 
-    static let maxBytes: Int64 = 25 << 20
+    static let maxBytes: Int64 = 100 << 20
     static let maxCount = 10
     static let parallel = 3
-    static let accepted: Set<String> = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "application/pdf",
-                                        "text/plain", "text/markdown", "text/csv", "application/json"]
 
     var items: [Item] = []
     /// A driven thread id (ot_...) scopes the upload; watched sessions and new threads leave it nil.
@@ -64,10 +62,8 @@ final class AttachmentTray {
             return
         }
         var it = Item(name: name, size: Int64(data.count), mime: mime, thumb: thumb)
-        if !Self.accepted.contains(mime) {
-            it.error = "This file type cannot be sent."
-        } else if it.size > Self.maxBytes {
-            it.error = "Larger than 25 MB."
+        if it.size > Self.maxBytes {
+            it.error = "Larger than 100 MB."
         }
         items.append(it)
         guard it.error == nil else { return }
@@ -197,7 +193,7 @@ struct AttachButton: View {
         .disabled(tray.full)
         .accessibilityLabel("Attach")
         .accessibilityHint("Adds a photo, a picture from the camera, or a file")
-        .photosPicker(isPresented: $showPhotos, selection: $picks, maxSelectionCount: AttachmentTray.maxCount, matching: .images)
+        .photosPicker(isPresented: $showPhotos, selection: $picks, maxSelectionCount: AttachmentTray.maxCount, matching: .any(of: [.images, .videos]))
         .onChange(of: picks) { _, new in
             guard !new.isEmpty else { return }
             picks = []
@@ -230,6 +226,11 @@ struct AttachButton: View {
             return
         }
         let types = p.supportedContentTypes
+        if let movie = types.first(where: { $0.conforms(to: .movie) }) {
+            let ext = movie.preferredFilenameExtension ?? "mov"
+            tray.add(data: data, name: "Video \(Self.stamp()).\(ext)", mime: movie.preferredMIMEType ?? "video/quicktime", thumb: nil)
+            return
+        }
         let img = UIImage(data: data)
         let thumb = img?.preparingThumbnail(of: CGSize(width: 120, height: 120))
         let base = "Photo \(Self.stamp())"
@@ -412,9 +413,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
     let onPick: ([URL]) -> Void
 
     static var types: [UTType] {
-        var t: [UTType] = [.image, .pdf, .plainText, .commaSeparatedText, .json, .sourceCode, .script, .shellScript, .html, .xml, .yaml, .log]
-        if let md = UTType("net.daringfireball.markdown") ?? UTType(filenameExtension: "md") { t.append(md) }
-        return t
+        [.item] // any file: the daemon keeps what it cannot read as text, an image or a pdf
     }
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {

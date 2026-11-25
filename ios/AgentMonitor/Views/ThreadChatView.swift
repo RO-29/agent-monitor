@@ -750,7 +750,7 @@ struct ChatItemView: View {
                         UploadThumb(att: a)
                     }
                     ForEach(att.filter { !$0.mime.hasPrefix("image/") || $0.mime == "image/heic" }) { a in
-                        Label(a.name ?? "Attachment", systemImage: a.mime.hasPrefix("image/") ? "photo" : "doc")
+                        Label(a.name ?? "Attachment", systemImage: attachmentIcon(a.mime))
                             .font(.footnote.weight(.medium)).foregroundStyle(Tok.fg2).lineLimit(1)
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Tok.panel2, in: Capsule())
@@ -1123,4 +1123,14 @@ struct TwoFingerTap: UIGestureRecognizerRepresentable {
     func handleUIGestureRecognizerAction(_ recognizer: UITapGestureRecognizer, context: Context) {
         if recognizer.state == .ended { action() }
     }
+}
+
+/// The chip icon for an attachment's type.
+func attachmentIcon(_ mime: String) -> String {
+    if mime.hasPrefix("image/") { return "photo" }
+    if mime.hasPrefix("video/") { return "film" }
+    if mime.hasPrefix("audio/") { return "waveform" }
+    if mime.contains("zip") || mime.contains("compressed") || mime.contains("rar") || mime.contains("tar") || mime.contains("gzip") { return "doc.zipper" }
+    if mime.contains("spreadsheet") || mime.contains("excel") || mime == "text/csv" { return "tablecells" }
+    return "doc"
 }

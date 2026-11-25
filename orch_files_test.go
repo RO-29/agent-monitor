@@ -65,27 +65,49 @@ func TestOrchUploadFileTypes(t *testing.T) {
 			t.Fatalf("%s read back: %v %+v", c.name, err, up)
 		}
 	}
+	// Files that claim a type they are not are kept as inert downloads, never as an image, pdf or text.
 	for _, c := range []struct {
 		name, ctype string
 		data        []byte
+		mime, ext   string
 	}{
-		{"x.svg", "image/svg+xml", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)},
-		{"fake.pdf", "application/pdf", []byte("just text")},
-		{"fake.png", "application/octet-stream", []byte("just text")},
-		{"bin.txt", "text/plain", []byte{0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0}},
-		{"a.zip", "application/zip", []byte("PK\x03\x04rest")},
+		{"x.svg", "image/svg+xml", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`), "application/octet-stream", ".bin"},
+		{"fake.pdf", "application/pdf", []byte("just text"), "application/octet-stream", ".bin"},
+		{"fake.png", "application/octet-stream", []byte("just text"), "application/octet-stream", ".bin"},
+		{"bin.txt", "text/plain", []byte{0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0}, "application/octet-stream", ".bin"},
+		{"a.zip", "application/zip", []byte("PK\x03\x04rest"), "application/zip", ".zip"},
+		{"sheet.xlsx", "", []byte("PK\x03\x04rest"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"},
+		{"clip.mov", "video/quicktime", []byte("\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00"), "video/quicktime", ".mov"},
+		{"tool", "", []byte{0xca, 0xfe, 0xba, 0xbe, 0, 1}, "application/octet-stream", ".bin"},
+		{"data.parquet", "", []byte("PAR1\x00\x01"), "application/octet-stream", ".parquet"},
 	} {
-		if code, out := uploadTyped(t, srv.URL, c.name, c.ctype, c.data); code != 415 {
-			t.Fatalf("%s accepted: %d %v", c.name, code, out)
+		code, out := uploadTyped(t, srv.URL, c.name, c.ctype, c.data)
+		if code != 201 || out["mime"] != c.mime || !strings.HasSuffix(out["path"].(string), c.ext) {
+			t.Fatalf("%s: %d %v", c.name, code, out)
+		}
+		up, err := e.m.Upload(out["id"].(string))
+		if err != nil || up.Mime != c.mime {
+			t.Fatalf("%s read back: %v %+v", c.name, err, up)
+		}
+		resp, err := http.Get(srv.URL + out["url"].(string))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		cd, video := resp.Header.Get("Content-Disposition"), strings.HasPrefix(c.mime, "video/")
+		if resp.Header.Get("X-Content-Type-Options") != "nosniff" || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "sandbox") || video == strings.HasPrefix(cd, "attachment") {
+			t.Fatalf("%s served with %v", c.name, resp.Header)
 		}
 	}
 	// HTML is kept as plain text: stored as .txt and served as text/plain, never as a page.
 	if code, out := uploadTyped(t, srv.URL, "page.html", "text/html", []byte("<!doctype html><html><script>alert(1)</script></html>")); code != 201 || out["mime"] != "text/plain" || !strings.HasSuffix(out["path"].(string), ".txt") {
 		t.Fatalf("page.html: %d %v", code, out)
 	}
+	defer func(old int64) { orchUploadMax = old }(orchUploadMax)
+	orchUploadMax = 25 << 20
 	big := append(append([]byte{}, tinyPDF...), make([]byte, 25<<20)...)
 	if code, out := uploadTyped(t, srv.URL, "big.pdf", "application/pdf", big); code != 413 {
-		t.Fatalf("over 25 MB: %d %v", code, out)
+		t.Fatalf("over the limit: %d %v", code, out)
 	}
 	nearly := append(append([]byte{}, tinyPDF...), bytes.Repeat([]byte(" "), 11<<20)...)
 	if code, out := uploadTyped(t, srv.URL, "eleven.pdf", "application/pdf", nearly); code != 201 {

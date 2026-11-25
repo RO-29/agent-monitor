@@ -261,7 +261,7 @@ export function uploadImage(threadId: string, file: File, onProgress: (f: number
         t += 0.12 + Math.random() * 0.1;
         onProgress(Math.min(1, t));
         if (t >= 1) {
-          if (file.size > MAX_FILE) return rej(new ApiError(413, "file is larger than 25 MB"));
+          if (file.size > MAX_FILE) return rej(new ApiError(413, `file is larger than ${MAX_FILE_LABEL}`));
           return res({ id: `up-${Date.now()}-${file.name}`, path: `~/.agent-monitor/uploads/${threadId}/${file.name}`, mime: file.type });
         }
         window.setTimeout(tick, 160);
@@ -295,14 +295,10 @@ export function uploadImage(threadId: string, file: File, onProgress: (f: number
 }
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-/** What POST /api/orch/uploads accepts; the daemon sniffs the content, the extension covers browsers that send no type. */
-export const FILE_TYPES = [...IMAGE_TYPES, "image/heic", "image/heif", "application/pdf", "text/plain", "text/markdown", "text/x-markdown", "text/csv", "application/json"];
-/** Markup and source code attach as plain text; the daemon keeps the same list (orchTextExt). */
-export const CODE_EXTS = (".html .htm .xml .yaml .yml .toml .ini .cfg .conf .log .diff .patch .sql .graphql .proto .go .py .rb .js .mjs .cjs .ts .tsx .jsx .vue .svelte .css .scss .java .kt .kts .scala .swift .m .mm .c .h .cc .cpp .hpp .cs .rs .php .pl .lua .r .sh .bash .zsh .fish .ps1 .dockerfile .tf .hcl .gradle .groovy .dart .ex .exs .erl .hs .clj .zig .nim .jl .ipynb").split(" ");
-export const FILE_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".heic", ".heif", ".pdf", ".txt", ".md", ".markdown", ".csv", ".json", ...CODE_EXTS];
-export const FILE_ACCEPT = [...FILE_TYPES, ...FILE_EXTS].join(",");
-export const MAX_FILE = 25 * 1024 * 1024;
-export const fileAccepted = (f: File) => FILE_TYPES.includes(f.type) || FILE_EXTS.some((x) => f.name.toLowerCase().endsWith(x));
+/** POST /api/orch/uploads takes any file; images, pdf and text are read by type, everything else is kept as it is. */
+export const MAX_FILE = 100 * 1024 * 1024;
+export const MAX_FILE_LABEL = "100 MB";
+export const PLAYABLE = (mime: string) => mime.startsWith("video/") || mime.startsWith("audio/");
 
 /** Template prompt variables the run body must fill: everything except the built-ins. */
 export const BUILTIN_VARS = new Set(["cwd", "branch", "date"]);

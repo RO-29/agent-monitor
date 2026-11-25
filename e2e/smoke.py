@@ -55,8 +55,9 @@ def uploads():
         check("upload served inert", c2 == 200 and h.get("Content-Type", "").startswith("text/plain") and h.get("X-Content-Type-Options") == "nosniff" and "sandbox" in h.get("Content-Security-Policy", ""))
     c, _, _ = upload("main.go", b"package main\n", "text/x-go")
     check("source file accepted", c == 201)
-    c, _, _ = upload("bin.go", b"a\x00b", "text/x-go")
-    check("binary refused", c == 415)
+    c, _, b = upload("bin.go", b"a\x00b", "text/x-go")
+    up = js(b).get("upload") or js(b)
+    check("binary kept as an inert file", c == 201 and up.get("mime") == "application/octet-stream" and up.get("path", "").endswith(".bin"), b[:120])
 
 
 def tmux_has(s):

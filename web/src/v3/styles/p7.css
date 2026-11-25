@@ -210,3 +210,7 @@
 .v3 .ws .watt-retry:hover{background:var(--panel-3)}
 .v3 .wcpm{flex:none;min-width:max-content}
 .v3 .wcpy{white-space:nowrap}
+.v3 .ws .wu-att .wu-media{display:flex;flex-direction:column;gap:3px;max-width:320px;font-size:12px}
+.v3 .ws .wu-att .wu-media video{max-width:320px;max-height:220px;border-radius:6px;border:1px solid var(--line);background:#000}
+.v3 .ws .wu-att .wu-media audio{width:280px}
+.v3 .ws .wu-att .wu-media a{color:var(--muted);text-decoration:none}

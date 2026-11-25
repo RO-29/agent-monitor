@@ -59,12 +59,14 @@ func TestOrchUploads(t *testing.T) {
 	if p := out["path"].(string); !strings.HasPrefix(p, filepath.Join(e.dir, "uploads", "new")+"/") || !strings.HasSuffix(p, ".png") {
 		t.Fatalf("path %s", p)
 	}
-	if code, out := uploadFile(t, srv.URL, "fake.png", []byte("hello, not an image"), ""); code != 415 {
-		t.Fatalf("text named .png: %d %v", code, out)
+	if code, out := uploadFile(t, srv.URL, "fake.png", []byte("hello, not an image"), ""); code != 201 || out["mime"] != "application/octet-stream" {
+		t.Fatalf("text named .png must stay an inert file: %d %v", code, out)
 	}
-	if code, _ := uploadFile(t, srv.URL, "svg.png", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`), ""); code != 415 {
-		t.Fatalf("svg accepted: %d", code)
+	if code, out := uploadFile(t, srv.URL, "svg.png", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`), ""); code != 201 || out["mime"] != "application/octet-stream" {
+		t.Fatalf("svg must stay an inert file: %d %v", code, out)
 	}
+	defer func(old int64) { orchUploadMax = old }(orchUploadMax)
+	orchUploadMax = 1 << 20
 	big := append(append([]byte{}, onePixelPNG...), make([]byte, orchUploadMax)...)
 	if code, out := uploadFile(t, srv.URL, "big.png", big, ""); code != 413 {
 		t.Fatalf("big: %d %v", code, out)
