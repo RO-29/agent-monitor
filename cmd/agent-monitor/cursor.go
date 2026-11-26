@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -232,11 +233,23 @@ func cursorChatFirstPrompt(chatID, chatDir string) string {
 	}
 	for _, it := range items {
 		if it.Kind == "user" {
-			if t := firstLine(it.Text); t != "" {
+			if t := cursorTitleLine(it.Text); t != "" {
 				t = clipString(t, 80)
 				cursorPromptCache.Store(chatDir, t)
 				return t
 			}
+		}
+	}
+	return ""
+}
+
+var reRoleHeader = regexp.MustCompile(`^[A-Z][A-Z _-]{1,20}:$`)
+
+// cursorTitleLine is the first line that says something; a bare role header such as "SYSTEM:" is skipped.
+func cursorTitleLine(text string) string {
+	for _, l := range strings.Split(text, "\n") {
+		if l = strings.TrimSpace(l); l != "" && !reRoleHeader.MatchString(l) {
+			return l
 		}
 	}
 	return ""

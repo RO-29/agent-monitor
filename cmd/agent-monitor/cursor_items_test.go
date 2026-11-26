@@ -63,3 +63,16 @@ func TestCursorWorkspaceFromContext(t *testing.T) {
 		t.Fatalf("workspace %q", got)
 	}
 }
+
+func TestCursorTitleLine(t *testing.T) {
+	for in, want := range map[string]string{
+		"SYSTEM:\nYou are a ClickHouse engineer.\nMore": "You are a ClickHouse engineer.",
+		"  \nFix the login page":                        "Fix the login page",
+		"Note: keep tests green":                        "Note: keep tests green",
+		"SYSTEM:\n\n":                                   "",
+	} {
+		if got := cursorTitleLine(in); got != want {
+			t.Errorf("cursorTitleLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
