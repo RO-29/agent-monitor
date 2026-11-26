@@ -584,3 +584,5 @@
 .v3 pre.wsent{opacity:.6}
 .v3 .sugbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px;margin-bottom:12px;border:1px dashed var(--line);border-radius:10px}
 .v3 .sugbox .sugrow{gap:6px;font-size:13px}
+.v3 .agroup{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.v3 .agroup ul{margin:0;padding-left:18px;max-height:180px;overflow:auto;font-size:12px}

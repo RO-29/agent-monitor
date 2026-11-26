@@ -91,8 +91,21 @@ export function useNewMark(key: string, items: OItem[] | undefined, atBottom: bo
   }, [items, seenAtOpen]);
 }
 
-export const NewLine = () => (
-  <div className="wnewline" role="separator" aria-label="New messages">
-    <span>New</span>
+// "Since you left": turns, files changed and errors from the New line down.
+export function sinceText(items: OItem[] | undefined, mark: string): string {
+  if (!items || !mark) return "";
+  const i = items.findIndex((x) => (x.runId || "_") === mark);
+  if (i < 0) return "";
+  const after = items.slice(i);
+  const turns = new Set(after.map((x) => x.runId)).size;
+  const files = new Set(after.flatMap((x) => (x.files || []).map((f) => f.path))).size;
+  const errs = after.filter((x) => x.kind === "error" || x.status === "failed" || (x.exitCode !== undefined && x.exitCode !== 0)).length;
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+  return [n(turns, "turn"), files ? n(files, "file") + " changed" : "", errs ? n(errs, "error") : ""].filter(Boolean).join(" · ");
+}
+
+export const NewLine = ({ since }: { since?: string }) => (
+  <div className="wnewline" role="separator" aria-label={since ? `New since you left: ${since}` : "New messages"}>
+    <span>{since ? `New since you left · ${since}` : "New"}</span>
   </div>
 );

@@ -6,7 +6,7 @@ import { showToast } from "../../../app/toast";
 import { ApiError, v3 } from "../../api/client";
 import { agentCls, agentLabel, mockHooks, useOrch, type OItem, type ORequest } from "../../api/orch";
 import type { Approval, DecideBody, PermOption, Question } from "../../api/types";
-import { canAlways, DenyTarget, diffLines, DiffView, type Line } from "../../components/ApprovalCard";
+import { AllowGroup, canAlways, DenyTarget, diffLines, DiffView, type Line } from "../../components/ApprovalCard";
 import { sentToTerminal, TermShownNote } from "../../components/TermShown";
 import { approvalKeyOk, useApproveKeys } from "../../keys";
 import { shortCwd } from "../../../lib/format";
@@ -687,6 +687,7 @@ function PermAsk({ ask }: { ask: AskInfo }) {
           </>
         )}
       </div>
+      {!ask.options && ask.approval && <AllowGroup a={ask.approval} />}
       {denyOpen && !ask.options && (
         <div className="wdeny">
           <textarea

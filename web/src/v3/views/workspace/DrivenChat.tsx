@@ -10,7 +10,7 @@ import { clearSent, useDraft } from "../../../lib/draft";
 import { useDocTitle } from "../../../lib/title";
 import { usd } from "../../components/Spend";
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { NewLine, PendingBubbles, useNewMark, usePendingSends } from "./sendMarks";
+import { NewLine, PendingBubbles, sinceText, useNewMark, usePendingSends } from "./sendMarks";
 import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
@@ -1126,7 +1126,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
           ))}
         {blocks.map((b, bi) => (
           <Fragment key={b.key}>
-          {b.key === newMark && bi > 0 && <NewLine />}
+          {b.key === newMark && bi > 0 && <NewLine since={sinceText(detail.items, newMark)} />}
           <RunBlock run={b.run} items={b.items.filter((i) => !isReviewItem(i))} now={now} after={b.run ? <>{cardFor(b.run.id)}{reviewInBlock && b.run.id === reviewRun && reviewCard}</> : undefined} diff={b.run && git.status === "ok" ? runDiff(cps, b.run, b.items.some((i) => i.kind === "fileChange" && i.status === "completed")) : null} onDiff={dnav.open} />
           </Fragment>
         ))}

@@ -7,7 +7,7 @@ import { dropPerm } from "../../lib/ws";
 import { ApiError, v3 } from "../api/client";
 import { dropNeedsYou, refreshNeedsYou, useNeedsYou, type NeedsYouItem } from "../api/needsYou";
 import type { Approval, DecideBody } from "../api/types";
-import { agentName, applyDecision, loadApprovals } from "../live";
+import { agentName, applyDecision, loadApprovals, useV3 } from "../live";
 import { confirmKey } from "../keys";
 import { sentToTerminal } from "./TermShown";
 
@@ -86,6 +86,61 @@ export async function quickDecide(a: Approval, how: "allow" | "always") {
     else showToast("Decision failed", (e as Error).message, { kind: "alert" });
     void loadApprovals();
   }
+}
+
+/** "Allow these N": pending requests that one Always rule would cover; the list shows before anything is sent. */
+export function AllowGroup({ a }: { a: Approval }) {
+  const { approvals } = useV3();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!a.group || a.state !== "pending") return null;
+  const same = [...approvals.values()].filter((x) => x.group === a.group && x.state === "pending" && x.risk !== "high" && !sentToTerminal(x));
+  if (same.length < 2) return null;
+  const all = async () => {
+    setBusy(true);
+    let failed = 0;
+    for (const x of same) {
+      try {
+        const r = await v3.decide(x.id, { behavior: "allow" });
+        applyDecision(r && r.id ? r : { ...x, state: "allowed" });
+      } catch {
+        failed++;
+      }
+    }
+    setBusy(false);
+    setOpen(false);
+    if (failed) showToast(`${same.length - failed} allowed, ${failed} not`, "Another surface may have answered first.", { kind: "alert" });
+    else showToast(`Allowed ${same.length} requests`, a.groupPattern || a.toolName);
+    void loadApprovals();
+  };
+  if (!open)
+    return (
+      <button className="btn sm" onClick={() => setOpen(true)} aria-expanded={false}>
+        Allow these {same.length}…
+      </button>
+    );
+  return (
+    <div className="agroup" role="group" aria-label={`${same.length} similar requests`}>
+      <div className="xs muted">
+        {same.length} requests match <code>{a.groupPattern || a.toolName}</code> in {shortCwd(a.cwd)}. Each one is allowed once; no rule is added.
+      </div>
+      <ul>
+        {same.map((x) => (
+          <li key={x.id}>
+            <code>{x.summary}</code>
+          </li>
+        ))}
+      </ul>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="btn sm pri" disabled={busy} onClick={() => void all()}>
+          Allow all {same.length}
+        </button>
+        <button className="btn sm ghost" disabled={busy} onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** Lets a keyboard handler open the deny box of a card it does not render. */

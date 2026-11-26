@@ -21,7 +21,7 @@ import { drivenRows, drivenSig } from "./driven";
 import { buildRows, counts } from "./model";
 import "./styles/v3.css";
 import "./styles/p6.css";
-import { useNeedsYou } from "./api/needsYou";
+import { sessionKey, useNeedsYou } from "./api/needsYou";
 
 export const VIEWS: { to: string; label: string; ic: string; key?: string }[] = [
   { to: "/board", label: "Board", ic: "▦", key: "b" },
@@ -186,6 +186,20 @@ export default function V3Shell() {
     setNotifyNav(nav);
   }, [nav]);
 
+  // n: the oldest request that needs you, then the next one on each press.
+  const nextNeed = useRef<() => void>(() => {});
+  nextNeed.current = () => {
+    const hrefs: string[] = [];
+    for (const i of [...ny.items].sort((a, b) => a.at - b.at)) {
+      const d = i.approval?.drivenId || i.threadId;
+      const sid = sessionKey(i);
+      const h = d ? `/w/${encodeURIComponent(d)}` : sid ? `/w/${encodeURIComponent(st.threadOf[sid] || sid)}` : "";
+      if (h && !hrefs.includes(h)) hrefs.push(h);
+    }
+    if (!hrefs.length) return void showToast("Nothing needs you", "No request is waiting.");
+    nav(hrefs[(hrefs.indexOf(loc.pathname) + 1) % hrefs.length]);
+  };
+
   const openPalette = useCallback((o?: { q?: string; scope?: string }) => setPal({ scope: scopeRef.current, ...(o || {}) }), []);
   const ctx = useMemo(() => ({ openPalette, openPane: (s: Session) => setPane(s), setScope: (r: string | undefined) => (scopeRef.current = r) }), [openPalette]);
 
@@ -212,6 +226,9 @@ export default function V3Shell() {
       else if (e.key === "c" && !g && !e.shiftKey && !overlayOpen()) {
         e.preventDefault();
         nav("/w/new");
+      } else if (e.key === "n" && !g && !e.shiftKey && !overlayOpen()) {
+        e.preventDefault();
+        nextNeed.current();
       } else if (g) {
         g = false;
         chord.pending = false;
@@ -352,6 +369,7 @@ export default function V3Shell() {
                 <dt><Kbd>a</Kbd> <Kbd>A</Kbd></dt><dd>Allow, always allow the selected or highlighted request. High risk and plans need a second press.</dd>
                 <dt><Kbd>d</Kbd></dt><dd>Deny the selected or highlighted request</dd>
                 <dt><Kbd>c</Kbd></dt><dd>New thread</dd>
+                <dt><Kbd>n</Kbd></dt><dd>Next request that needs you</dd>
                 <dt><Kbd>enter</Kbd></dt><dd>Open the thread</dd>
                 <dt><Kbd>e</Kbd></dt><dd>Next error in Transcript</dd>
                 <dt><Kbd>g</Kbd> then <Kbd>h</Kbd></dt><dd>Threads</dd>

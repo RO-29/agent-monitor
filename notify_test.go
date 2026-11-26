@@ -599,3 +599,30 @@ func TestNotifyRemindsAnUnansweredRequestOnce(t *testing.T) {
 		t.Fatalf("reminded twice: %d", len(list))
 	}
 }
+
+func TestNotifyRestartClosesEndedRequests(t *testing.T) {
+	zero := 0
+	cfg := &NotifySettings{BatchSec: &zero}
+	dir := t.TempDir()
+	n, err := openNotifier(dir, func() NotifySettings { return *cfg })
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.Emit(notifyEvent{Kind: "needs-you", Title: "gone", Keys: []string{"ap_gone"}})
+	n.Emit(notifyEvent{Kind: "needs-you", Title: "still open", Keys: []string{"tp:s1"}})
+	n.db.Close()
+	n, err = openNotifier(dir, func() NotifySettings { return *cfg })
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { n.db.Close() })
+	n.settleRestored(map[string]bool{"tp:s1": true})
+	list, _, _ := n.List(0, 10)
+	if len(list) != 2 || list[0].Resolved || !list[1].Resolved {
+		t.Fatalf("after restart = %+v", list)
+	}
+	n.Resolve("tp:s1")
+	if r, _ := n.get(list[0].ID); !r.Resolved {
+		t.Fatalf("a restored request did not resolve: %+v", r)
+	}
+}

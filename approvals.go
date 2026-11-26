@@ -46,11 +46,13 @@ type Approval struct {
 	RootID      string           `json:"rootId,omitempty"`
 	Options     []acpPermOption  `json:"options,omitempty"`
 	// Source "terminal-shown": the CLI shows its own prompt too, and a card decision is typed into it.
-	Source    string `json:"source,omitempty"`
-	SentAt    int64  `json:"sentAt,omitempty"`
-	Choice    string `json:"choice,omitempty"`
-	ToolUseID string `json:"toolUseId,omitempty"`
-	fullText  string
+	Source       string `json:"source,omitempty"`
+	SentAt       int64  `json:"sentAt,omitempty"`
+	Choice       string `json:"choice,omitempty"`
+	ToolUseID    string `json:"toolUseId,omitempty"`
+	Group        string `json:"group,omitempty"`
+	GroupPattern string `json:"groupPattern,omitempty"`
+	fullText     string
 	// noAutoAllow keeps allow rules from answering (read-only workspaces); deny rules still apply.
 	noAutoAllow bool
 }
@@ -355,6 +357,11 @@ func buildApproval(hook string, p hookPayload) *Approval {
 		a.Risk, a.RiskReason = "medium", "chained, piped or redirected command"
 	}
 	a.AlwaysOK = a.Kind == "permission" && a.Risk != "high" && !(isShellTool(a.ToolName) && isCompoundShell(a.fullText)) && alwaysPattern(a) != ""
+	if a.AlwaysOK && a.Cwd != "" {
+		// Requests with one group are what one Always rule would cover: "Allow these N" answers them together.
+		a.GroupPattern = alwaysPattern(a)
+		a.Group = suggestKey(a.Agent, a.ToolName, a.GroupPattern, a.Cwd)
+	}
 	return a
 }
 

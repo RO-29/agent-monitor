@@ -11,11 +11,15 @@ self.addEventListener("push", (e) => {
   }
   const url = n.url || (n.threadId ? `/w/${encodeURIComponent(n.threadId)}` : "/notifications");
   e.waitUntil(
-    self.registration.showNotification(n.title || "agent-monitor", {
-      body: n.body || "",
-      tag: n.id ? `am-${n.id}` : undefined,
-      data: { url },
-      requireInteraction: n.kind === "needs-you",
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // A focused agent-monitor tab shows the alert itself.
+      if (list.some((c) => c.focused)) return;
+      return self.registration.showNotification(n.title || "agent-monitor", {
+        body: n.body || "",
+        tag: n.id ? `am-${n.id}` : undefined,
+        data: { url },
+        requireInteraction: n.kind === "needs-you",
+      });
     }),
   );
 });

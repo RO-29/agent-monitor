@@ -1,6 +1,6 @@
 // Phase 6 notifications: SSE /api/notify/stream, the notification list with read state, in-app toasts, Web Push.
 import { useEffect, useSyncExternalStore } from "react";
-import { playBeep } from "../../app/notify";
+import { closePushNotify, playBeep } from "../../app/notify";
 import { showToast } from "../../app/toast";
 import { ApiError, isMissing } from "./client";
 import { mockWanted, toMs } from "./orch";
@@ -81,6 +81,7 @@ function add(n: ONotification, live: boolean) {
   if (i >= 0) {
     s.list = s.list.slice();
     s.list[i] = { ...s.list[i], ...v };
+    if (v.read || v.resolved) closePushNotify(v.id);
   } else {
     s.list = [v, ...s.list].sort((a, b) => b.at - a.at).slice(0, 300);
     if (live) toastFor(v);
@@ -186,7 +187,10 @@ async function load() {
       const i = s.list.findIndex((x) => x.id === v.id);
       if (i < 0) s.list.push(v);
       // A resolution made while the stream was down only shows in the list.
-      else if ((v.read && !s.list[i].read) || (v.resolved && !s.list[i].resolved)) s.list[i] = { ...s.list[i], read: s.list[i].read || v.read, resolved: v.resolved };
+      else if ((v.read && !s.list[i].read) || (v.resolved && !s.list[i].resolved)) {
+        s.list[i] = { ...s.list[i], read: s.list[i].read || v.read, resolved: v.resolved };
+        closePushNotify(v.id);
+      }
     }
     s.list = [...s.list].sort((a, b) => b.at - a.at);
     s.status = "ok";

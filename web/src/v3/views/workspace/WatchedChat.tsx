@@ -40,7 +40,7 @@ import { ResumeChip, SelectBar, SelectCtx, useSelection } from "./MsgActions";
 import { LinkedChip, LinkedPage, sessionLinks, type LinkedEntry } from "./linked";
 import { NewThreadBtn } from "./NewThread";
 import { useCmdHistory } from "./bash";
-import { NewLine, PendingBubbles, useNewMark, usePendingSends } from "./sendMarks";
+import { NewLine, PendingBubbles, sinceText, useNewMark, usePendingSends } from "./sendMarks";
 import { useDocTitle } from "../../../lib/title";
 import { useUsageLimits } from "../../api/usage";
 import { creditsLine } from "../../components/Usage";
@@ -448,7 +448,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         )}
         {shownBlocks.map((b) => (
           <Fragment key={b.key}>
-            {b.key === newMark && b !== shownBlocks[0] && <NewLine />}
+            {b.key === newMark && b !== shownBlocks[0] && <NewLine since={sinceText(f?.items, newMark)} />}
             <RunBlock run={b.run} items={b.items} now={now} />
           </Fragment>
         ))}

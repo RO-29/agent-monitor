@@ -143,6 +143,8 @@ type Notifier struct {
 	open    map[int64]int       // notification id -> approvals still open
 	gone    map[string]bool     // approvals that ended before their alert was stored
 	openAt  map[int64]time.Time // open "needs you" alerts not reminded yet
+	// restored: keys reloaded at start, checked once against the live requests.
+	restored map[string]bool
 }
 
 type notifyBatch struct {
@@ -174,13 +176,58 @@ func openNotifier(dir string, cfg func() NotifySettings) (*Notifier, error) {
 	}
 	// Older databases lack the device column; the error on a second ALTER is expected.
 	_, _ = db.Exec(`ALTER TABLE push_subs ADD COLUMN device TEXT NOT NULL DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE notifications ADD COLUMN keys TEXT NOT NULL DEFAULT ''`)
 	n := &Notifier{db: db, cfg: cfg, now: time.Now, unit: time.Second, subs: map[int]chan ONotification{}, batches: map[string]*notifyBatch{}, keyOf: map[string]int64{}, open: map[int64]int{}, gone: map[string]bool{}, openAt: map[int64]time.Time{}}
 	if keys, err := loadVAPID(dir); err != nil {
 		log.Printf("notify: web push off: %v", err)
 	} else {
 		n.push = &webPusher{keys: keys, sub: vapidSubject(), client: newPushClient()}
 	}
+	n.restoreOpen()
 	return n, nil
+}
+
+// restoreOpen reloads the open requests of the last day after a restart; settleRestored later closes the ended ones.
+func (n *Notifier) restoreOpen() {
+	rows, err := n.db.Query(`SELECT id, json, keys FROM notifications WHERE keys != '' AND at > ?`, n.now().Add(-24*time.Hour).UnixMilli())
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.restored = map[string]bool{}
+	for rows.Next() {
+		var id int64
+		var raw, keys string
+		var no ONotification
+		if rows.Scan(&id, &raw, &keys) != nil || json.Unmarshal([]byte(raw), &no) != nil || no.Resolved {
+			continue
+		}
+		for _, k := range strings.Split(keys, "\n") {
+			if k != "" {
+				n.keyOf[k] = id
+				n.open[id]++
+				n.restored[k] = true
+			}
+		}
+	}
+}
+
+// settleRestored resolves the restored requests that are no longer open.
+func (n *Notifier) settleRestored(open map[string]bool) {
+	n.mu.Lock()
+	var ended []string
+	for k := range n.restored {
+		if !open[k] {
+			ended = append(ended, k)
+		}
+	}
+	n.restored = nil
+	n.mu.Unlock()
+	for _, k := range ended {
+		n.Resolve(k)
+	}
 }
 
 // Emit takes an event: the first of a kind goes out at once, later ones in the batch window fold into one.
@@ -264,7 +311,7 @@ func (n *Notifier) deliver(ev notifyEvent) {
 	}
 	no.Quiet = cfg.quiet(now) && !(ev.Kind == "needs-you" && onOr(cfg.QuietAllowsNeedsYou))
 	b, _ := json.Marshal(no)
-	res, err := n.db.Exec(`INSERT INTO notifications(at, json) VALUES(?, ?)`, no.At, string(b))
+	res, err := n.db.Exec(`INSERT INTO notifications(at, json, keys) VALUES(?, ?, ?)`, no.At, string(b), strings.Join(ev.Keys, "\n"))
 	if err != nil {
 		log.Printf("notify: store: %v", err)
 		return
@@ -341,7 +388,9 @@ func (n *Notifier) remind(old int64, now time.Time) {
 	no.ID, no.At, no.Quiet = "", now.UnixMilli(), false
 	no.Title = fmt.Sprintf("Still waiting (%d min): %s", max(1, int(now.Sub(time.UnixMilli(first.At)).Minutes())), first.Title)
 	b, _ := json.Marshal(no)
-	res, err := n.db.Exec(`INSERT INTO notifications(at, json) VALUES(?, ?)`, no.At, string(b))
+	var keys string
+	_ = n.db.QueryRow(`SELECT keys FROM notifications WHERE id=?`, old).Scan(&keys)
+	res, err := n.db.Exec(`INSERT INTO notifications(at, json, keys) VALUES(?, ?, ?)`, no.At, string(b), keys)
 	if err != nil {
 		return
 	}

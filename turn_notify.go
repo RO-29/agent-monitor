@@ -39,13 +39,23 @@ func startTurnNotifier() {
 	go func() {
 		t := time.NewTicker(3 * time.Second)
 		defer t.Stop()
+		ticks := 0
 		for range t.C {
 			if notifier == nil || store == nil {
 				continue
 			}
 			turnNotifyTick(store.All(), time.Now())
-			promptNotifyTick(needsYou())
+			items := needsYou()
+			promptNotifyTick(items)
 			notifier.remindTick()
+			// After a restart, give the pane scans 30 s, then close the alerts whose requests ended.
+			if ticks++; ticks == 10 {
+				open := map[string]bool{}
+				for _, it := range items {
+					open[it.Key] = true
+				}
+				notifier.settleRestored(open)
+			}
 		}
 	}()
 }

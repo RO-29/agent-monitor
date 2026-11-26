@@ -48,3 +48,25 @@ func TestPaneScreenIgnoresPromptLookalikes(t *testing.T) {
 		t.Fatalf("lookalike: %s", got)
 	}
 }
+
+func TestPaneScreenShowsCursorAndOpenCodePrompts(t *testing.T) {
+	s := NewStore()
+	for _, c := range []struct {
+		tool   Tool
+		prompt string
+	}{
+		{ToolCursorAgent, "  $ rm -rf build\n\n  Run this command?\n  → Run (once) (y)\n    Skip (esc or n)\n"},
+		{ToolOpencode, "△ Permission required\n  bash: make test\n  Allow once   Allow always   Reject\n"},
+	} {
+		sess := s.Upsert(UpsertInput{Tool: c.tool, SessionID: "x", State: StateRunning, HasState: true})
+		applyPaneScreen(s, sess, c.prompt)
+		got := s.Get(sess.ID)
+		if got.State != StateAwaitingPermission || got.PermissionMessage == "" && got.LastMessage == "" {
+			t.Fatalf("%s prompt: %s %+v", c.tool, got.State, got)
+		}
+		applyPaneScreen(s, got, "  done.\n> \n")
+		if got := s.Get(sess.ID).State; got != StateRunning {
+			t.Fatalf("%s answered: %s", c.tool, got)
+		}
+	}
+}

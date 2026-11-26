@@ -24,6 +24,8 @@ export interface Approval {
   risk: Risk;
   riskReason: string;
   alwaysOk?: boolean;
+  group?: string; // requests one Always rule would cover share it
+  groupPattern?: string;
   suggestions?: object[];
   questions?: Question[];
   plan?: string;

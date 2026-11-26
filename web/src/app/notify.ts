@@ -43,19 +43,38 @@ export function playBeep() {
   }
 }
 
+// With Web Push on, the service worker shows the daemon's alert; a page copy would be the second one.
+let pushOn = false;
+if (typeof navigator !== "undefined" && "serviceWorker" in navigator)
+  void navigator.serviceWorker.getRegistration().then((r) => r?.pushManager?.getSubscription().then((s) => (pushOn = !!s))).catch(() => {});
+
+const shown = new Map<string, Notification>();
+export function closeOsNotify(tag: string) {
+  shown.get(tag)?.close();
+  shown.delete(tag);
+}
+
 function osNotify(title: string, body: string, tag: string, onClick?: () => void) {
-  if (!pref(KEYS.notify, true)) return;
+  if (!pref(KEYS.notify, true) || pushOn) return;
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   try {
     const n = new Notification(title, { body, tag, requireInteraction: true });
+    shown.set(tag, n);
+    n.onclose = () => shown.get(tag) === n && shown.delete(tag);
     n.onclick = () => {
       window.focus();
       onClick?.();
-      n.close();
+      closeOsNotify(tag);
     };
   } catch {
     /* blocked */
   }
+}
+
+/** Closes the service worker's copy of a daemon alert (tag am-<id>) once it is read or answered. */
+export function closePushNotify(id: string) {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker.getRegistration().then((r) => r?.getNotifications({ tag: `am-${id}` }).then((ns) => ns.forEach((n) => n.close()))).catch(() => {});
 }
 
 /** Mount once (in Shell). Watches sessions + WS events and fires alerts. */
@@ -88,7 +107,7 @@ export function useNotifications(navigate: (path: string) => void) {
         }
       } else {
         // awaiting-input is a finished turn: ready, not a request, so it fires nothing.
-        permMsg.current.delete(s.id);
+        if (permMsg.current.delete(s.id)) closeOsNotify(s.id); // answered here or elsewhere
       }
     });
   }, [live.version]); // eslint-disable-line react-hooks/exhaustive-deps

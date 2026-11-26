@@ -88,6 +88,10 @@ func startPanePromptWatcher(s *Store, pr *PaneRegistry) {
 // applyPaneScreen keeps the "prompt open" state in step with the screen.
 // A finished turn (awaiting-input) has no prompt on screen and is left alone.
 func applyPaneScreen(s *Store, sess *Session, content string) {
+	if sess.Tool != ToolClaude && sess.Tool != ToolCodex {
+		applyOtherPaneScreen(s, sess, content)
+		return
+	}
 	atPrompt := panePromptOpen(content)
 	switch {
 	case atPrompt && sess.State != StateAwaitingPermission && parsedPromptOpen(content):
@@ -102,6 +106,22 @@ func applyPaneScreen(s *Store, sess *Session, content string) {
 			next = StateCompleted // a prompt shown on /exit: the session stays ended
 		}
 		s.SetState(sess.Tool, sess.SessionID, next, "")
+	}
+}
+
+// Cursor and OpenCode permission prompts: a card that says to answer in the terminal (no keys are known).
+var reOtherPrompt = regexp.MustCompile(`(?i)(\(y/n\)|\[y/n\]|run (this )?command\?|permission required|allow once|allow always|` +
+	`\(esc or n\)|skip \(esc|reject \(|approve\?|do you want to (run|allow|proceed))`)
+
+var otherAgentNames = map[Tool]string{ToolCursor: "Cursor", ToolCursorAgent: "Cursor", ToolOpencode: "OpenCode"}
+
+func applyOtherPaneScreen(s *Store, sess *Session, content string) {
+	open := reOtherPrompt.MatchString(lastLines(content, 12))
+	switch {
+	case open && sess.State != StateAwaitingPermission:
+		s.SetState(sess.Tool, sess.SessionID, StateAwaitingPermission, promptSummaryAs(lastLines(content, 12), firstOf(otherAgentNames[sess.Tool], "The agent")))
+	case !open && sess.State == StateAwaitingPermission:
+		s.SetState(sess.Tool, sess.SessionID, StateRunning, "")
 	}
 }
 
@@ -238,14 +258,16 @@ func lastLines(s string, n int) string {
 
 // promptSummary picks a one-line gist for the session message — the question
 // line (ends in "?") if present, else the first offered option.
-func promptSummary(tail string) string {
+func promptSummary(tail string) string { return promptSummaryAs(tail, "Claude") }
+
+func promptSummaryAs(tail, agent string) string {
 	for _, ln := range strings.Split(tail, "\n") {
 		t := strings.TrimSpace(ln)
 		if strings.HasSuffix(t, "?") && len(t) > 3 {
 			return clip(t, 160)
 		}
 	}
-	return "Claude is waiting for your answer"
+	return agent + " is waiting for your answer"
 }
 
 func clip(s string, n int) string {
