@@ -407,7 +407,6 @@ function DigestOne({ t, title }: { t: V3Thread; title: string }) {
       <div className="row">
         <AgentBadge tool={t.tools?.[0]} />
         <b className="grow1 ell">{title}</b>
-        {drivenIdOf(t) && <DrivenTag />}
         <span className="muted small" style={{ flex: "none" }}>
           {repoOf(t)}
           {t.turns > 1 ? ` · ${t.turns.toLocaleString()} turns` : ""}

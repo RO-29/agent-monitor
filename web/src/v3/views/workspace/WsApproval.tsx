@@ -300,7 +300,9 @@ function RiskLine({ ask }: { ask: AskInfo }) {
 }
 
 /** Full text with a visible cut marker and a Show all toggle; never cuts in silence. */
-export function FullText({ text, label, lines = 8, chars = 600 }: { text: string; label: string; lines?: number; chars?: number }) {
+export function FullText({ text, label, lines = 8, chars: max = 600 }: { text: string; label: string; lines?: number; chars?: number }) {
+  // A long single line wraps many times on a phone, so the character limit is smaller there.
+  const chars = typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches ? Math.min(max, 240) : max;
   const [all, setAll] = useState(false);
   const ls = text.split("\n");
   const long = ls.length > lines || text.length > chars;

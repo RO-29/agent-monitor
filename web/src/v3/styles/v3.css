@@ -466,7 +466,7 @@
 .v3 .flight > .fl:hover,.v3 .digest > .dg:hover{background:var(--panel-2);text-decoration:none}
 .v3 .fl .ag,.v3 .dg .ag{width:22px;height:22px;border-radius:6px;font-size:11px}
 .v3 .fl b,.v3 .dg b{font-weight:600}
-.v3 .fl .nowl{font:12.5px var(--f-mono);color:var(--fg-2)}
+.v3 .fl .nowl{font:13.5px var(--f-ui);color:var(--fg-2)}
 .v3 .sbars{display:flex;gap:2px;align-items:flex-end;height:20px;flex:none}
 .v3 .sbars i{width:3px;background:var(--run);opacity:.75;border-radius:1px;display:block;min-height:1px}
 .v3 .sbars i.e{background:var(--err);opacity:1}
