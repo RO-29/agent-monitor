@@ -273,6 +273,11 @@ Claude threads also take a permission mode: Ask each time, Accept edits, Plan fi
 Messages can carry images (paste or drop them in the composer). The composer completes `@` file paths,
 `$` skills and Codex prompts, and `/` commands.
 
+A message that starts with `!` runs as a shell command in the thread's folder, as in Claude Code's
+bash mode. The output shows in the chat at once, no turn starts, and the agent sees the command and its
+output with your next message. A command stops after 10 minutes. This also works in a session you
+continued with Continue here, which has no terminal.
+
 A message sent while a driven thread works waits in the queue above the composer and goes when the agent
 is idle, one message per turn. For a terminal session that agent-monitor can reach (a session host or a
 tmux pane), the composer types the message straight into the CLI, as if you typed it there: a busy

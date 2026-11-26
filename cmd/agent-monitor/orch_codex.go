@@ -751,6 +751,9 @@ func (m *OrchManager) SendWith(id, text string, attachments []string) (string, e
 	if m.handover(id).Live {
 		return "", orchConflict("live")
 	}
+	if cmd := bangCommand(text); cmd != "" && len(attachments) == 0 {
+		return m.runBang(id, cmd)
+	}
 	if err := m.spendGate(id); err != nil {
 		return "", err
 	}
@@ -758,7 +761,8 @@ func (m *OrchManager) SendWith(id, text string, attachments []string) (string, e
 	if err != nil {
 		return "", err
 	}
-	return d.send(text, imgs)
+	mode, err := d.send(takeBangContext(id)+text, imgs)
+	return mode, err
 }
 
 func (m *OrchManager) Interrupt(id string) error {

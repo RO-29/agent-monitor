@@ -1155,6 +1155,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         files
         skills={t.agent === "claude" || t.agent === "codex"}
         commands={commands}
+        bash
         attach={att}
         top={
           <>
