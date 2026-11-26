@@ -503,7 +503,12 @@ struct Composer: View {
         sending = true
         defer { sending = false }
         do {
-            if let d = drivenID, busyCLI {
+            // A side question and a ! command never wait: neither starts a turn in this thread.
+            let now = ids.isEmpty && (body.hasPrefix("!") || (body.hasPrefix("/side ") && body.count > 6))
+            if let d = drivenID, now {
+                try await api.drivenSend(d, text: body, attachments: [])
+                status = body.hasPrefix("/side ") ? "Side question sent: a read-only agent answers it." : nil
+            } else if let d = drivenID, busyCLI {
                 // The web queues too: a message never jumps into a running turn.
                 try await api.drivenQueue(d, text: body, attachments: ids)
                 status = "Queued: it goes when the turn ends."

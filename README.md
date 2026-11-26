@@ -288,6 +288,13 @@ threads one message that tells the agent to continue (turns older than 6 hours a
 `bin/install-build.sh` lists these threads before it restarts. Set `AGENT_MONITOR_NO_RESUME=1` in the
 daemon's environment to turn this off.
 
+`/side <question>` in a driven thread asks a side question while the agent works. A read-only child
+agent of the same kind gets the thread's latest messages and answers; the thread's own agent never
+sees the question. `/side` and `!` messages skip the queue.
+
+Create PR fills the description from the thread: the agent's last answer as the summary, then the
+messages that asked for the work.
+
 Rename a thread with a double-click on its title, or with Rename in the thread menu (web and iPhone).
 A renamed terminal session keeps your title when the agent sets a new one; an empty title goes back to
 the agent's title. The titles live in `~/.agent-monitor/titles.json`.

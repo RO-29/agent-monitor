@@ -8,7 +8,7 @@ import type { V3Thread } from "../../api/types";
 import { statusInfo } from "./Diff";
 import { FoldBox } from "../../components/fold";
 import { p7, type OMergeRefusal, type OMergeStrategy } from "../../api/p7";
-import { commitSubject, gitErrorToast, isLoopback, pushBlocked, refreshGit, runActive, shortSha, useGit, useGitPoll, type DiffNav, type GitEntry } from "./git";
+import { commitSubject, gitErrorToast, prBody, isLoopback, pushBlocked, refreshGit, runActive, shortSha, useGit, useGitPoll, type DiffNav, type GitEntry } from "./git";
 
 type Form = null | "commit" | "pr" | "pushfirst" | "rmwt" | "merge";
 
@@ -141,7 +141,7 @@ export function GitBox({ detail, git }: { detail: ODetail; git: GitEntry }) {
     if (f === "commit") setMsg(commitSubject(detail));
     if (f === "pr") {
       setTitle(t.title);
-      setBody("");
+      setBody(prBody(detail));
       setDraft(true);
     }
     setForm(f);
@@ -295,7 +295,7 @@ export function GitBox({ detail, git }: { detail: ODetail; git: GitEntry }) {
       {form === "pr" && (
         <div className="wgit-form">
           <input className="inp" value={title} autoFocus placeholder="Title" aria-label="Pull request title" onChange={(e) => setTitle(e.target.value)} />
-          <textarea className="inp" rows={4} value={body} placeholder="Description (optional)" aria-label="Pull request description" onChange={(e) => setBody(e.target.value)} />
+          <textarea className="inp" rows={8} value={body} placeholder="Description (optional)" aria-label="Pull request description" onChange={(e) => setBody(e.target.value)} />
           <label className="wgit-chk">
             <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} /> Draft
           </label>

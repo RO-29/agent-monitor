@@ -183,6 +183,19 @@ export function commitSubject(d: ODetail): string {
   return line.length > 72 ? `${line.slice(0, 71).replace(/\s+\S*$/, "")}` : line;
 }
 
+/** A PR description from the thread: the agent's last answer, then the prompts that asked for the work. */
+export function prBody(d: ODetail): string {
+  const items = [...d.items].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
+  const answer = [...items].reverse().find((i) => i.kind === "agent" && i.text?.trim())?.text?.trim() || "";
+  const asks = items
+    .filter((i) => i.kind === "user" && i.text?.trim() && !i.text.trim().startsWith("!") && !i.text.trim().startsWith("/"))
+    .map((i) => i.text!.trim().split("\n")[0].slice(0, 160));
+  const out: string[] = [];
+  if (answer) out.push("## Summary", "", answer.length > 1500 ? answer.slice(0, 1500).replace(/\s+\S*$/, "") + " …" : answer);
+  if (asks.length) out.push("", "## Asked for", "", ...[...new Set(asks)].slice(-8).map((a) => `- ${a}`));
+  return out.join("\n").trim();
+}
+
 export function shortSha(s?: string) {
   return (s || "").slice(0, 7);
 }

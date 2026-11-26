@@ -16,7 +16,7 @@ import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
 import { ApiError } from "../../api/client";
 import { EditTitle, startRename } from "../../components/EditTitle";
-import { CopyBtn } from "../../components/CopyBtn";
+import { copyWithToast } from "../../components/CopyBtn";
 import { agentCls, agentLabel, agentVar, allowOnce, closeThread, continueInParent, interruptThread, pinThread, renameThread, sendMessage, settleThread, spendBlockOf, toMs, useOrch, type ODetail, type OItem, type ORun, type OThread, type SpendBlock } from "../../api/orch";
 import { Markdown } from "../../components/Markdown";
 import { Boundary } from "../../components/Boundary";
@@ -893,7 +893,16 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
     if (att.failed) return void showToast("A file did not upload", "Retry it or remove it, then send.", { kind: "alert" });
     setBusy(true);
     try {
-      if (queueing) {
+      // A side question and a ! command never wait for the agent: neither starts a turn in this thread.
+      const side = /^\/side\s+\S/.test(body) && !att.ids.length;
+      const bang = body.startsWith("!") && !att.ids.length;
+      if (side) {
+        await sendMessage(t.id, body);
+        setText(clearSent(body));
+        showToast("Side question sent", `A read-only ${agentName(t.agent)} answers it. This thread keeps working.`);
+        return;
+      }
+      if (queueing && !bang) {
         await queueApi.add(t.id, body, { attachments: att.ids });
         setText(clearSent(body));
         att.clear();
@@ -930,6 +939,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
     ...(noGit ? [] : [{ key: "diff", label: "Show the thread diff", run: () => dnav.open({ from: "base", to: "worktree", label: "Thread" }) }]),
     ...(running || bashRun ? [{ key: "stop", label: bashRun ? "Stop the running ! command" : "Stop the running turn", run: () => void stop() }] : []),
     { key: "terminal", label: termOpen ? "Hide the terminal" : "Open a terminal here", run: toggleTerm },
+    { key: "side", label: "Ask a side question (the agent keeps working)", run: () => setText("/side ") },
     { key: "rename", label: "Rename this thread", run: startRename },
     { key: t.pinned ? "unpin" : "pin", label: t.pinned ? "Unpin this thread" : "Pin this thread", run: () => void pinThread(t.id, !t.pinned).catch((e: Error) => showToast("Pin failed", e.message, { kind: "alert" })) },
     { key: t.group === "settled" ? "unsettle" : "settle", label: t.group === "settled" ? "Move back to the active list" : "Settle this thread", run: () => void settleThread(t.id, t.group !== "settled").catch((e: Error) => showToast("Settle failed", e.message, { kind: "alert" })) },
@@ -1108,7 +1118,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
           </Fragment>
         ))}
         <PendingBubbles list={sent.list} drop={sent.drop} />
-        {t.error && t.status === "error" && !running && <ErrorCard t={t} runs={detail.runs} />}
+        {t.error && t.status === "error" && !running && <ErrorCard t={t} runs={detail.runs} items={detail.items} />}
         {[...cards.keys()].filter((k) => !usedCards.has(k)).map((k) => (
           <SubagentCard key={k} list={cards.get(k)!} kids={kids} needIds={needIds} now={now} />
         ))}
@@ -1152,7 +1162,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         onEmptyUp={() => qref.current?.selectNewest() ?? false}
         disabled={closed || wtGone}
         autoFocus={!closed && !wtGone && detail.runs.length === 0 && !ho.terminal}
-        placeholder={closed ? "This thread is closed." : wtGone ? `The worktree was removed. The branch ${t.worktree?.branch || ""} stays.` : `${queueing ? "Queue a message for when it is idle" : "Ask a follow-up"}. @ files${t.agent === "claude" || t.agent === "codex" ? ", $ skills" : ""}, / commands`}
+        placeholder={closed ? "This thread is closed." : wtGone ? `The worktree was removed. The branch ${t.worktree?.branch || ""} stays.` : queueing ? "Queue a message for when it is idle. /side asks without waiting, ! runs a command" : `Ask a follow-up. @ files${t.agent === "claude" || t.agent === "codex" ? ", $ skills" : ""}, / commands`}
         cwd={t.worktree && !t.worktree.removed ? t.worktree.path : t.cwd}
         agent={t.agent}
         files
@@ -1342,10 +1352,14 @@ export function NotFoundChat({ status, onBack }: { status: string; onBack?: () =
 }
 
 /** The error that ended the thread, at the end of the chat where the reader is, with a retry of the last prompt. */
-function ErrorCard({ t, runs }: { t: OThread; runs: ORun[] }) {
+function ErrorCard({ t, runs, items }: { t: OThread; runs: ORun[]; items: OItem[] }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const last = [...runs].reverse().find((r) => r.prompt && !r.prompt.startsWith("!"))?.prompt || "";
+  const usable = (p?: string) => !!p?.trim() && !p.trim().startsWith("!") && !p.trim().startsWith("/side ");
+  const last =
+    [...runs].sort((a, b) => b.index - a.index).find((r) => usable(r.prompt))?.prompt ||
+    [...items].reverse().find((i) => i.kind === "user" && usable(i.text))?.text ||
+    "";
   const lines = t.error!.split("\n");
   const long = lines.length > 6;
   const retry = async () => {
@@ -1362,7 +1376,9 @@ function ErrorCard({ t, runs }: { t: OThread; runs: ORun[] }) {
     <div className="werrcard" role="alert">
       <div className="werrcard-h">
         <span className="werrcard-t">{agentName(t.agent)} stopped with an error</span>
-        <CopyBtn text={t.error!} label="Copy error" className="btn sm ghost" />
+        <button className="btn sm ghost" onClick={() => void copyWithToast(t.error!).then((ok) => ok && showToast("Error copied"))}>
+          Copy error
+        </button>
       </div>
       <pre className="werrcard-m">{open || !long ? t.error : lines.slice(0, 6).join("\n")}</pre>
       {long && (

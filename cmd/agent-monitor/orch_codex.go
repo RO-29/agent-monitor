@@ -748,6 +748,10 @@ func (m *OrchManager) SendWith(id, text string, attachments []string) (string, e
 	if _, err := m.store.Thread(id); err != nil {
 		return "", err
 	}
+	if q, ok := sideCommand(text); ok && len(attachments) == 0 {
+		_, err := m.Side(id, q) // a child agent: the session itself is not touched, so a live terminal is fine
+		return "side", err
+	}
 	if m.handover(id).Live {
 		return "", orchConflict("live")
 	}
