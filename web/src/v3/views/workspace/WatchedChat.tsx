@@ -176,7 +176,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const orch = useOrch();
   const nav = useNavigate();
   const shell = useShell();
-  const pane = useContext(PaneCtx);
+  const paneOf = useContext(PaneCtx);
   const dnav = useDiffNav();
   const [statusOpen, setStatusOpen] = useState(false);
   // The header Diff shows what this session changed, even after a commit; Uncommitted stays in the Git box.
@@ -379,7 +379,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
             <TopBarItem />
             <NarrowBarItems status={status} onSide={onSide} />
             {renameId && (
-              <button role="menuitem" onClick={() => startRename(pane)}>
+              <button role="menuitem" onClick={() => startRename(paneOf)}>
                 Rename
               </button>
             )}
