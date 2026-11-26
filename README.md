@@ -302,6 +302,19 @@ turn, and empty otherwise. Add
 `#{@am_badge}` to `window-status-format` or `set-titles-string` in `~/.tmux.conf` to see it.
 `AGENT_MONITOR_NO_TMUX_BADGES=1` turns it off.
 
+**Face ID and Touch ID.** In the iPhone app, Settings, Security:
+- *Lock with Face ID* covers the app until Face ID or the passcode unlocks it.
+- *Face ID for approvals* makes a key in the phone's Secure Enclave that signs only after Face ID, and
+  gives its public key to the daemon. From then on the daemon refuses an approval, a terminal answer,
+  a typed answer to a waiting permission menu, a terminal, or any admin change from that phone
+  without a fresh signature (HTTP 428). A copied device token cannot approve. A plain deny needs no
+  signature. Allow and Yes on a notification open the app first. If the phone loses its key, reset it
+  on the Mac in Settings, Devices.
+
+The Mac app asks for Touch ID (or the Mac password) before it sends an approval. Turn it off with
+agent-monitor, Touch ID for Approvals. This guards against a person at an unlocked Mac only: programs on
+the Mac can still reach the daemon.
+
 Create PR fills the description from the thread: the agent's last answer as the summary, then the
 messages that asked for the work.
 

@@ -10,6 +10,10 @@ struct SettingsView: View {
     @State private var savedToken = PairLink.mask(Config.password)
     @State private var pairedHaptic = 0
     @AppStorage("voice.cleanup") private var voiceCleanup = VoiceCleanup.always.rawValue
+    @AppStorage(kAppLockKey) private var appLock = false
+    @State private var bioOn = Bio.enabled
+    @State private var bioBusy = false
+    @State private var bioMsg: String?
 
     var body: some View {
         @Bindable var store = store
@@ -79,6 +83,30 @@ struct SettingsView: View {
                     header("Pair")
                 } footer: {
                     Text("On the Mac, open Settings, Devices, add this phone and copy its pair link. The link works once, for 5 minutes.")
+                }
+                .listRowBackground(Tok.panel)
+
+                Section {
+                    Toggle(isOn: $appLock) {
+                        Label { Text("Lock with Face ID") } icon: {
+                            Image(systemName: "faceid").font(.footnote.weight(.semibold)).foregroundStyle(Tok.onAccent)
+                                .frame(width: 28, height: 28).background(Tok.accent, in: RoundedRectangle(cornerRadius: 7))
+                        }
+                    }
+                    Toggle(isOn: Binding(get: { bioOn }, set: { on in Task { await setBio(on) } })) {
+                        Label { Text("Face ID for approvals") } icon: {
+                            Image(systemName: "checkmark.shield").font(.footnote.weight(.semibold)).foregroundStyle(Tok.onAccent)
+                                .frame(width: 28, height: 28).background(Tok.ok, in: RoundedRectangle(cornerRadius: 7))
+                        }
+                    }
+                    .disabled(bioBusy || (!Bio.available && !bioOn))
+                    if let bioMsg { Text(bioMsg).font(.footnote).foregroundStyle(Tok.err) }
+                } header: {
+                    header("Security")
+                } footer: {
+                    Text(Bio.available || bioOn
+                         ? "With Face ID for approvals, the Mac accepts an approval or a settings change from this phone only with a Face ID signature from this phone. A copied token cannot approve. Allow and Yes on a notification open the app first."
+                         : "This phone has no Face ID set up, so Face ID for approvals is not available.")
                 }
                 .listRowBackground(Tok.panel)
 
@@ -168,6 +196,18 @@ struct SettingsView: View {
         URL(string: Config.serverURL)?.host.map { h in
             URL(string: Config.serverURL)?.port.map { "\(h):\($0)" } ?? h
         } ?? Config.serverURL
+    }
+
+    private func setBio(_ on: Bool) async {
+        bioBusy = true
+        bioMsg = nil
+        do {
+            if on { try await APIClient.shared.bioEnroll() } else { try await APIClient.shared.bioRemove() }
+        } catch {
+            bioMsg = error.localizedDescription
+        }
+        bioOn = Bio.enabled
+        bioBusy = false
     }
 
     private func header(_ s: String) -> some View {

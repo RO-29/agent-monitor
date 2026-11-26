@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UserNotifications
 
 /// The alert kinds a person can switch and give a sound in Settings, Alerts.
@@ -287,9 +288,11 @@ enum NotifyAction {
     static let yes = "am.yes", no = "am.no", allow = "am.allow", deny = "am.deny", send = "am.send"
 
     static func register() {
-        let yesA = UNNotificationAction(identifier: yes, title: "Yes", options: [.authenticationRequired])
-        let noA = UNNotificationAction(identifier: no, title: "No", options: [.authenticationRequired, .destructive])
-        let allowA = UNNotificationAction(identifier: allow, title: "Allow", options: [.authenticationRequired])
+        // Face ID cannot show in the background, so with Face ID for approvals these buttons open the app.
+        let open: UNNotificationActionOptions = Bio.enabled ? [.authenticationRequired, .foreground] : [.authenticationRequired]
+        let yesA = UNNotificationAction(identifier: yes, title: "Yes", options: open)
+        let noA = UNNotificationAction(identifier: no, title: "No", options: open.union(.destructive))
+        let allowA = UNNotificationAction(identifier: allow, title: "Allow", options: open)
         let denyA = UNNotificationAction(identifier: deny, title: "Deny", options: [.authenticationRequired, .destructive])
         let replyA = UNTextInputNotificationAction(identifier: send, title: "Reply", options: [.authenticationRequired],
                                                    textInputButtonTitle: "Send", textInputPlaceholder: "Message the agent")
@@ -301,6 +304,14 @@ enum NotifyAction {
         ])
     }
 
+    /// The Face ID prompt needs the app on screen; a foreground action starts before it gets there.
+    static func waitUntilActive() async {
+        for _ in 0..<30 {
+            if await MainActor.run(body: { UIApplication.shared.applicationState == .active }) { return }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
     /// Maps a thread id to the session a reply should go to; the app sets it from the store.
     @MainActor static var replyTarget: ((String) async -> String)?
 
@@ -308,6 +319,7 @@ enum NotifyAction {
         let thread = (info["sessionId"] as? String) ?? (info["threadId"] as? String)
         let api = APIClient.shared
         var done = ""
+        if Bio.enabled, [yes, no, allow].contains(action) { await waitUntilActive() }
         do {
             switch action {
             case allow, deny:

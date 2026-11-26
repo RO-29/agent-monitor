@@ -70,9 +70,24 @@ struct APIClient {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, resp) = try await session.data(for: req)
+        let (data, resp) = try await perform(req)
         try Self.check(resp, data)
         return data
+    }
+
+    /// Sends a write; when the daemon asks for Face ID (428, "bio": true), signs it and sends it once more.
+    func perform(_ req: URLRequest) async throws -> (Data, URLResponse) {
+        let (data, resp) = try await session.data(for: req)
+        guard machine == nil, via == nil, (resp as? HTTPURLResponse)?.statusCode == 428,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any], obj["bio"] as? Bool == true else {
+            return (data, resp)
+        }
+        guard Bio.enabled else {
+            throw APIError(message: "The Mac asks for Face ID from this phone, but this phone has no Face ID key. Reset Face ID for this phone on the Mac in Settings, Devices, then turn it on again here.", status: 428)
+        }
+        var signed = req
+        signed.setValue(try await Bio.header(for: req, reason: Bio.reason(for: req)), forHTTPHeaderField: "X-AM-Bio")
+        return try await session.data(for: signed)
     }
 
     static func check(_ resp: URLResponse, _ data: Data) throws {

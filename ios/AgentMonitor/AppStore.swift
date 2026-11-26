@@ -611,6 +611,8 @@ final class AppStore {
         guard pendingDecisions[a.id] == nil else { return }
         decisionErrors[a.id] = nil
         pendingDecisions[a.id] = PendingDecision(approval: a, body: body, label: label, start: Date())
+        // Face ID is the confirmation, and it must show while the app is on screen: no undo wait.
+        if Bio.enabled && body.behavior == "allow" { return flushDecision(a.id) }
         decisionTimers[a.id] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(Self.undoWindow * 1_000_000_000))
             guard !Task.isCancelled else { return }

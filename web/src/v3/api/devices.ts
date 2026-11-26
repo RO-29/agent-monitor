@@ -10,6 +10,8 @@ export interface Device {
   lastIp?: string;
   revokedAt?: number;
   current?: boolean;
+  /** Approvals and admin writes from this device need a Face ID signature. */
+  bio?: boolean;
 }
 export interface NewDevice {
   device: Device;
@@ -46,6 +48,7 @@ const real = {
   list: () => req<Device[] | { devices: Device[] }>("GET", "/api/devices").then((r) => (Array.isArray(r) ? r : r.devices || []).map(norm)),
   add: (name: string) => req<NewDevice>("POST", "/api/devices", { name }).then((r) => ({ ...r, device: norm(r.device) })),
   revoke: (id: string) => req<unknown>("DELETE", `/api/devices/${encodeURIComponent(id)}`),
+  resetBio: (id: string) => req<unknown>("DELETE", `/api/devices/${encodeURIComponent(id)}/bio-key`),
   settings: () => req<Partial<DeviceSettings>>("GET", "/api/settings").then((r) => ({ requireDeviceToken: !!r.requireDeviceToken, remoteTerminal: !!r.remoteTerminal})),
   setRequire: (on: boolean) => req<Partial<DeviceSettings>>("POST", "/api/settings", { requireDeviceToken: on }).then((r) => ({ requireDeviceToken: r.requireDeviceToken ?? on })),
   setRemoteTerminal: (on: boolean) => req<Partial<DeviceSettings>>("POST", "/api/settings", { remoteTerminal: on }).then((r) => ({ remoteTerminal: r.remoteTerminal ?? on })),
@@ -56,7 +59,7 @@ const now = Date.now();
 const H = 3600_000;
 let mockList: Device[] = [
   { id: "dev-mac", name: "MacBook Pro", createdAt: now - 40 * 24 * H, lastUsedAt: now - 60_000, lastIp: "100.101.12.4", current: true },
-  { id: "dev-phone", name: "iPhone 16", createdAt: now - 12 * 24 * H, lastUsedAt: now - 3 * H, lastIp: "100.88.40.17" },
+  { id: "dev-phone", name: "iPhone 16", createdAt: now - 12 * 24 * H, lastUsedAt: now - 3 * H, lastIp: "100.88.40.17", bio: true },
   { id: "dev-ipad", name: "Old iPad", createdAt: now - 90 * 24 * H, lastUsedAt: now - 30 * 24 * H, lastIp: "100.70.2.9", revokedAt: now - 20 * 24 * H },
 ];
 let mockRequire = false;
@@ -72,6 +75,10 @@ const mock: typeof real = {
   },
   revoke: (id) => {
     mockList = mockList.map((d) => (d.id === id ? { ...d, revokedAt: Date.now() } : d));
+    return later({});
+  },
+  resetBio: (id) => {
+    mockList = mockList.map((d) => (d.id === id ? { ...d, bio: false } : d));
     return later({});
   },
   settings: () => later({ requireDeviceToken: mockRequire, remoteTerminal: mockRemoteTerm}),

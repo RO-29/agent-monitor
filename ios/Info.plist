@@ -43,6 +43,8 @@
 	<string>Agent Monitor connects to the agent-monitor daemon on your Tailscale network to show and control your agents.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Agent Monitor uses the camera to take a photo and attach it to a message for an agent.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Agent Monitor uses Face ID to unlock the app and to sign the approvals you give to your agents.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Agent Monitor uses the microphone when you dictate a message to an agent.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

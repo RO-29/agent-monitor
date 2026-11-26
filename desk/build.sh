@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 APP="agent-monitor.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-swiftc -O -o "$APP/Contents/MacOS/AgentMonitor" desk/*.swift -framework Cocoa -framework WebKit -framework UserNotifications -framework Carbon
+swiftc -O -o "$APP/Contents/MacOS/AgentMonitor" desk/*.swift -framework Cocoa -framework WebKit -framework UserNotifications -framework Carbon -framework LocalAuthentication
 [ -f tv/AppIcon.icns ] && cp tv/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

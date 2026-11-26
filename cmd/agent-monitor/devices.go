@@ -41,6 +41,8 @@ type Device struct {
 	Kind       string `json:"kind"`              // device (a person's app) or machine (another daemon)
 	Level      string `json:"level"`             // view, control or admin; a machine is never admin
 	BoundIP    string `json:"boundIp,omitempty"` // a machine grant works only from the address that paired
+	Bio        bool   `json:"bio"`               // approvals and admin writes need a Face ID signature
+	bioKey     string // base64 of the uncompressed P-256 public key from the phone's Secure Enclave
 	hash       []byte
 }
 
@@ -108,14 +110,14 @@ func openDeviceStore(dir string) (*DeviceStore, error) {
 		return nil, err
 	}
 	// Devices paired before levels existed are the user's own: they stay admin.
-	for _, col := range []string{`kind TEXT NOT NULL DEFAULT 'device'`, `level TEXT NOT NULL DEFAULT 'admin'`, `bound_ip TEXT NOT NULL DEFAULT ''`} {
+	for _, col := range []string{`kind TEXT NOT NULL DEFAULT 'device'`, `level TEXT NOT NULL DEFAULT 'admin'`, `bound_ip TEXT NOT NULL DEFAULT ''`, `bio_key TEXT NOT NULL DEFAULT ''`} {
 		if _, err := db.Exec(`ALTER TABLE devices ADD COLUMN ` + col); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
 			return nil, err
 		}
 	}
 	s := &DeviceStore{db: db, now: time.Now}
-	rows, err := db.Query(`SELECT id, name, token_hash, created_at, last_used_at, last_ip, revoked_at, kind, level, bound_ip FROM devices ORDER BY created_at`)
+	rows, err := db.Query(`SELECT id, name, token_hash, created_at, last_used_at, last_ip, revoked_at, kind, level, bound_ip, bio_key FROM devices ORDER BY created_at`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -124,10 +126,11 @@ func openDeviceStore(dir string) (*DeviceStore, error) {
 	for rows.Next() {
 		d := &Device{}
 		var h string
-		if err := rows.Scan(&d.ID, &d.Name, &h, &d.CreatedAt, &d.LastUsedAt, &d.LastIP, &d.RevokedAt, &d.Kind, &d.Level, &d.BoundIP); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &h, &d.CreatedAt, &d.LastUsedAt, &d.LastIP, &d.RevokedAt, &d.Kind, &d.Level, &d.BoundIP, &d.bioKey); err != nil {
 			return nil, err
 		}
 		d.hash, _ = hex.DecodeString(h)
+		d.Bio = d.bioKey != ""
 		s.devs = append(s.devs, d)
 	}
 	return s, rows.Err()
@@ -267,6 +270,22 @@ func (s *DeviceStore) BindIP(id, ip string) {
 			}
 		}
 	}
+}
+
+// SetBioKey stores or clears (key "") a device's Face ID public key; it returns false for an unknown id.
+func (s *DeviceStore) SetBioKey(id, key string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, d := range s.devs {
+		if d.ID == id {
+			if _, err := s.db.Exec(`UPDATE devices SET bio_key=? WHERE id=?`, key, id); err != nil {
+				return true, err
+			}
+			d.bioKey, d.Bio = key, key != ""
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Revoke marks a device revoked; it returns false for an unknown id.
@@ -437,6 +456,7 @@ func registerDeviceRoutes(mux *http.ServeMux) {
 		deviceStore = s
 	}
 	deviceRoutes(mux, deviceStore)
+	bioRoutes(mux, deviceStore)
 }
 
 func deviceRoutes(mux *http.ServeMux, s *DeviceStore) {

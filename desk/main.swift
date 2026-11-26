@@ -67,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         if kDebug { c.preferences.setValue(true, forKey: "developerExtrasEnabled") }
         c.userContentController.addUserScript(WKUserScript(source: kShellScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         c.userContentController.addUserScript(WKUserScript(source: kDropScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        c.userContentController.addScriptMessageHandler(TouchIDGate(), contentWorld: .page, name: "amTouchID")
+        c.userContentController.addUserScript(WKUserScript(source: kTouchIDScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         if !kToken.isEmpty, let ck = HTTPCookie(properties: [.domain: kHost, .path: "/", .name: "am_device", .value: kToken, .secure: kBase.hasPrefix("https") ? "TRUE" : "FALSE",
                                                          HTTPCookiePropertyKey("HttpOnly"): "TRUE"]) { // no page script reads it
             c.websiteDataStore.httpCookieStore.setCookie(ck)
@@ -228,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
     @objc func toggleApprovals() { approvals.toggle(fromHotkey: false) }
     @objc func toggleApprovalsAuto() { approvals.autoShow.toggle() }
+    @objc func toggleTouchID() { TouchIDGate.enabled.toggle() }
     @objc func toggleApproveKeys() {
         approveKeys.toggle()
         let on = approveKeys ? "true" : "false"
@@ -312,6 +315,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         case #selector(toggleApprovals):
             item.state = approvals.isShown ? .on : .off
             return true
+        case #selector(toggleTouchID):
+            item.state = TouchIDGate.enabled ? .on : .off
+            return true
         case #selector(toggleApprovalsAuto):
             item.state = approvals.autoShow ? .on : .off
             return true
@@ -359,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
             mine("Settings…", #selector(goSettings), ","),
             mine("Show Notifications", #selector(toggleNotifications), ""),
             mine("Show Approvals Automatically", #selector(toggleApprovalsAuto), ""),
+            mine("Touch ID for Approvals", #selector(toggleTouchID), ""),
             .separator(),
             std("Hide agent-monitor", "hide:", "h"),
             std("Hide Others", "hideOtherApplications:", "h", [.command, .option]),

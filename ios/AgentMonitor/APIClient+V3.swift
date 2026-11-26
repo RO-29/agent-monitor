@@ -10,7 +10,7 @@ extension APIClient {
         authorize(&req)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(body)
-        let (data, resp) = try await session.data(for: req)
+        let (data, resp) = try await perform(req)
         try Self.check(resp, data)
         return data
     }

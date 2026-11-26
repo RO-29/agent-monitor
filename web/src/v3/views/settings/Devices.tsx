@@ -117,6 +117,17 @@ function DeviceRow({ d, onRevoked }: { d: Device; onRevoked: () => void }) {
     }
     setBusy(false);
   };
+  const resetBio = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      await devicesApi().resetBio(d.id);
+      onRevoked();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+    setBusy(false);
+  };
   const created = d.createdAt ? new Date(d.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "unknown";
   return (
     <li className={`sx-dev ${d.revokedAt ? "off" : ""}`}>
@@ -124,12 +135,22 @@ function DeviceRow({ d, onRevoked }: { d: Device; onRevoked: () => void }) {
         <div className="sx-dev-n">
           <b className="trunc">{d.name || "Unnamed device"}</b>
           {d.current && <span className="pill p-ok">this device</span>}
+          {d.bio && !d.revokedAt && (
+            <span className="pill p-ok" title="Approvals and admin changes from this device need Face ID">
+              Face ID
+            </span>
+          )}
           {d.revokedAt && <span className="pill p-mute">revoked {fmtAgo(d.revokedAt)}</span>}
         </div>
         <div className="sx-dev-meta">
           <span>Added {created}</span>
           <span>{d.lastUsedAt ? `Last used ${fmtAgo(d.lastUsedAt)}` : "Never used"}</span>
           {d.lastIp && <span className="mono">{d.lastIp}</span>}
+          {d.bio && !d.revokedAt && (
+            <button className="btn sm ghost" disabled={busy} onClick={resetBio} title="Use this when the phone lost its Face ID key, for example after a new install. The phone can then set a new key.">
+              Reset Face ID
+            </button>
+          )}
         </div>
         {err && (
           <span className="sx-note err-t" role="alert">

@@ -14,6 +14,7 @@ struct AgentMonitorApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .modifier(AppLockGate())
                 .environment(store)
                 .tint(Tok.accent)
                 .task {
