@@ -75,6 +75,18 @@ extension APIClient {
         try await post("/api/orch/threads/\(enc(id))/messages", body: body)
     }
 
+    /// Stops the running turn of a driven thread.
+    func drivenInterrupt(_ id: String) async throws {
+        try await post("/api/orch/threads/\(enc(id))/interrupt")
+    }
+
+    /// Adds a message to a driven thread's queue: it goes when the running turn ends.
+    func drivenQueue(_ id: String, text: String, attachments: [String]) async throws {
+        var body: [String: Any] = ["text": text]
+        if !attachments.isEmpty { body["attachments"] = attachments }
+        try await post("/api/queue/\(enc(id))", body: body)
+    }
+
     /// Settles a driven thread: it leaves "needs you" until it changes again.
     func drivenSettle(_ id: String) async throws {
         try await post("/api/orch/threads/\(enc(id))/settle", body: ["settled": true])

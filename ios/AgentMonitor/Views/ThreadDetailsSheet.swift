@@ -19,6 +19,7 @@ struct ThreadDetailsSheet: View {
     @State private var gitError: String?
     @State private var gitLoaded = false
     @State private var copied = 0
+    @State private var diffFor: DiffTarget?
 
     private var agent: String { thread?.agent ?? session?.tool ?? "" }
     private var cwd: String { session?.cwd ?? thread?.cwd ?? "" }
@@ -97,6 +98,7 @@ struct ThreadDetailsSheet: View {
             .task { await loadKids() }
             .task { if let sid = sessionID { place = try? await APIClient.shared.place(sid) } }
             .task(id: cwd) { await loadGit() }
+            .sheet(item: $diffFor) { DiffSheet(target: $0) }
         }
     }
 
@@ -160,7 +162,16 @@ struct ThreadDetailsSheet: View {
                 let files = g.files ?? []
                 LabeledContent("Changes", value: files.isEmpty && (g.dirty ?? 0) == 0 ? "Clean" : "\(max(g.dirty ?? 0, files.count)) files")
                 ForEach(files.prefix(20), id: \.path) { f in
-                    fileRow(f.path, add: f.add ?? 0, del: f.del ?? 0, mark: gitMark(f.status))
+                    Button { diffFor = DiffTarget(cwd: cwd, path: f.path) } label: {
+                        fileRow(f.path, add: f.add ?? 0, del: f.del ?? 0, mark: gitMark(f.status))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows the changes in this file")
+                }
+                if !files.isEmpty {
+                    Button { diffFor = DiffTarget(cwd: cwd, path: "") } label: {
+                        Label("Show all changes", systemImage: "plus.forwardslash.minus")
+                    }
                 }
                 if files.count > 20 {
                     Text("and \(files.count - 20) more").font(.footnote).foregroundStyle(Tok.muted)

@@ -172,6 +172,9 @@ struct Composer: View {
                     }
                 }
             }
+            if text.isEmpty, clearedText == nil, focused, slashHits.isEmpty, reachable {
+                SavedRepliesBar(text: $text)
+            }
             if !text.isEmpty || clearedText != nil {
                 HStack(spacing: 8) {
                     Spacer()
@@ -212,9 +215,9 @@ struct Composer: View {
                 .background(bashMode ? Tok.needSoft : Tok.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(bashMode ? Tok.need : focused ? Tok.accent : Tok.line2, lineWidth: 1))
-                if busyCLI, sessionID != nil, reachable {
-                    // Esc in the terminal stops the turn, or closes an open prompt.
-                    Button { Task { await pressEsc() } } label: {
+                if busyCLI, sessionID != nil || drivenID != nil, reachable {
+                    // A driven turn stops through the daemon; Esc in the terminal stops a watched one.
+                    Button { Task { if let d = drivenID { await stopDriven(d) } else { await pressEsc() } } } label: {
                         Image(systemName: "stop.fill").font(.system(size: 14, weight: .bold))
                             .foregroundStyle(Tok.fg)
                             .frame(width: 36, height: 36)
@@ -224,7 +227,7 @@ struct Composer: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(acting)
-                    .accessibilityLabel("Stop with Esc")
+                    .accessibilityLabel(drivenID != nil ? "Stop the turn" : "Stop with Esc")
                 }
                 Button { Task { await send() } } label: {
                     ZStack {
@@ -463,6 +466,17 @@ struct Composer: View {
 
     // MARK: actions
 
+    private func stopDriven(_ id: String) async {
+        acting = true
+        defer { acting = false }
+        do {
+            try await api.drivenInterrupt(id)
+            ToastCenter.shared.show("Stopped", icon: "stop.circle")
+        } catch {
+            self.error = "Could not stop: \(error.localizedDescription)"
+        }
+    }
+
     private func send() async {
         guard !sending else { return }
         sending = true
@@ -475,7 +489,11 @@ struct Composer: View {
         sending = true
         defer { sending = false }
         do {
-            if let d = drivenID {
+            if let d = drivenID, busyCLI {
+                // The web queues too: a message never jumps into a running turn.
+                try await api.drivenQueue(d, text: body, attachments: ids)
+                status = "Queued: it goes when the turn ends."
+            } else if let d = drivenID {
                 try await api.drivenSend(d, text: body, attachments: ids)
                 status = nil
             } else if let sid = sessionID {

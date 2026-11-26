@@ -541,7 +541,11 @@
 .v3 .md .mdtable{overflow-x:auto;margin:6px 0 10px}
 .v3 .md table{border-collapse:collapse;font-size:13px;min-width:min(440px,100%)}
 .v3 .md th,.v3 .md td{border-bottom:1px solid var(--line);padding:6px 14px 6px 0;text-align:left;vertical-align:top}
-.v3 .md th{font-weight:600;color:var(--fg-2);font-size:12px}
+.v3 .md th{font-weight:600;color:var(--fg-2);font-size:12px;white-space:nowrap}
+/* "anywhere" from the chat text lets a column shrink to one letter ("Medi um"); cells break only between words. */
+.v3 .md th,.v3 .md td{overflow-wrap:normal;word-break:normal;hyphens:manual}
+.v3 .md td{min-width:3ch}
+.v3 .md td code{overflow-wrap:break-word;word-break:normal}
 .v3 .md blockquote{margin:0 0 8px;padding-left:12px;border-left:2px solid var(--line-2);color:var(--fg-2)}
 .v3 .md hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 .v3 .md .mdref{border-bottom:1px dotted var(--muted)}

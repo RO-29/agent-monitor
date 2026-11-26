@@ -61,6 +61,8 @@ struct Approval: Codable, Identifiable, Hashable {
     var decidedBy: String?
     var message: String?
     var alwaysOk: Bool?
+    var group: String?
+    var groupPattern: String?
     var drivenId: String?
     var options: [PermOption]?
     var source: String?
@@ -633,6 +635,22 @@ struct OGitFile: Decodable, Hashable {
     var status: String
     var add: Int?
     var del: Int?
+}
+
+/// GET /api/orch/git/diff: one patch per changed file.
+struct ODiffFile: Decodable, Hashable {
+    var path: String
+    var status: String?
+    var add: Int?
+    var del: Int?
+    var binary: Bool?
+    var patch: String?
+    var truncated: Bool?
+}
+
+struct ODiff: Decodable {
+    var files: [ODiffFile]?
+    var truncated: Bool?
 }
 
 struct OGit: Decodable, Hashable {

@@ -18,6 +18,15 @@ struct HookApprovalCard: View {
     @State private var other: [String: String] = [:]
     @State private var confirmBody: DecideBody?
     @State private var showInput = false
+    @State private var groupOpen = false
+    @State private var groupBusy = false
+
+    /// Pending requests that one Always rule would cover, this one included.
+    private var sameGroup: [Approval] {
+        guard let g = a.group, a.isPending else { return [] }
+        return store.approvalsByID.values.filter { $0.group == g && $0.isPending && !$0.highRisk && !$0.sentToTerminal }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
 
     private var locked: Bool { a.sentToTerminal || store.pendingDecisions[a.id] != nil }
     private var accent: Color { a.highRisk ? Tok.err : Tok.need }
@@ -131,6 +140,7 @@ struct HookApprovalCard: View {
                         .buttonStyle(.am(.deny, big: true, full: true))
                 }
                 .disabled(locked)
+                if sameGroup.count > 1 { groupBox }
                 if a.canAlways {
                     Button { send(DecideBody(behavior: "allow", always: true)) } label: {
                         Text("Always allow")
@@ -278,6 +288,42 @@ struct HookApprovalCard: View {
     private func trimmed(_ s: String) -> String? {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
+    }
+
+    @ViewBuilder private var groupBox: some View {
+        let list = sameGroup
+        if groupOpen {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(list.count) requests match \(a.groupPattern ?? a.toolName) in \(a.project). Each one is allowed once; no rule is added.")
+                    .font(.footnote).foregroundStyle(Tok.fg2)
+                ForEach(list, id: \.id) { x in
+                    Text(x.summary).font(.caption.monospaced()).lineLimit(2).foregroundStyle(Tok.fg)
+                }
+                HStack {
+                    Button("Allow all \(list.count)") { Task { await allowGroup(list) } }
+                        .buttonStyle(.am(.allow))
+                    Button("Cancel") { groupOpen = false }.buttonStyle(.am(.ghost))
+                }
+                .disabled(groupBusy)
+            }
+            .padding(10)
+            .background(Tok.panel2, in: RoundedRectangle(cornerRadius: Radius.row))
+        } else {
+            Button("Allow these \(list.count)…") { groupOpen = true }
+                .buttonStyle(.am(.normal, big: true, full: true))
+                .disabled(locked)
+        }
+    }
+
+    private func allowGroup(_ list: [Approval]) async {
+        groupBusy = true
+        defer { groupBusy = false; groupOpen = false }
+        var failed = 0
+        for x in list {
+            do { try await store.decide(x, .allow()) } catch { failed += 1 }
+        }
+        ToastCenter.shared.show(failed == 0 ? "Allowed \(list.count) requests" : "\(list.count - failed) allowed, \(failed) not",
+                                icon: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
     }
 
     private func send(_ body: DecideBody, confirmed: Bool = false) {

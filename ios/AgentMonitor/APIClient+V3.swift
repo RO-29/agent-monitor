@@ -113,6 +113,14 @@ extension APIClient {
         return try await get("/api/orch/git?" + q, as: OGit.self)
     }
 
+    /// The work tree diff of a watched or driven folder; path "" means every changed file.
+    func cwdDiff(_ cwd: String, path: String) async throws -> ODiff {
+        var c = URLComponents()
+        c.queryItems = [URLQueryItem(name: "cwd", value: cwd)] + (path.isEmpty ? [] : [URLQueryItem(name: "path", value: path)])
+        let q = (c.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B")
+        return try await get("/api/orch/git/diff?" + q, as: ODiff.self)
+    }
+
     // MARK: Pairing
 
     /// Trades a single-use pair code for the device token, which the daemon returns only as the am_device cookie.
