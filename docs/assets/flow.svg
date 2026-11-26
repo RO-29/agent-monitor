@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-labelledby="t d">
+<title id="t">agent-monitor flow</title>
+<desc id="d">An agent in a terminal asks for permission. The agent-monitor daemon catches the request and sends it to the phone and the web app. The user taps Allow, and the agent continues.</desc>
+<style>
+  .bg{fill:#0f1218}
+  .card{fill:#171b23;stroke:#2a303c;stroke-width:1.2}
+  .mono{font:500 13px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#c9d1dc}
+  .ui{font:500 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#c9d1dc}
+  .h{font:600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#8b95a5;letter-spacing:.08em}
+  .big{font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#e8edf4}
+  .dim{fill:#7d8796}
+  .claude{fill:#e08562}
+  .ok{fill:#5dc48a}
+  .need{fill:#f0ae4a}
+  .wire{fill:none;stroke:#2a303c;stroke-width:2;stroke-dasharray:4 6}
+  .pkt{fill:#86a3ff;filter:drop-shadow(0 0 6px #86a3ff)}
+  .loop *{animation-duration:12s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+  .typing{animation-name:typing}
+  .ask{animation-name:ask;opacity:0}
+  .p1{animation-name:p1;opacity:0}
+  .core{animation-name:core}
+  .p2{animation-name:p2;opacity:0}
+  .p3{animation-name:p3;opacity:0}
+  .alert{animation-name:alert;opacity:0}
+  .walert{animation-name:walert;opacity:0}
+  .tap{animation-name:tap;opacity:0}
+  .allow{animation-name:allow}
+  .p4{animation-name:p4;opacity:0}
+  .done{animation-name:done;opacity:0}
+  .cursor{animation:blink 1s steps(1) infinite}
+  @keyframes typing{0%{clip-path:inset(0 100% 0 0)}12%,100%{clip-path:inset(0 0 0 0)}}
+  @keyframes ask{0%,14%{opacity:0}17%,72%{opacity:1}76%,100%{opacity:0}}
+  @keyframes p1{0%,17%{opacity:0;transform:translate(0,0)}18%{opacity:1}28%{opacity:1;transform:translate(178px,0)}29%,100%{opacity:0;transform:translate(178px,0)}}
+  @keyframes core{0%,27%{transform:scale(1)}31%{transform:scale(1.06)}35%,100%{transform:scale(1)}}
+  @keyframes p2{0%,32%{opacity:0;transform:translate(0,0)}33%{opacity:1}42%{opacity:1;transform:translate(176px,-92px)}43%,100%{opacity:0;transform:translate(176px,-92px)}}
+  @keyframes p3{0%,32%{opacity:0;transform:translate(0,0)}33%{opacity:1}42%{opacity:1;transform:translate(176px,92px)}43%,100%{opacity:0;transform:translate(176px,92px)}}
+  @keyframes alert{0%,42%{opacity:0;transform:translateY(8px)}46%,84%{opacity:1;transform:translateY(0)}90%,100%{opacity:0;transform:translateY(0)}}
+  @keyframes walert{0%,42%{opacity:0;transform:translateY(8px)}46%,60%{opacity:1;transform:translateY(0)}64%,100%{opacity:0}}
+  @keyframes tap{0%,54%{opacity:0;transform:scale(.4)}57%{opacity:.9;transform:scale(1)}62%,100%{opacity:0;transform:scale(1.6)}}
+  @keyframes allow{0%,56%{fill:#2c7d4f}58%,84%{fill:#5dc48a}90%,100%{fill:#2c7d4f}}
+  @keyframes p4{0%,60%{opacity:0;transform:translate(0,0)}61%{opacity:1}72%{opacity:1;transform:translate(-354px,92px)}73%,100%{opacity:0;transform:translate(-354px,92px)}}
+  @keyframes done{0%,74%{opacity:0}78%,94%{opacity:1}100%{opacity:0}}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.loop *{animation:none!important}.ask,.alert,.walert,.done{opacity:1}}
+</style>
+<rect class="bg" width="960" height="440" rx="18"/>
+
+<!-- wires -->
+<path class="wire" d="M300 214 H 404"/>
+<path class="wire" d="M560 214 C 610 214 620 122 676 122"/>
+<path class="wire" d="M560 214 C 610 214 620 306 676 306"/>
+
+<g class="loop">
+  <!-- terminal -->
+  <rect class="card" x="28" y="92" width="272" height="244" rx="12"/>
+  <circle cx="48" cy="112" r="5" fill="#f07068"/><circle cx="64" cy="112" r="5" fill="#f0ae4a"/><circle cx="80" cy="112" r="5" fill="#5dc48a"/>
+  <text class="h" x="100" y="116">TMUX · API-SERVER</text>
+  <text class="mono" x="46" y="150"><tspan class="claude">✻</tspan> claude</text>
+  <g class="typing"><text class="mono" x="46" y="176"><tspan class="dim">❯</tspan> fix the flaky test</text></g>
+  <g class="ask">
+    <text class="mono" x="46" y="208"><tspan class="need">●</tspan> Bash(go test ./...)</text>
+    <text class="mono dim" x="62" y="230">Do you want to proceed?</text>
+    <text class="mono dim" x="62" y="252">❯ 1. Yes   2. No</text>
+  </g>
+  <g class="done">
+    <rect x="40" y="194" width="248" height="70" fill="#171b23"/>
+    <text class="mono" x="46" y="208"><tspan class="ok">✓</tspan> Bash(go test ./...)</text>
+    <text class="mono dim" x="62" y="230">ok  api  1.82s</text>
+    <text class="mono" x="46" y="256"><tspan class="claude">✻</tspan> Writing the fix…</text>
+  </g>
+  <text class="mono dim" x="46" y="316">esc to interrupt<tspan class="cursor"> ▍</tspan></text>
+
+  <!-- daemon -->
+  <g class="core" style="transform-origin:482px 214px;transform-box:view-box">
+    <rect x="404" y="160" width="156" height="108" rx="16" fill="#1a2030" stroke="#86a3ff" stroke-width="1.5"/>
+    <text class="big" x="482" y="202" text-anchor="middle">agent-monitor</text>
+    <text class="ui dim" x="482" y="224" text-anchor="middle">daemon · :7777</text>
+    <text class="ui dim" x="482" y="246" text-anchor="middle" font-size="12">hooks · panes · MCP</text>
+  </g>
+
+  <!-- packets -->
+  <circle class="pkt p1" cx="304" cy="214" r="6"/>
+  <circle class="pkt p2" cx="562" cy="214" r="6"/>
+  <circle class="pkt p3" cx="562" cy="214" r="6"/>
+  <circle class="pkt p4" cx="676" cy="122" r="6"/>
+
+  <!-- phone -->
+  <rect class="card" x="676" y="40" width="256" height="164" rx="22"/>
+  <text class="h" x="696" y="68">IPHONE</text>
+  <g class="alert">
+    <rect x="692" y="80" width="224" height="108" rx="12" fill="#222838"/>
+    <text class="ui" x="706" y="104"><tspan class="need">●</tspan> Claude needs you</text>
+    <text class="mono" x="706" y="128" font-size="12">go test ./...</text>
+    <rect class="allow" x="706" y="144" width="92" height="30" rx="8" fill="#2c7d4f"/>
+    <text class="ui" x="752" y="164" text-anchor="middle" fill="#0f1218" style="fill:#0f1218;font-weight:700">Allow</text>
+    <rect x="808" y="144" width="92" height="30" rx="8" fill="none" stroke="#3a4252"/>
+    <text class="ui dim" x="854" y="164" text-anchor="middle">Deny</text>
+    <circle class="tap" cx="752" cy="159" r="16" fill="none" stroke="#e8edf4" stroke-width="2" style="transform-origin:752px 159px;transform-box:view-box"/>
+  </g>
+
+  <!-- web -->
+  <rect class="card" x="676" y="236" width="256" height="164" rx="12"/>
+  <text class="h" x="696" y="264">WEB · LOCALHOST:7777</text>
+  <g class="walert">
+    <rect x="692" y="278" width="224" height="34" rx="8" fill="#222838"/>
+    <text class="ui" x="706" y="300"><tspan class="need">●</tspan> Needs you · api-server</text>
+  </g>
+  <rect x="692" y="322" width="224" height="12" rx="4" fill="#222838"/>
+  <rect x="692" y="342" width="160" height="12" rx="4" fill="#222838"/>
+  <rect x="692" y="362" width="190" height="12" rx="4" fill="#222838"/>
+</g>
+
+<text class="ui dim" x="480" y="424" text-anchor="middle" font-size="12">The agent asks · agent-monitor catches it · you answer from any device · the agent continues</text>
+</svg>
