@@ -208,7 +208,7 @@ leak: .wfx x3
 leak: .why x2
 leak: .wplan x2
 leak: .wq x2
-leak: .wq-a x4
+leak: .wq-a x5
 leak: .wq-b x7
 leak: .wq-box x2
 leak: .wq-t x2
