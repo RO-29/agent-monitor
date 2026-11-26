@@ -276,6 +276,7 @@ func FormatPaneDelivery(fromLabel, message string) string {
 		from = "(unknown)"
 	}
 	// Trim trailing whitespace/newlines so the fence sits flush.
-	msg := strings.TrimRight(message, "\r\n\t ")
+	// A CR or ESC from another agent would act as a key; a fence in the text would close ours.
+	msg := strings.ReplaceAll(strings.TrimRight(typedText(message), "\n\t "), "```", "'''")
 	return fmt.Sprintf("[from %s — agent-monitor talk]\n```\n%s\n```\n", from, msg)
 }

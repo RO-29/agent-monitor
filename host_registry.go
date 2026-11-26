@@ -422,7 +422,6 @@ func termWriteLock(target string) func() {
 // targetText types text into a target ("host:<id>" or a tmux pane id), then Enter when asked.
 func targetText(target, text string, enter bool) error {
 	defer termWriteLock(target)()
-	text = typedText(text)
 	if h, isHost, err := targetHost(target); isHost {
 		if err != nil {
 			return err

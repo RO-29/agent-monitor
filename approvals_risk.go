@@ -289,6 +289,9 @@ var shellInterpreters = map[string]bool{"python": true, "python3": true, "node":
 // "" means Always is not offered: no rule may cover more than the user saw.
 func alwaysPattern(a *Approval) string {
 	if isShellTool(a.ToolName) {
+		if strings.ContainsAny(a.Summary, "*?") {
+			return "" // a glob in the command would act as a wildcard in the rule
+		}
 		f := strings.Fields(a.Summary)
 		var keep []string
 		for _, t := range f {

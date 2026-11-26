@@ -402,6 +402,7 @@ func runServer() {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
+		body.Text = typedText(body.Text)
 		// "!" runs a shell command in Claude Code with no approval.
 		if callerLevel(r) < LevelAdmin && strings.HasPrefix(strings.TrimSpace(body.Text), "!") {
 			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
