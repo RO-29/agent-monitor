@@ -62,6 +62,7 @@ struct Composer: View {
     @State private var slashPanel: SlashPanel?
     /// This agent's usage credits, shown under the status line.
     @State private var credits: String?
+    @AppStorage("composerStatusOpen") private var statusOpen = false
     @State private var skillCmds: [(String, String)] = []
     /// While the box holds "/word" with no space: the agent's built-in commands and skills that match.
     private var slashHits: [(String, String)] {
@@ -84,9 +85,23 @@ struct Composer: View {
                 .accessibilityElement(children: .combine)
             }
             let sl = (reachable ? queue?.statusLine ?? [] : []) + (credits.map { [$0] } ?? [])
-            if !sl.isEmpty {
-                Text(sl.joined(separator: "\n")).font(.caption.monospaced()).foregroundStyle(.secondary)
-                    .lineLimit(5).frame(maxWidth: .infinity, alignment: .leading)
+            // One line by default and none while typing; a tap shows every line.
+            if !sl.isEmpty, !focused {
+                Button { withAnimation(.snappy) { statusOpen.toggle() } } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(statusOpen ? sl.joined(separator: "\n") : sl[0])
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                            .lineLimit(statusOpen ? 6 : 1).truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if sl.count > 1 {
+                            Image(systemName: statusOpen ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(Tok.muted)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(statusOpen ? "Hide the status lines" : "Show all status lines")
             }
             if let d = queue?.draft, !d.isEmpty, reachable {
                 VStack(alignment: .leading, spacing: 6) {
