@@ -362,7 +362,7 @@ func (n *Notifier) remind(old int64, now time.Time) {
 		_, _ = n.db.Exec(`DELETE FROM notifications WHERE id=?`, id)
 		return
 	}
-	first.Read = true
+	first.Read, first.Resolved = true, true // superseded: every device clears its banner
 	fb, _ := json.Marshal(first)
 	_, _ = n.db.Exec(`UPDATE notifications SET read=1, json=? WHERE id=?`, string(fb), old)
 	n.publish(first)
@@ -525,18 +525,40 @@ func (n *Notifier) get(id string) (ONotification, bool) {
 	return no, true
 }
 
+// MarkRead also tells the other devices, and takes the alert off the lock screen.
 func (n *Notifier) MarkRead(ids []string, all bool) error {
 	if all {
-		_, err := n.db.Exec(`UPDATE notifications SET read=1 WHERE read=0`)
-		return err
+		ids = nil
+		rows, err := n.db.Query(`SELECT id FROM notifications WHERE read=0 ORDER BY id DESC LIMIT 500`)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				ids = append(ids, strconv.FormatInt(id, 10))
+			}
+		}
+		rows.Close()
+		if _, err := n.db.Exec(`UPDATE notifications SET read=1 WHERE read=0`); err != nil {
+			return err
+		}
 	}
 	for _, s := range ids {
 		id, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			continue
 		}
-		if _, err := n.db.Exec(`UPDATE notifications SET read=1 WHERE id=?`, id); err != nil {
-			return err
+		if !all {
+			if _, err := n.db.Exec(`UPDATE notifications SET read=1 WHERE id=?`, id); err != nil {
+				return err
+			}
+		}
+		if no, ok := n.get(s); ok {
+			n.publish(no)
+		}
+		if n.bark {
+			barkDelete(s)
 		}
 	}
 	return nil

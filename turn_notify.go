@@ -54,7 +54,8 @@ func turnNotifyTick(all []*Session, now time.Time) {
 	turnWatch.mu.Lock()
 	defer turnWatch.mu.Unlock()
 	for _, s := range all {
-		if s.TranscriptPath == "" || now.UnixMilli()-s.LastActivityAt > turnNotifyWindow.Milliseconds() {
+		// The watched-items reader parses Claude and Codex transcripts only.
+		if s.TranscriptPath == "" || s.Tool != ToolClaude && s.Tool != ToolCodex || now.UnixMilli()-s.LastActivityAt > turnNotifyWindow.Milliseconds() {
 			continue
 		}
 		st := turnWatch.seen[s.ID]

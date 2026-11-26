@@ -911,6 +911,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const send = async () => {
     const body = text.trim();
     if ((!body && !att.ids.length) || busy || closed || wtGone || att.uploading) return;
+    if (att.failed) return void showToast("A file did not upload", "Retry it or remove it, then send.", { kind: "alert" });
     setBusy(true);
     try {
       if (queueing) {

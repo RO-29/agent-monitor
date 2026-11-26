@@ -35,7 +35,8 @@ func promptKey(screen string) string {
 	if end < 0 {
 		return ""
 	}
-	sum := sha256.Sum256([]byte(compactText(strings.Join(lines[max(0, end-20):end+1], "\n"))))
+	// The ❯ cursor moves with the arrow keys; it is not a new prompt.
+	sum := sha256.Sum256([]byte(compactText(strings.ReplaceAll(strings.Join(lines[max(0, end-20):end+1], "\n"), "❯", " "))))
 	return hex.EncodeToString(sum[:6])
 }
 

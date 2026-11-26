@@ -81,7 +81,7 @@ export default function Inbox() {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();
         if (needsSecond(sel.approvals[0], e.key)) return;
-        void quickDecide(sel.approvals[0], e.key === "A" ? "always" : "allow");
+        void quickDecide(sel.approvals[0], e.key === "A" && e.shiftKey ? "always" : "allow");
       } else if (e.key === "d" && sel?.approvals[0]) {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();

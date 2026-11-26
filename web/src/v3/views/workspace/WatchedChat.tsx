@@ -274,6 +274,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
     const body = again ? "!" + again : text.trim();
     const ids = again ? [] : att.ids;
     if (busy || mode === "off" || att.uploading || (mode === "tmux" && !body && !ids.length)) return;
+    if (!again && att.failed) return void showToast("A file did not upload", "Retry it or remove it, then send.", { kind: "alert" });
     setBusy(true);
     try {
       if (mode === "tmux") {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -697,6 +698,9 @@ func (s *ApprovalStore) decide(id string, d approvalDecision) (*Approval, int, e
 	if d.limited && d.Always {
 		return nil, http.StatusForbidden, fmt.Errorf("always adds a lasting rule and needs admin access; allow once instead")
 	}
+	if d.limited && d.UpdatedInput != nil && a.Kind == "permission" {
+		return nil, http.StatusForbidden, fmt.Errorf("an edited command needs admin access")
+	}
 	if d.UpdatedInput != nil && a.Agent != "claude" {
 		return nil, http.StatusBadRequest, fmt.Errorf("updatedInput is supported only for Claude approvals")
 	}
@@ -741,8 +745,8 @@ func (s *ApprovalStore) decide(id string, d approvalDecision) (*Approval, int, e
 
 func (s *ApprovalStore) addAlwaysRule(a *Approval) {
 	r := Rule{Action: "allow", Agent: a.Agent, Tool: a.ToolName, Pattern: alwaysPattern(a), CwdPrefix: a.Cwd}
-	if r.Pattern == "" {
-		return // a rule with no pattern would allow every call of the tool
+	if r.Pattern == "" || r.CwdPrefix == "" {
+		return // no pattern or no folder: the rule would cover more than the user saw
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -764,8 +768,14 @@ func (s *ApprovalStore) upsertRule(r Rule) (Rule, error) {
 	default:
 		return r, fmt.Errorf("action must be allow, deny or hold")
 	}
+	if r.Agent == "cursor-agent" {
+		r.Agent = "cursor" // Cursor approvals carry "cursor" for the editor and the CLI
+	}
 	if r.Agent != "" && !isRegistryID(r.Agent) && r.Agent != "cursor" {
 		return r, fmt.Errorf("unknown agent %q", r.Agent)
+	}
+	if r.Action == "allow" && r.Tool == "" && r.Pattern == "" {
+		return r, fmt.Errorf("an allow rule needs a tool or a pattern")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -910,7 +920,11 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 			writeJSON(w, map[string]any{"suggestions": s.ruleSuggestions(time.Now())})
 		case len(parts) == 4 && parts[0] == "rules" && parts[1] == "suggest" && parts[3] == "dismiss" && r.Method == http.MethodPost:
 			if err := s.dismissSuggestion(parts[2]); err != nil {
-				bad(http.StatusInternalServerError, err.Error())
+				code := http.StatusInternalServerError
+				if errors.Is(err, errBadSuggestKey) {
+					code = http.StatusBadRequest
+				}
+				bad(code, err.Error())
 				return
 			}
 			writeJSON(w, map[string]any{"ok": true})

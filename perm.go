@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -78,6 +79,9 @@ func (p *PermStore) Subscribe(l func(PermEvent)) func() {
 }
 
 func (p *PermStore) broadcast(e PermEvent) {
+	if e.Kind == "perm-remove" && notifier != nil {
+		notifier.Resolve("perm:" + e.ID)
+	}
 	p.mu.Lock()
 	ls := make([]func(PermEvent), 0, len(p.listeners))
 	for _, l := range p.listeners {
@@ -108,6 +112,11 @@ func (p *PermStore) Register(req *PermissionRequest) {
 	p.requests[req.ID] = req
 	p.mu.Unlock()
 	p.broadcast(PermEvent{Kind: "perm-add", Request: req})
+	if notifier != nil {
+		name := firstOf(filepath.Base(req.Cwd), "Agent")
+		notifier.Emit(notifyEvent{Kind: "needs-you", ThreadID: req.SessionID, Title: name + ": " + firstOf(req.ToolName, "a tool") + " needs approval",
+			Body: clipString(approvalSummary("permission", req.ToolName, req.Input), 300), Keys: []string{"perm:" + req.ID}})
+	}
 }
 
 func (p *PermStore) List() []*PermissionRequest {

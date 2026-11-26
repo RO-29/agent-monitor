@@ -106,6 +106,11 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 			orchWriteErr(w, orchBadRequest("bad json"))
 			return
 		}
+		// A thread that runs with no approvals is a shell: admin only.
+		if callerLevel(r) < LevelAdmin && (in.ApprovalPolicy == "never" || in.PermissionMode == "auto" || in.PermissionMode == "bypassPermissions" || in.Sandbox == "danger-full-access") {
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a thread with no approvals needs admin access"})
+			return
+		}
 		th, err := m.CreateThread(in)
 		if err != nil {
 			orchWriteErr(w, err)

@@ -93,6 +93,12 @@ var accessRules = []accessRule{
 	{"", "/api/orch/git", "", LevelAdmin},
 	{"", "/api/orch/threads/", "/git", LevelAdmin},
 	{"", "/api/orch/threads/", "/diff", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/restore", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/commit", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/push", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/pr", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/merge", LevelAdmin},
+	{"POST", "/api/orch/threads/", "/worktree/remove", LevelAdmin},
 	{"", "/api/orch/files$", "", LevelAdmin},
 
 	// Driving the agents.

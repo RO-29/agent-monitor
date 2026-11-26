@@ -4,12 +4,14 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 )
+
+var errBadSuggestKey = errors.New("bad suggestion key")
 
 // RuleSuggestion: a call the user allowed by hand often, with no deny, that no allow rule covers yet.
 type RuleSuggestion struct {
@@ -56,7 +58,8 @@ func (s *ApprovalStore) ruleSuggestions(now time.Time) []RuleSuggestion {
 			continue
 		}
 		p := alwaysPattern(a)
-		if p == "" || isShellTool(a.ToolName) && isCompoundShell(a.Summary) {
+		// No folder means a rule for every folder: broader than what the user saw.
+		if p == "" || a.Cwd == "" || isShellTool(a.ToolName) && isCompoundShell(a.Summary) {
 			continue
 		}
 		k := suggestKey(a.Agent, a.ToolName, p, a.Cwd)
@@ -126,7 +129,9 @@ func (s *ApprovalStore) loadDismissedLocked() map[string]bool {
 }
 
 func (s *ApprovalStore) dismissSuggestion(key string) error {
-	key = strings.TrimSpace(key)
+	if _, err := hex.DecodeString(key); err != nil || len(key) != 12 {
+		return errBadSuggestKey
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	m := s.loadDismissedLocked()

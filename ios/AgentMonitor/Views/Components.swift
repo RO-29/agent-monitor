@@ -698,6 +698,7 @@ struct AskOption: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.box).stroke(on ? Tok.accent : Tok.line, lineWidth: 1))
         .background(RoundedRectangle(cornerRadius: Radius.box + 2).fill(on ? Tok.accentSoft : .clear).padding(-2))
         .contentShape(Rectangle())
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

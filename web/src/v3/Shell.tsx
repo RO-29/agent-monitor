@@ -259,17 +259,7 @@ export default function V3Shell() {
         : p === "settings"
           ? path.startsWith("/settings")
           : path === "/more" || [...LOOKS, ...VIEWS].some((v) => path.startsWith(v.to)) || path.startsWith("/threads") || path.startsWith("/t/");
-  const toggleNotify = async () => {
-    if (!notifyOn && typeof Notification !== "undefined") {
-      // "Alerts on" must mean alerts come: turn it on only with the permission granted.
-      const p = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-      if (p !== "granted") {
-        showToast("Desktop alerts are blocked", "Allow notifications for this site in the browser settings.", { kind: "alert" });
-        return;
-      }
-    }
-    setNotify(!notifyOn);
-  };
+  const toggleNotify = notifyToggle(notifyOn, setNotify);
   const menuBody = <MenuBody path={path} theme={theme} onTheme={toggleTheme} notifyOn={notifyOn} onNotify={toggleNotify} />;
 
   return (
@@ -411,6 +401,18 @@ export default function V3Shell() {
   );
 }
 
+// "Alerts on" must mean alerts come: turn it on only with the permission granted.
+const notifyToggle = (on: boolean, set: (v: boolean) => void) => async () => {
+  if (!on && typeof Notification !== "undefined") {
+    const p = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    if (p !== "granted") {
+      showToast("Desktop alerts are blocked", "Allow notifications for this site in the browser settings.", { kind: "alert" });
+      return;
+    }
+  }
+  set(!on);
+};
+
 export function MorePage() {
   const loc = useLocation();
   const [theme, toggleTheme] = useTheme();
@@ -419,7 +421,7 @@ export function MorePage() {
     <div className="desk-page">
       <div className="desk-col" style={{ maxWidth: 520 }}>
         <div className="dmenu" style={{ position: "static", boxShadow: "none" }}>
-          <MenuBody path={loc.pathname} theme={theme} onTheme={toggleTheme} notifyOn={notifyOn} onNotify={() => setNotify(!notifyOn)} />
+          <MenuBody path={loc.pathname} theme={theme} onTheme={toggleTheme} notifyOn={notifyOn} onNotify={notifyToggle(notifyOn, setNotify)} />
         </div>
       </div>
     </div>

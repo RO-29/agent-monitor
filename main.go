@@ -402,6 +402,11 @@ func runServer() {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
+		// "!" runs a shell command in Claude Code with no approval.
+		if callerLevel(r) < LevelAdmin && strings.HasPrefix(strings.TrimSpace(body.Text), "!") {
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
+			return
+		}
 		if drivenSessionAction(w, id, "send", body.Text) {
 			return
 		}
@@ -620,6 +625,10 @@ func runServer() {
 	})
 	// POST /api/panes/sweep: GC and dedupe now, then return the registry.
 	mux.HandleFunc("/api/panes/sweep", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST only"})
+			return
+		}
 		var gcDropped, dedupeDropped int
 		if panes, err := listTmuxPanes(); err == nil {
 			gcDropped = len(paneRegistry.GarbageCollect(panes))

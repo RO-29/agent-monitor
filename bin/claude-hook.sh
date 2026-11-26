@@ -29,7 +29,7 @@ esac
 
 # Always forward to the legacy event sink (records SessionStart, tool calls,
 # notifications, etc).
-curl -fsS \
+curl -fsS --connect-timeout 1 --max-time 3 \
   -H 'Content-Type: application/json' \
   --data-binary "$PAYLOAD" \
   "$EVENTS_URL" >/dev/null 2>&1 || true
@@ -46,7 +46,7 @@ case "$event" in
       # No pid: $PPID is this short-lived hook shell, so GC falls back to the pane still existing.
       body=$(printf '{"tool":"claude","sessionId":"%s","paneId":"%s","tmuxSocket":"%s","cwd":"%s","source":"hook"}' \
         "$session_id" "$TMUX_PANE" "${TMUX:-}" "$cwd")
-      curl -fsS \
+      curl -fsS --connect-timeout 1 --max-time 3 \
         -H 'Content-Type: application/json' \
         --data-binary "$body" \
         "${MONITOR_URL}/api/pane/register" >/dev/null 2>&1 || true
@@ -56,7 +56,7 @@ case "$event" in
     # Clean up immediately when claude exits — don't wait for the periodic
     # GC to notice the dead pid. agentId for claude is "claude:<sessionId>".
     if [ -n "$session_id" ]; then
-      curl -fsS -X DELETE \
+      curl -fsS --connect-timeout 1 --max-time 3 -X DELETE \
         "${MONITOR_URL}/api/pane/registration/claude:${session_id}" \
         >/dev/null 2>&1 || true
     fi

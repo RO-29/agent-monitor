@@ -87,7 +87,7 @@ func isFileWriteTool(tool string) bool {
 
 func isShellTool(tool string) bool {
 	switch tool {
-	case "Bash", "shell", "exec_command", "local_shell", "unified_exec":
+	case "Bash", "shell", "shell_command", "container.exec", "exec_command", "local_shell", "unified_exec":
 		return true
 	}
 	return false
@@ -281,6 +281,10 @@ func cleanAbs(p string) string {
 	return p
 }
 
+var shellInterpreters = map[string]bool{"python": true, "python3": true, "node": true, "bash": true, "sh": true, "zsh": true, "env": true,
+	"xargs": true, "ruby": true, "perl": true, "deno": true, "bun": true, "npx": true, "uvx": true, "sudo": true, "eval": true, "exec": true,
+	"osascript": true, "awk": true, "command": true, "nohup": true, "time": true, "timeout": true, "watch": true, "sbatch": true}
+
 // alwaysPattern derives a rule pattern from an approval: a command prefix, a directory or the exact call.
 // "" means Always is not offered: no rule may cover more than the user saw.
 func alwaysPattern(a *Approval) string {
@@ -288,15 +292,20 @@ func alwaysPattern(a *Approval) string {
 		f := strings.Fields(a.Summary)
 		var keep []string
 		for _, t := range f {
-			if len(keep) == 3 || strings.HasPrefix(t, "-") || strings.ContainsAny(t, "/=$'\"&|;") {
+			if len(keep) == 3 || strings.HasPrefix(t, "-") || strings.ContainsAny(t, "/=$'\"&|;*?") {
 				break
 			}
 			keep = append(keep, t)
 		}
-		if len(keep) == 0 {
+		// An interpreter runs any code its arguments carry: only the exact command.
+		exact := len(keep) == 0 || len(keep) == len(f) || len(keep) == 1 && shellInterpreters[keep[0]]
+		if exact {
+			if strings.ContainsAny(a.Summary, "*?") || len(a.Summary) >= 300 {
+				return ""
+			}
 			return a.Summary
 		}
-		return strings.Join(keep, " ") + "*"
+		return strings.Join(keep, " ") + " *" // a word boundary: "go test *" never matches "go testx"
 	}
 	if a.ToolName == "request_permissions" {
 		return ""

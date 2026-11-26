@@ -143,7 +143,7 @@ export default function Now() {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();
         if (needsSecond(cur.a, e.key)) return;
-        void quickDecide(cur.a, e.key === "A" ? "always" : "allow");
+        void quickDecide(cur.a, e.key === "A" && e.shiftKey ? "always" : "allow");
       } else if (e.key === "d" && cur) {
         if (!approvalKeyOk(e)) return;
         e.preventDefault();

@@ -220,6 +220,9 @@ func barkDo(op func()) {
 // barkQueue pushes a new alert; while the iPhone app is open it waits, then goes unless read or resolved.
 func barkQueue(no ONotification, current func(id string) (ONotification, bool)) {
 	barkDo(func() {
+		if cur, ok := current(no.ID); ok && (cur.Read || cur.Resolved) {
+			return // answered or read before the send
+		}
 		bark.mu.Lock()
 		wait := time.Until(bark.phoneActive)
 		bark.mu.Unlock()

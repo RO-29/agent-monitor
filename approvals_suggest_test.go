@@ -22,13 +22,13 @@ func TestRuleSuggestionsFromAudit(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		add("Bash", "npm run build", "allowed", true)
 	}
-	add("Bash", "npm run build --watch", "denied", true) // same "npm run build*" shape: vetoed
+	add("Bash", "npm run build", "denied", true) // the same command once denied: vetoed
 	for i := 0; i < 3; i++ {
 		add("Bash", "rm -rf /tmp/x", "allowed", false) // high risk: never suggested
 	}
 	add("Bash", "make all", "allowed", true) // too few
 	got := s.ruleSuggestions(now)
-	if len(got) != 1 || got[0].Pattern != "go test*" || got[0].Count != 4 || got[0].CwdPrefix != "/repo" {
+	if len(got) != 1 || got[0].Pattern != "go test *" || got[0].Count != 4 || got[0].CwdPrefix != "/repo" {
 		t.Fatalf("suggestions = %+v", got)
 	}
 	if err := s.dismissSuggestion(got[0].Key); err != nil {
@@ -44,5 +44,29 @@ func TestRuleSuggestionsFromAudit(t *testing.T) {
 	add("Bash", "make all", "allowed", true)
 	if got := s.ruleSuggestions(now); len(got) != 0 {
 		t.Fatalf("a covered call was suggested: %+v", got)
+	}
+}
+
+func TestAlwaysPatternStaysNarrow(t *testing.T) {
+	for in, want := range map[string]string{
+		"python3 -V":            "python3 -V",
+		"go test ./pkg":         "go test *",
+		"npm run build":         "npm run build",
+		"bash -n x.sh":          "bash -n x.sh",
+		"ls *.go":               "",
+		"git diff --stat HEAD~": "git diff *",
+	} {
+		if got := alwaysPattern(&Approval{ToolName: "Bash", Summary: in}); got != want {
+			t.Errorf("alwaysPattern(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if !globMatch("go test *", "go test ./x") || globMatch("go test *", "go testx") {
+		t.Error("the word boundary does not hold")
+	}
+}
+
+func TestTypedTextDropsControlBytes(t *testing.T) {
+	if got := typedText("hi\r!rm x\x1b[A\x07\tok"); got != "hi\n!rm x[A\tok" {
+		t.Errorf("typedText = %q", got)
 	}
 }

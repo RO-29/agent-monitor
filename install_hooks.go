@@ -62,17 +62,8 @@ func installClaudePermissions() {
 	}
 	allow, _ := perms["allow"].([]any)
 
-	// Tools we want pre-approved. Wildcard `mcp__agent-monitor` covers our
-	// own MCP tools. Bash/Read/Write/Edit cover the common gates that fire
-	// when claude wants to inspect/modify code mid-demo. Without these the
-	// demo recording stalls on permission prompts every few seconds.
-	want := []string{
-		"mcp__agent-monitor",
-		"Bash",
-		"Read",
-		"Write",
-		"Edit",
-	}
+	// Only our own MCP tools: allowing Bash or Edit here would skip every approval card.
+	want := []string{"mcp__agent-monitor"}
 	added := 0
 	for _, w := range want {
 		present := false
@@ -98,7 +89,12 @@ func installClaudePermissions() {
 		fmt.Fprintf(os.Stderr, "✗ Claude permissions: marshal failed: %v\n", err)
 		return
 	}
-	if err := os.WriteFile(settingsPath, append(out, '\n'), 0o644); err != nil {
+	tmp := settingsPath + ".am-tmp"
+	err = os.WriteFile(tmp, append(out, '\n'), 0o644)
+	if err == nil {
+		err = os.Rename(tmp, settingsPath)
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Claude permissions: write failed: %v\n", err)
 		return
 	}

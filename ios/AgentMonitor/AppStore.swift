@@ -698,6 +698,8 @@ final class AppStore {
             let list = (r.items ?? []).sorted { $0.at > $1.at }
             alerts = list
             settleDoneWatches(list)
+            // Banners for alerts answered or read elsewhere while the app slept.
+            for a in list where a.isRead || (a.resolved ?? false) { Notifier.shared.clearAlert(id: a.id) }
             lastAlertID = max(lastAlertID, list.compactMap { Int64($0.id) }.max() ?? 0)
             alertsError = nil
         } catch {
@@ -721,7 +723,7 @@ final class AppStore {
         if let n = Int64(a.id) { lastAlertID = max(lastAlertID, n) }
         if let i = alerts.firstIndex(where: { $0.id == a.id }) {
             alerts[i] = a
-            if a.resolved ?? false { Notifier.shared.clearAlert(id: a.id) }
+            if a.isRead || (a.resolved ?? false) { Notifier.shared.clearAlert(id: a.id) }
             return
         }
         alerts.insert(a, at: 0)
@@ -787,11 +789,11 @@ final class AppStore {
         return open == resolveThreadID(id)
     }
 
-    /// The daemon's alert and the app's own needs-you check can both see one prompt; one banner per session per 2 min.
+    /// The daemon's alert and the app's own needs-you check can both see one prompt; one banner per session per 20 s.
     private var bannerAt: [String: Date] = [:]
     private func bannerShown(_ id: String?) -> Bool {
         guard let id else { return false }
-        if let t = bannerAt[id], Date().timeIntervalSince(t) < 120 { return true }
+        if let t = bannerAt[id], Date().timeIntervalSince(t) < 20 { return true }
         bannerAt[id] = Date()
         return false
     }

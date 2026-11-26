@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { useLive } from "../../../lib/ws";
 import { useOrch, useOrchThread } from "../../api/orch";
 import { typing } from "../../ctx";
+import { overlayOpen } from "../../keys";
 import { useV3 } from "../../live";
 import { buildRows } from "../../model";
 import { DrivenChat, NotFoundChat, useTick } from "./DrivenChat";
@@ -96,7 +97,7 @@ export default function Workspace() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (typing(e) || e.metaKey || e.ctrlKey || e.altKey || (e.key !== "j" && e.key !== "k")) return;
-      if (!rows.length) return;
+      if (!rows.length || overlayOpen()) return;
       const order = visualOrder(tree);
       const i = order.findIndex((r) => r.id === sel);
       const n = order[Math.max(0, Math.min(order.length - 1, i < 0 ? 0 : i + (e.key === "j" ? 1 : -1)))];

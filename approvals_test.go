@@ -196,7 +196,7 @@ func TestApprovalAlwaysCreatesRule(t *testing.T) {
 			found = &r
 		}
 	}
-	if found == nil || found.Pattern != "npm test*" || found.CwdPrefix != "/repo/app" {
+	if found == nil || found.Pattern != "npm test *" || found.CwdPrefix != "/repo/app" {
 		t.Fatalf("rule %+v", found)
 	}
 	code, raw := e.post("/api/approvals/hook/"+hookClaudePermission, claudeBash("npm test ./pkg"))

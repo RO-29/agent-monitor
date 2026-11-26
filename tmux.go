@@ -115,6 +115,17 @@ var (
 	typePause = 25 * time.Millisecond
 )
 
+// typedText drops control bytes from text that is typed into a terminal: a CR or ESC would act as a key.
+func typedText(s string) string {
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' || r >= 0x20 && r != 0x7f && (r < 0x80 || r > 0x9f) {
+			return r
+		}
+		return -1
+	}, s)
+}
+
 // typeAsKeys types text in short parts; each line break is "\" then Enter, Claude Code's newline in every terminal.
 func typeAsKeys(text string, sendText func(string) error, sendKeys func([]string) error) error {
 	for i, line := range strings.Split(text, "\n") {
