@@ -72,7 +72,7 @@ struct RunningDrivenBar: View {
     @State private var all = false
 
     var body: some View {
-        let list = kids.filter { $0.status == "running" || $0.status == "starting" }
+        let list = kids.filter { ODriven.active($0.status) }
             .sorted { ($0.createdAt ?? 0) < ($1.createdAt ?? 0) }
         if !list.isEmpty {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -92,12 +92,16 @@ struct RunningDrivenBar: View {
                                     .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 5))
                                 Text(c.title ?? "Subagent").font(.footnote).foregroundStyle(Tok.fg2).lineLimit(1)
                                 Spacer(minLength: 4)
-                                Text(elapsed(c, ctx.date)).font(.caption.monospacedDigit()).foregroundStyle(Tok.muted)
+                                if c.status == "waiting" {
+                                    Text("waiting").font(.caption.weight(.medium)).foregroundStyle(Tok.need)
+                                } else {
+                                    Text(elapsed(c, ctx.date)).font(.caption.monospacedDigit()).foregroundStyle(Tok.muted)
+                                }
                             }
                             .frame(minHeight: 32).contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(c.title ?? "Subagent"), running for \(elapsed(c, ctx.date))")
+                        .accessibilityLabel(c.status == "waiting" ? "\(c.title ?? "Subagent"), waiting" : "\(c.title ?? "Subagent"), running for \(elapsed(c, ctx.date))")
                     }
                     if list.count > 3 {
                         Button(all ? "Show fewer" : "Show all \(list.count)") { all.toggle() }

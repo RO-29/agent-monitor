@@ -756,7 +756,7 @@ struct ThreadChatView: View {
 
     private func drivenLoop(_ id: String) async {
         items = [:]; prior = [:]; priorSID = nil; earlier = nil; loaded = false; feedError = nil
-        pending = []; newMark = nil; markSet = false
+        pending = []; newMark = nil; markSet = false; drivenKids = []
         var hasStream = true
         var wait: UInt64 = 1
         while !Task.isCancelled {
@@ -796,7 +796,7 @@ struct ThreadChatView: View {
                     continue
                 }
             }
-            let busy = driven?.status == "running" || driven?.status == "starting"
+            let busy = ODriven.active(driven?.status) || drivenKids.contains { ODriven.active($0.status) }
             wait = busy ? 2 : min(max(wait, 5) * 2, 30)
             try? await Task.sleep(nanoseconds: wait * 1_000_000_000)
         }

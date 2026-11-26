@@ -154,9 +154,11 @@ go build -o agent-monitor ./cmd/agent-monitor   # web/dist is committed, so go b
 Run `bin/build.sh` after you change anything under `web/`. It runs the CSS collision check, the
 markdown check, `npm run build` and `go build`, so the new web app is embedded in the binary.
 
-The CSS collision check (`bin/css-collisions.py`) fails when a change defines a selector one more time,
-or styles a global class inside a new context. Both broke the layout before. If the override is
-intended, run `bin/css-collisions.py --update` and commit `web/css-baseline.txt`.
+The CSS collision check (`bin/css-collisions.py`) reads every stylesheet under `web/src`. It fails when
+a change defines a selector one more time (inside `@media` too), or styles a global class (`.x` or
+`.v3 .x`) under other ancestors. Both broke the layout before. If the override is intended, run
+`bin/css-collisions.py --update` and commit `web/css-baseline.txt`. The check counts rules only: a
+change that removes one rule and adds another for the same selector passes.
 
 Required native helper: `rust/am-helper/build.sh ~/agent-monitor` builds `am-helper` and puts it next to
 the binary. It serves `mcp-perm-server`, `run` and `__pty-leader`. The Go binary has no copy of these modes

@@ -700,6 +700,8 @@ struct ODriven: Decodable, Hashable {
     /// The CLI session this thread continued ("Continue here"); its earlier turns show above the driven ones.
     var nativeId: String?
     var createdAt: Int64?
+    /// The daemon's activeStatus (orch_groups.go): a waiting child still runs.
+    static func active(_ s: String?) -> Bool { s == "starting" || s == "running" || s == "waiting" }
 }
 
 struct ODrivenDetail: Decodable {
