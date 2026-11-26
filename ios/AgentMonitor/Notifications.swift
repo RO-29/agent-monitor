@@ -239,12 +239,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// Replaces a banner after its action worked, with no sound, so the user sees the answer went.
-    func actionDone(id: String, title: String, body: String, info: [AnyHashable: Any]) {
+    func actionDone(id: String, title: String, body: String, group: String) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.interruptionLevel = .passive
-        content.threadIdentifier = (info["threadId"] as? String) ?? (info["sessionId"] as? String) ?? "done"
+        content.threadIdentifier = group
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 
@@ -354,8 +354,10 @@ enum NotifyAction {
             await fail(error.localizedDescription, thread)
             return
         }
-        if !done.isEmpty {
-            await MainActor.run { Notifier.shared.actionDone(id: bannerID, title: done, body: title, info: info) }
+        // Plain String copies keep the main-actor hop Sendable.
+        let msg = done, group = thread ?? "done"
+        if !msg.isEmpty {
+            await MainActor.run { Notifier.shared.actionDone(id: bannerID, title: msg, body: title, group: group) }
         }
     }
 

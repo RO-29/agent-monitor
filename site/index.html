@@ -167,6 +167,12 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg2);padding:1px 6p
 .am .worked .run-t{color:var(--run)}
 .am .wactivity{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg-2);flex-wrap:wrap}
 .am .wactivity .run-t{color:var(--run)}
+.am .kids{border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:6px 10px;display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.am .kids-h{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--fg)}
+.am .kids-r{display:flex;align-items:center;gap:8px;min-width:0;color:var(--fg-2)}
+.am .kids-r .t{font-size:11px;padding:1px 6px;border-radius:5px;background:var(--sub-soft);color:var(--sub);flex:none}
+.am .kids-r .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .kids-r .d{margin-left:auto;font:11.5px var(--f-mono);color:var(--muted);flex:none}
 .am .agent{color:var(--fg)}
 .am .trail-h{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);min-width:0;flex-wrap:wrap}
 .am .trail-bar{display:flex;gap:2px;flex:1 1 120px;min-width:80px;height:14px}
@@ -358,8 +364,9 @@ footer a{color:var(--ink)}
         <div class="copy">
           <span class="tag">Live chat</span>
           <h3>See what the agent does now</h3>
-          <p>A running thread shows one activity line with the state of the agent. After the turn, the tool calls fold into a step trail: one row of colored segments. Open it to read each call.</p>
+          <p>A running thread shows one activity line with the state of the agent. Subagents that run show in a live row with their type, task and time, so a parent that waits never looks stuck. After the turn, the tool calls fold into a step trail: one row of colored segments. Open it to read each call.</p>
           <ul>
+            <li>Tap a running subagent to read its transcript as it works</li>
             <li>Segment width shows how long a call took</li>
             <li>Colors: Bash, Edit, MCP, Web, Script. A failed call is red.</li>
             <li>The summary counts calls, tools and time</li>
@@ -376,6 +383,11 @@ footer a{color:var(--ink)}
             </div>
             <div class="witem"><span class="ic" style="color:var(--ok)">&#10003;</span><code>go test ./...</code><span class="wim">38s</span></div>
             <div class="witem"><span class="ic" style="color:var(--need)">&plusmn;</span><code>router/routes.ts</code><span class="wim">2s</span></div>
+            <div class="kids">
+              <div class="kids-h"><span class="pulse run-t">&#9679;</span>2 subagents running</div>
+              <div class="kids-r"><span class="t">Explore</span><span class="n">Find every import of the old router</span><span class="d">1m 04s</span></div>
+              <div class="kids-r"><span class="t">general-purpose</span><span class="n">Update the route tests</span><span class="d">38s</span></div>
+            </div>
             <div class="wactivity"><span class="pulse run-t">&#9679;</span> &#10043; Thinking&hellip; (12s &middot; &darr; 300 tokens)</div>
           </div>
         </div></div>

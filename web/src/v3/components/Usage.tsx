@@ -206,7 +206,7 @@ const famLabel = (m: string) => {
 function ModelTable({ models, agent }: { models: ModelUsage[]; agent: string }) {
   const has5 = models.some((m) => m.window === "5h");
   const [win, setWin] = useState<"5h" | "weekly">(has5 ? "5h" : "weekly");
-  const rows = models.filter((m) => m.window === win).sort((a, b) => famRank(a.model) - famRank(b.model) || b.costUsd - a.costUsd || a.model.localeCompare(b.model));
+  const rows = models.filter((m) => m.window === win && m.model !== "<synthetic>").sort((a, b) => famRank(a.model) - famRank(b.model) || b.costUsd - a.costUsd || a.model.localeCompare(b.model));
   const sum = rows.reduce((t, m) => ({ i: t.i + m.inTokens, o: t.o + m.outTokens, r: t.r + m.cacheRead, w: t.w + m.cacheWrite, c: t.c + m.costUsd, n: t.n + m.messages }), { i: 0, o: 0, r: 0, w: 0, c: 0, n: 0 });
   return (
     <>

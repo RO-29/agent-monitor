@@ -31,6 +31,9 @@ sends your answer back to the agent.
 - Pin, settle and snooze a thread. A thread that is done for more than 24 hours settles by itself.
 - Subagents: a driven thread can start child threads, and the right panel shows them as a tree.
 - A live activity line and a step trail in the chat show what the agent does now and which tool calls it ran.
+- A live row above the composer lists the subagents that run now, with type, task and elapsed time. Tap
+  one to read its transcript. This works for Claude Code subagents in watched sessions too.
+- Empty watched sessions (no messages) hide behind a "Show N empty sessions" link.
 
 **Approvals and rules**
 
@@ -329,7 +332,8 @@ children at once (fan-out).
   result. The results are fenced and marked as untrusted subagent output.
 - Closing a parent closes its children. Stop on a waiting parent interrupts the children too.
 
-The right panel shows the lineage as a tree.
+The right panel shows the lineage as a tree. While any child runs, the chat shows a live row above the
+composer (web and iPhone) with each child's type, task and elapsed time, and the list refreshes every 5 s.
 
 ## Git panel
 
@@ -367,6 +371,8 @@ limit. A fan-out sends one notice when all of its children end.
 - Web Push works on a secure origin (for example `tailscale serve`). The VAPID keys are generated once
   on your Mac, and no third-party service is used.
 - The Mac app reads the same stream and posts macOS notifications.
+- The iPhone app asks for notification permission at its first alert, not at launch, and shows that
+  alert after you allow it.
 
 Settings → Notifications sets each kind on or off, quiet hours, and a batch window (20 seconds by
 default).
