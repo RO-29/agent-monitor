@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { showToast } from "../../app/toast";
 
 const RENAME = "am-rename";
 
-/** Opens the title editor of the chat on screen (from a command menu). */
-export const startRename = () => window.dispatchEvent(new Event(RENAME));
+/** Which chat a component sits in when two show side by side. */
+export const PaneCtx = createContext<"main" | "beside">("main");
+
+/** Opens the title editor of the chat in that pane (from a command menu). */
+export const startRename = (pane: "main" | "beside" = "main") => window.dispatchEvent(new CustomEvent(RENAME, { detail: pane }));
 
 /** The chat title; a double-click or startRename() edits it. Enter saves, Esc cancels. */
 export function EditTitle({ title, save }: { title: string; save: (t: string) => Promise<unknown> }) {
@@ -12,14 +15,16 @@ export function EditTitle({ title, save }: { title: string; save: (t: string) =>
   const ending = useRef(false); // Enter then blur must save once
   // The saved title shows until the server list has it.
   const [saved, setSaved] = useState<string | null>(null);
+  const pane = useContext(PaneCtx);
   useEffect(() => {
-    const on = () => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent).detail !== pane) return;
       ending.current = false;
       setEdit(saved ?? title);
     };
     window.addEventListener(RENAME, on);
     return () => window.removeEventListener(RENAME, on);
-  }, [title, saved]);
+  }, [title, saved, pane]);
   useEffect(() => {
     if (saved !== null && saved === title) setSaved(null);
   }, [title, saved]);

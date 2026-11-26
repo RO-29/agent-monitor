@@ -2,7 +2,7 @@ import { AgentIcon } from "../../components/AgentIcon";
 // Left column: driven and watched threads grouped as Needs you, Working, Ready, Settled, with subagents nested.
 import { ListHideBtn } from "./barToggles";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtAgo, fmtUsd } from "../../../lib/format";
 import { pinThread, settleThread, snoozeThread, useOrch } from "../../api/orch";
@@ -106,6 +106,22 @@ export function TermIcon() {
 
 const CostCtx = createContext<Map<string, number>>(new Map());
 
+const enc = encodeURIComponent;
+/** Opens id next to the open thread; false when no other thread is open. */
+function useOpenBeside(): (id: string) => boolean {
+  const { threadId } = useParams();
+  const nav = useNavigate();
+  return (id) => {
+    if (!threadId || threadId === id) return false;
+    if (!window.matchMedia("(min-width:1101px)").matches) {
+      showToast("The window is too narrow", "Two threads side by side need a window wider than 1100 px.");
+      return true;
+    }
+    nav(`/w/${enc(threadId)}?beside=${enc(id)}`);
+    return true;
+  };
+}
+
 function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: boolean; onMenu: (r: WRow, x: number, y: number, anchor?: HTMLElement) => void }) {
   const cost = useContext(CostCtx).get(r.id);
   const note = noteOf(r);
@@ -131,9 +147,14 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
     onMenu(r, e.clientX, e.clientY);
   };
   const status = r.snoozedUntil ? `Snoozed until ${fmtUntil(r.snoozedUntil)}` : r.status;
+  const [sp] = useSearchParams();
+  const openBeside = useOpenBeside();
+  const rid = r.openId || r.id;
+  const keep = sp.get("beside");
+  const to = keep && keep !== rid ? `/w/${enc(rid)}?beside=${enc(keep)}` : `/w/${enc(rid)}`;
   return (
     <div className={`wth-w ${child ? "wsubrow" : ""} ${r.driven ? "has-menu" : ""}`}>
-      <Link to={`/w/${encodeURIComponent(r.openId || r.id)}`} className={`wth ${child ? "wsubrow" : ""}`} role="option" aria-selected={sel} data-id={r.id} onContextMenu={ctx} title={`${r.title} · ${status}`}>
+      <Link to={to} className={`wth ${child ? "wsubrow" : ""}`} role="option" aria-selected={sel} data-id={r.id} onContextMenu={ctx} onClick={(e) => e.altKey && openBeside(rid) && e.preventDefault()} title={`${r.title} · ${status}${sel ? "" : " (⌥-click opens it beside)"}`}>
         <span className={`wsd ${dc} ${dc === "run" ? "wpulse" : ""}`} aria-hidden />
         <span className="ti">{r.title}</span>
         <span className="t">{r.at && Date.now() - r.at < 5000 ? "now" : fmtAgo(r.at, "")}</span>
@@ -214,8 +235,16 @@ function RowMenu({ r, x, y, onClose }: { r: WRow; x: number; y: number; onClose:
     onClose();
     void rowAction(r, a);
   };
+  const { threadId } = useParams();
+  const openBeside = useOpenBeside();
+  const rid = r.openId || r.id;
   return (
     <div className="wmenu" role="menu" ref={ref} style={pos} aria-label={`Actions for ${r.title}`}>
+      {threadId && threadId !== rid && (
+        <button role="menuitem" onClick={() => (onClose(), openBeside(rid))}>
+          Open beside <span className="kbd">⌥ click</span>
+        </button>
+      )}
       <button role="menuitem" onClick={() => act("pin")}>
         {r.pinned ? "Unpin" : "Pin"} <span className="kbd">p</span>
       </button>

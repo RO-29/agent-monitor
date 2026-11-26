@@ -15,7 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
 import { ApiError } from "../../api/client";
-import { EditTitle, startRename } from "../../components/EditTitle";
+import { EditTitle, PaneCtx, startRename } from "../../components/EditTitle";
 import { copyWithToast } from "../../components/CopyBtn";
 import { agentCls, agentLabel, agentVar, allowOnce, closeThread, continueInParent, interruptThread, pinThread, renameThread, sendMessage, settleThread, spendBlockOf, toMs, useOrch, type ODetail, type OItem, type ORun, type OThread, type SpendBlock } from "../../api/orch";
 import { Markdown } from "../../components/Markdown";
@@ -933,6 +933,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const [reviewing, setReviewing] = useState(false);
   useEffect(() => setReviewing(false), [t.id]);
   const nav = useNavigate();
+  const pane = useContext(PaneCtx);
   const canReview = !closed && !noGit && t.review?.state !== "running";
   const commands: PickCommand[] = [
     ...(canReview ? [{ key: "review", label: "Review the changes", run: () => setReviewing(true) }] : []),
@@ -940,7 +941,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
     ...(running || bashRun ? [{ key: "stop", label: bashRun ? "Stop the running ! command" : "Stop the running turn", run: () => void stop() }] : []),
     { key: "terminal", label: termOpen ? "Hide the terminal" : "Open a terminal here", run: toggleTerm },
     { key: "side", label: "Ask a side question (the agent keeps working)", run: () => setText("/side ") },
-    { key: "rename", label: "Rename this thread", run: startRename },
+    { key: "rename", label: "Rename this thread", run: () => startRename(pane) },
     { key: t.pinned ? "unpin" : "pin", label: t.pinned ? "Unpin this thread" : "Pin this thread", run: () => void pinThread(t.id, !t.pinned).catch((e: Error) => showToast("Pin failed", e.message, { kind: "alert" })) },
     { key: t.group === "settled" ? "unsettle" : "settle", label: t.group === "settled" ? "Move back to the active list" : "Settle this thread", run: () => void settleThread(t.id, t.group !== "settled").catch((e: Error) => showToast("Settle failed", e.message, { kind: "alert" })) },
     ...(closed ? [] : [{ key: "close", label: "Close this thread", run: () => setConfirmClose(true) }]),

@@ -10,6 +10,7 @@ const SHOTS = [
   { name: "approval", path: "/w/tok" },
   { name: "error", path: "/w/bad" },
   { name: "desk", path: "/desk" },
+  { name: "split", path: "/w/cmt?beside=bad" },
 ];
 const SIZES = [
   { tag: "desktop", width: 1440, height: 900, mobile: false },
@@ -43,7 +44,7 @@ try {
     for (const size of SIZES) {
       await send("Emulation.setDeviceMetricsOverride", { width: size.width, height: size.height, deviceScaleFactor: 2, mobile: size.mobile });
       for (const s of SHOTS) {
-        await send("Page.navigate", { url: `${base}${s.path}?mock=1&theme=${theme}` });
+        await send("Page.navigate", { url: `${base}${s.path}${s.path.includes("?") ? "&" : "?"}mock=1&theme=${theme}` });
         await sleep(2500); // the sample data loads as a separate chunk
         const shot = await send("Page.captureScreenshot", { format: "png" });
         const file = `${out}/${s.name}-${size.tag}-${theme}.png`;

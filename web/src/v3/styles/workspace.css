@@ -937,3 +937,12 @@
 .v3 .ws .werrcard-t{flex:1;font-weight:600;color:var(--err)}
 .v3 .ws .werrcard-m{margin:0;font-family:var(--f-mono);font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg);max-height:60vh;overflow:auto}
 .v3 .ws .werrcard-a{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px}
+
+/* Two chats side by side: /w/<id>?beside=<id2>, only above 1100 px. */
+@media (min-width:1101px){
+  .v3 .ws.split{grid-template-columns:280px minmax(0,1fr) minmax(0,1fr);--wcol:760px}
+  .v3 .ws.split.lay-l{grid-template-columns:0 minmax(0,1fr) minmax(0,1fr)}
+}
+.v3 .ws .wbeside{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--line);background:var(--panel)}
+.v3 .ws .wbeside > .wchat{flex:1;min-height:0}
+.v3 .ws .wbeside-h{display:flex;align-items:center;gap:6px;padding:4px 10px;border-bottom:1px solid var(--line);background:var(--panel-2)}

@@ -292,6 +292,10 @@ daemon's environment to turn this off.
 agent of the same kind gets the thread's latest messages and answers; the thread's own agent never
 sees the question. `/side` and `!` messages skip the queue.
 
+Option-click a thread in the list, or pick Open beside in its menu, to show it next to the open
+thread (`/w/<id>?beside=<id2>`). It needs a window wider than 1100 px. Swap makes it the main
+thread, and Close ends the split.
+
 Create PR fills the description from the thread: the agent's last answer as the summary, then the
 messages that asked for the work.
 

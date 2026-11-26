@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Screenshots of the web app with sample data only, taken on the build Mac after bin/remote-build.sh.
-# Usage: bin/screenshots.sh   (output: ~/agent-monitor-shots/<commit>/, 16 PNG files)
+# Usage: bin/screenshots.sh   (output: ~/agent-monitor-shots/<commit>/, 20 PNG files)
 set -euo pipefail
 [[ -f "$HOME/.config/agent-monitor/build.env" ]] && source "$HOME/.config/agent-monitor/build.env"
 HOST="${AM_BUILD_HOST:?set AM_BUILD_HOST=user@host in ~/.config/agent-monitor/build.env}"

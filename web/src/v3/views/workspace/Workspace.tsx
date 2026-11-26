@@ -27,6 +27,7 @@ import { barForKey, drawer, toggleBar, useLayout, wide } from "../../layout";
 import "../../styles/workspace.css";
 import "../../styles/p7.css";
 import { useNeedsYou, drivenNeedIds } from "../../api/needsYou";
+import { BesideChat, useSplitFits } from "./Beside";
 
 export default function Workspace() {
   const { threadId } = useParams();
@@ -126,6 +127,11 @@ export default function Workspace() {
     ) : null;
 
   const back = () => nav("/w");
+  const besideId = sp.get("beside") || "";
+  const fits = useSplitFits();
+  const split = !!sel && !!besideId && besideId !== sel && fits;
+  const closeBeside = () => nav(`/w/${encodeURIComponent(sel || "")}`);
+  const swap = () => nav(`/w/${encodeURIComponent(besideId)}?beside=${encodeURIComponent(sel || "")}`);
   let main: React.ReactNode;
   let side: React.ReactNode = null;
   if (isNew) main = <NewThread onBack={back} />;
@@ -157,14 +163,20 @@ export default function Workspace() {
   } else main = <NotFoundChat status={v.threadsStatus === "loading" && status !== "missing" ? "loading" : status} onBack={back} />;
 
   return (
-    <div className={`ws ${sel || isNew || isSearch ? "has-sel" : ""} ${side ? "" : "no-side"} ${sideOpen && side ? "side-open" : ""} ${lay.left ? "lay-l" : ""} ${lay.right ? "lay-r" : ""} ${lay.top ? "lay-t" : ""}`}>
+    <div className={`ws ${sel || isNew || isSearch ? "has-sel" : ""} ${split ? "split" : side ? "" : "no-side"} ${sideOpen && side ? "side-open" : ""} ${lay.left ? "lay-l" : ""} ${lay.right ? "lay-r" : ""} ${lay.top ? "lay-t" : ""}`}>
       <ThreadList rows={rows} tree={tree} sel={sel} notice={notice} liveLabel={liveLabel} />
       <Boundary key={sel || (isNew ? "new" : isSearch ? "search" : "none")} what={isSearch ? "Search" : "This thread"} className="wchat">
         {main}
       </Boundary>
-      {side}
-      {sideOpen && side && <div className="wside-scrim" onClick={closeSide} aria-hidden />}
-      <EdgeBtns side={!!side} />
+      {split ? (
+        <Boundary key={"beside:" + besideId} what="The second thread" className="wchat">
+          <BesideChat id={besideId} rows={rows} watchedRows={watchedRows} onClose={closeBeside} onSwap={swap} />
+        </Boundary>
+      ) : (
+        side
+      )}
+      {!split && sideOpen && side && <div className="wside-scrim" onClick={closeSide} aria-hidden />}
+      <EdgeBtns side={!!side && !split} />
     </div>
   );
 }

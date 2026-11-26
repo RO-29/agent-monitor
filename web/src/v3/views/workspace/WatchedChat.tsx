@@ -7,7 +7,7 @@ import { CostBadge } from "../../components/SpendBits";
 import { insertFor } from "../../../lib/insert";
 import { DetailsBtn, ListShowBtn, TopBarItem, TopReveal } from "./barToggles";
 import { clearSent, useDraft } from "../../../lib/draft";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../../api/client";
 import type { Session } from "../../../api/types";
@@ -27,7 +27,7 @@ import { nativeSid } from "./handover";
 import { p7 } from "../../api/p7";
 import { isMissing, v3 } from "../../api/client";
 import { Composer, useAttachments } from "./Composer";
-import { EditTitle, startRename } from "../../components/EditTitle";
+import { EditTitle, PaneCtx, startRename } from "../../components/EditTitle";
 import { cliApi, queueApi, useQueue } from "../../api/queue";
 import { QueueList, type QueueListHandle } from "./QueueList";
 import { Boundary } from "../../components/Boundary";
@@ -176,6 +176,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const orch = useOrch();
   const nav = useNavigate();
   const shell = useShell();
+  const pane = useContext(PaneCtx);
   const dnav = useDiffNav();
   const [statusOpen, setStatusOpen] = useState(false);
   // The header Diff shows what this session changed, even after a commit; Uncommitted stays in the Git box.
@@ -378,7 +379,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
             <TopBarItem />
             <NarrowBarItems status={status} onSide={onSide} />
             {renameId && (
-              <button role="menuitem" onClick={startRename}>
+              <button role="menuitem" onClick={() => startRename(pane)}>
                 Rename
               </button>
             )}
