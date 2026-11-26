@@ -70,3 +70,15 @@ func TestPaneScreenShowsCursorAndOpenCodePrompts(t *testing.T) {
 		}
 	}
 }
+
+func TestPaneActivityReadsTheWorkingLine(t *testing.T) {
+	for in, want := range map[string]string{
+		"✻ Thinking… (12s · ↓ 300 tokens · esc to interrupt)\n\n────\n❯ \n────\n": "Thinking… (12s · ↓ 300 tokens)",
+		"• Working (8s • esc to interrupt)\n› \n":                                 "Working (8s)",
+		"✻ Brewed for 29s\n────\n❯ \n────\n":                                      "",
+	} {
+		if got := paneActivity(in); got != want {
+			t.Errorf("paneActivity(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -44,6 +44,8 @@ export interface QView {
   cli?: CliView;
   /** The agent terminal's footer (model, context, mode), read from its pane. */
   statusLine?: string[];
+  /** The agent's working line while a turn runs ("Thinking… (12s)"), read from its pane. */
+  activity?: string;
   status: "loading" | "ok" | "missing" | "error";
 }
 
@@ -101,8 +103,8 @@ export const queueApi = {
       const qs = new URLSearchParams();
       if (session) qs.set("session", session);
       if (cliAll) qs.set("cliAll", "1");
-      const r = await req<{ items?: QItem[]; paused?: string; terminal?: string[]; cli?: CliView; statusLine?: string[] }>("GET", `/api/queue/${enc(threadId)}${qs.toString() ? `?${qs}` : ""}`);
-      set(threadId, { items: r.items || [], paused: r.paused, terminal: r.terminal, cli: r.cli, statusLine: r.statusLine, status: "ok" });
+      const r = await req<{ items?: QItem[]; paused?: string; terminal?: string[]; cli?: CliView; statusLine?: string[]; activity?: string }>("GET", `/api/queue/${enc(threadId)}${qs.toString() ? `?${qs}` : ""}`);
+      set(threadId, { items: r.items || [], paused: r.paused, terminal: r.terminal, cli: r.cli, statusLine: r.statusLine, activity: r.activity, status: "ok" });
     } catch (e) {
       const st = (e as { status?: number }).status;
       set(threadId, { status: st === 404 || st === 405 ? "missing" : "error" });
@@ -180,8 +182,8 @@ export const cliApi = {
 };
 
 /** The queue of one thread; loads on open and on every reconnect, then follows the stream. */
-export function useQueue(threadId: string, session?: string, poll = false, opts: { cliAll?: boolean; bump?: number } = {}): QView {
-  const { cliAll = false, bump = 0 } = opts;
+export function useQueue(threadId: string, session?: string, poll = false, opts: { cliAll?: boolean; bump?: number; fast?: boolean } = {}): QView {
+  const { cliAll = false, bump = 0, fast = false } = opts;
   useEffect(() => {
     if (!threadId) return;
     void queueApi.load(threadId, session, cliAll);
@@ -194,8 +196,8 @@ export function useQueue(threadId: string, session?: string, poll = false, opts:
     (f) => (subs.add(f), () => subs.delete(f)),
     () => views.get(threadId) || EMPTY,
   );
-  // While a ! command runs, its output on the terminal refreshes every 1.5 s.
-  const running = !!view.cli?.items?.some((i) => i.kind === "bash" && i.status === "running");
+  // While a ! command or a turn runs, the terminal's output and working line refresh every 1.5 s.
+  const running = fast || !!view.activity || !!view.cli?.items?.some((i) => i.kind === "bash" && i.status === "running");
   useEffect(() => {
     if (!threadId || !poll || !running) return;
     const t = window.setInterval(() => void queueApi.load(threadId, session, cliAll), 1500);

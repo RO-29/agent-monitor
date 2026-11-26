@@ -15,6 +15,27 @@ var (
 	reSlashChoice = regexp.MustCompile(`^\s*(❯\s*)?(/\S+\s{2,}\S|@\S+\s*$)`)
 )
 
+var (
+	reEscInterrupt = regexp.MustCompile(`(?i)\s*[·•]?\s*esc to interrupt`)
+	reEmptyParens  = regexp.MustCompile(`\(\s*\)`)
+)
+
+// paneActivity is the agent's working line ("✻ Thinking… (12s · esc to interrupt)") as "Thinking… (12s)"; "" when idle.
+func paneActivity(screen string) string {
+	lines := strings.Split(strings.TrimRight(reStatusANSI.ReplaceAllString(screen, ""), "\n"), "\n")
+	for i := len(lines) - 1; i >= 0 && i >= len(lines)-30; i-- {
+		t := strings.TrimSpace(lines[i])
+		if !strings.Contains(strings.ToLower(t), "esc to interrupt") {
+			continue
+		}
+		t = strings.TrimLeftFunc(t, func(r rune) bool { return !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') })
+		t = reEscInterrupt.ReplaceAllString(t, "")
+		t = strings.TrimSpace(reEmptyParens.ReplaceAllString(strings.ReplaceAll(t, "( ", "("), ""))
+		return clipRunes(t, 120)
+	}
+	return ""
+}
+
 // paneStatusLine returns the footer an agent's terminal draws under its input box: model, context, mode.
 func paneStatusLine(tool Tool, screen string) []string {
 	screen = reStatusANSI.ReplaceAllString(screen, "")

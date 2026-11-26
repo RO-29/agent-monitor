@@ -492,6 +492,8 @@ type CLIQueueView struct {
 	Draft string `json:"draft,omitempty"`
 	// StatusLine is the agent terminal's own footer (model, context, mode), read from the pane.
 	StatusLine []string `json:"statusLine,omitempty"`
+	// Activity is the working line while a turn runs ("Thinking… (12s)"), read from the pane.
+	Activity string `json:"activity,omitempty"`
 }
 
 // cliTerm reads and types into a session's terminal, host first; tests swap it.
@@ -570,7 +572,7 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		}
 		if t := cliIO.target(ref.ID); t != "" {
 			scr, _ := cliIO.screen(t)
-			v.StatusLine = paneStatusLine(ToolCodex, scr)
+			v.StatusLine, v.Activity = paneStatusLine(ToolCodex, scr), paneActivity(scr)
 		}
 		return v, "", nil
 	}
@@ -579,7 +581,7 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 		v.Reachable = t != "" // Cursor and others take sends with no queue view
 		if t != "" {
 			scr, _ := cliIO.screen(t)
-			v.StatusLine = paneStatusLine(ref.Tool, scr)
+			v.StatusLine, v.Activity = paneStatusLine(ref.Tool, scr), paneActivity(scr)
 		}
 		return v, "", errCLINotSupported
 	}
@@ -589,7 +591,7 @@ func cliQueueView(id string, all bool) (*CLIQueueView, string, error) {
 	screen := ""
 	if target != "" {
 		screen, _ = cliIO.screen(target)
-		v.StatusLine = paneStatusLine(ToolClaude, screen)
+		v.StatusLine, v.Activity = paneStatusLine(ToolClaude, screen), paneActivity(screen)
 	}
 	items, err := cliQueueOf(ref.Path)
 	if err != nil {

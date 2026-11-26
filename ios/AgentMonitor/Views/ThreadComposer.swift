@@ -72,6 +72,15 @@ struct Composer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if reachable, let a = queue?.activity, !a.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(Tok.accent)
+                        .symbolEffect(.pulse, options: .repeating)
+                    Text(a).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
             let sl = (reachable ? queue?.statusLine ?? [] : []) + (credits.map { [$0] } ?? [])
             if !sl.isEmpty {
                 Text(sl.joined(separator: "\n")).font(.caption.monospaced()).foregroundStyle(.secondary)
@@ -580,8 +589,8 @@ struct Composer: View {
             }
             await loadQueue(sid)
             n += 1
-            // A running ! command shows its terminal output, so it refreshes faster.
-            let live = queue?.items?.contains { $0.kind == "bash" && $0.status == "running" } ?? false
+            // A running turn or ! command refreshes faster.
+            let live = queue?.activity?.isEmpty == false || (queue?.items?.contains { $0.kind == "bash" && $0.status == "running" } ?? false)
             try? await Task.sleep(nanoseconds: live ? 1_500_000_000 : 5_000_000_000)
         }
     }

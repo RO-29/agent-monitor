@@ -248,7 +248,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const awaiting = session?.state === "awaiting-permission" || session?.state === "awaiting-input";
   const cliName = row.agent === "claude" ? "Claude Code" : row.agent === "codex" ? "Codex" : agentName(row.agent);
   const [cliAll, setCliAll] = useState(false);
-  const q = useQueue(row.id, sid, owned, { cliAll, bump: session?.cliQueued || 0 });
+  const q = useQueue(row.id, sid, owned, { cliAll, bump: session?.cliQueued || 0, fast: running || sent.list.length > 0 });
   const usage = useUsageLimits(60_000);
   const credits = creditsLine(usage.data?.agents.find((a) => a.agent === row.agent));
   const qref = useRef<QueueListHandle>(null);
@@ -453,6 +453,11 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           </Fragment>
         ))}
         {!oldTab && <PendingBubbles list={sent.list} drop={sent.drop} />}
+        {!oldTab && (q.activity || running) && (
+          <div className="wactivity" role="status" aria-live="polite">
+            <span className="wic run wpulse">●</span> {q.activity || `${cliName} is working…`}
+          </div>
+        )}
         {!oldTab && <AskAnnouncer asks={asks} />}
         {!oldTab && asks.map((a) => (
           <Boundary key={a.approvalId} what="This request">

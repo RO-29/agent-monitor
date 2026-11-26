@@ -408,6 +408,8 @@ struct CLIQueueView: Decodable {
     var draft: String?
     /// The agent terminal's footer (model, context, mode).
     var statusLine: [String]?
+    /// The agent's working line while a turn runs ("Thinking… (12s)").
+    var activity: String?
 }
 
 // MARK: - Terminal question (a question or plan shown in the Claude Code pane)
