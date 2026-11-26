@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const cursorScanAge = 365 * 24 * time.Hour
@@ -277,7 +278,8 @@ func cursorPromptTitle(text string) string {
 		if v == "" {
 			v = cursorTitleLine(text[m[1]:])
 		}
-		if v != "" && r >= rank {
+		v = strings.TrimSpace(strings.TrimPrefix(v, "Goal:"))
+		if letters(v) >= 3 && r >= rank {
 			best, rank = v, r
 		}
 	}
@@ -285,4 +287,14 @@ func cursorPromptTitle(text string) string {
 		best = first
 	}
 	return clipString(strings.Join(strings.Fields(best), " "), 80)
+}
+
+func letters(s string) int {
+	n := 0
+	for _, r := range s {
+		if unicode.IsLetter(r) {
+			n++
+		}
+	}
+	return n
 }

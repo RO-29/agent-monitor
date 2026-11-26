@@ -84,7 +84,9 @@ func TestCursorPromptTitle(t *testing.T) {
 		"SYSTEM:\nYou are an engineer.\nOriginal goal: speed up the query\nSQL query:\nSELECT 1\n\nFOLLOW-UP QUESTION:\nwhat are those tables?\n\nThink step by step.": "what are those tables?",
 		"SYSTEM:\nYou are an engineer.\nSQL query:\nSELECT count() FROM t\n":                                                                                           "SELECT count() FROM t",
 		"SYSTEM:\nYou are an engineer.\nOriginal goal: speed up the query\nSQL query:\nSELECT 1":                                                                       "speed up the query",
-		"You are a helper with no labels.": "You are a helper with no labels.",
+		"You are a bot.\nUSER:\nwhat is X?\nUSER:\n?":                                                                                                                  "what is X?",
+		"You are a bot.\nOriginal goal:\nGoal: help me understand":                                                                                                     "help me understand",
+		"You are a helper with no labels.":                                                                                                                             "You are a helper with no labels.",
 	} {
 		if got := cursorPromptTitle(in); got != want {
 			t.Errorf("cursorPromptTitle(%q) = %q, want %q", in, got, want)
