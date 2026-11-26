@@ -1,26 +1,158 @@
 # agent-monitor
 
-agent-monitor is one Go daemon for the coding agents on your Mac. It watches every Claude Code,
-Codex, Cursor, opencode and cursor-agent session that runs in a terminal. It can also start and drive
-agents itself: Claude Code, Codex and any agent that speaks the Agent Client Protocol (ACP). One web app
-shows all of them, answers their permission prompts, and works from a phone over Tailscale.
+agent-monitor is one Go daemon for the coding agents on your Mac. It watches every Claude Code, Codex,
+Cursor, opencode and cursor-agent session that runs in a terminal. It can also start and drive agents
+itself: Claude Code, Codex and any agent that speaks the Agent Client Protocol (ACP). One web app shows
+all of them, answers their permission prompts, and works from a phone over Tailscale. An iPhone app
+uses the same daemon.
+
+![agent-monitor flow](docs/assets/flow.svg)
 
 Website: [agent-monitor-5xo.pages.dev](https://agent-monitor-5xo.pages.dev)
 
-## Quick start
+## Why
 
-```bash
-go build -o agent-monitor .   # web/dist is committed, so go build alone works
-./agent-monitor install       # hooks and MCP entries for Claude Code and Codex
-./agent-monitor               # the daemon, on http://localhost:7777
+- You run many agent sessions in many terminals. No single place shows which one works, which one is
+  done and which one waits for you.
+- An agent stops at a permission prompt. It waits until you come back to the terminal, and you lose
+  time when you are away.
+- Each agent has its own transcript format, so you cannot search your past sessions in one place.
+- You want to see and answer your agents from a phone, without a cloud service between you and your Mac.
+
+agent-monitor puts all sessions in one list, brings every prompt to the surface where you are, and
+sends your answer back to the agent.
+
+## What you get
+
+**Workspace and threads**
+
+- One thread list for watched sessions (started in a terminal) and driven threads (started and owned by
+  agent-monitor). Groups: Needs you, Working, Ready and Settled.
+- Pin, settle and snooze a thread. A thread that is done for more than 24 hours settles by itself.
+- Subagents: a driven thread can start child threads, and the right panel shows them as a tree.
+- A live activity line and a step trail in the chat show what the agent does now and which tool calls it ran.
+
+**Approvals and rules**
+
+- Permission prompts, questions and plan approvals from the web app, the iPhone app and the Mac
+  Approvals window.
+- Risk level and reason on each request. Rules allow, deny or hold by agent, tool, pattern and folder.
+- **Always** makes a rule only as wide as the call you saw, or applies the permission suggestions of
+  the Claude CLI.
+- Suggested rules: the daemon reads 30 days of approvals and proposes an allow rule for a call that you
+  approved 3 or more times and never denied. Add or dismiss each one in Rules (web) or Settings (iPhone).
+- **Allow these N** answers a group of the same request from several sessions at once.
+
+**Needs-you alerts and reminders**
+
+- Notices when a thread needs you, finishes, fails or reaches a spend limit.
+- A reminder repeats an unanswered needs-you alert once (10 minutes by default, set in Settings).
+- Open alerts survive a daemon restart, and an alert closes on every device when you answer it on one.
+- Toasts, a notification centre, Web Push and macOS notifications.
+
+**Search**
+
+- Full-text search over every transcript on the machine, with filters and an Ask mode that answers with
+  citations.
+- Agents can search the same history through two read-only MCP tools.
+
+**Phone, iPhone app and pairing**
+
+- The web app works from a phone over Tailscale. The iPhone app is a SwiftUI app for the same daemon,
+  with Stop, the message queue, a diff viewer and saved replies.
+- Pair a device with a one-time link. Revoke it at any time.
+
+**Git panel and diff**
+
+- Checkpoints, diff, restore, commit, push, Create PR, merge of worktree threads and a read-only review.
+
+**Terminal sessions and agent-to-agent talk**
+
+- A terminal panel, a session host (`agent-monitor run`) and a pane viewer.
+- Agents message each other with MCP tools or with the `agent-monitor` command line.
+
+**Spend limits**
+
+- Limits per thread and per day in US dollars, with a notice at 80% and a stop at 100%.
+
+**Templates and schedules**
+
+- Saved New thread forms with variables, and cron schedules that run inside the daemon.
+
+## How it works
+
+Three sources feed the daemon. The daemon shows the result on every surface. Your answer goes back to the
+agent by the path it came from.
+
+```mermaid
+flowchart LR
+  subgraph Agents
+    A1[Agent hooks]
+    A2[Pane watching and session host]
+    A3[MCP permission server]
+    A4[Driven agents: stdio, JSON-RPC, ACP]
+  end
+  D[agent-monitor daemon :7777]
+  subgraph Surfaces
+    W[Web app]
+    I[iPhone app]
+    N[Notifications]
+    M[Mac Approvals window]
+  end
+  A1 --> D
+  A2 --> D
+  A3 --> D
+  A4 --> D
+  D --> W
+  D --> I
+  D --> N
+  D --> M
+  W -- answer --> D
+  I -- answer --> D
+  M -- answer --> D
+  D -- answer --> A1
+  D -- answer --> A3
+  D -- keys and input --> A2
+  D -- reply --> A4
 ```
 
-Run `./build.sh` after you change anything under `web/`. It runs the markdown check, `npm run build`
+1. An agent produces an event: a hook call, a screen change in a registered pane, or a request to the
+   MCP permission server. A driven agent talks to the daemon directly.
+2. The daemon on port 7777 stores the event, links it to a thread and decides whether you must act.
+3. The web app, the iPhone app, the Mac Approvals window and notifications show the thread and the
+   request.
+4. You answer on one surface. The daemon sends the answer to the agent, and closes the same card on
+   the other surfaces.
+
+## Design
+
+- **Registered, not inferred.** The daemon never guesses which tmux pane belongs to which agent. Hooks,
+  `agent-monitor run` and a pane picker register the pane, and a registration is the truth.
+- **Loopback is trusted, other devices must prove themselves.** The daemon always listens on
+  `127.0.0.1`. Other devices use a password or a paired device token.
+- **The MCP server is a separate process.** It is the `am-helper` binary, which each agent starts itself.
+- **One daemon, one state folder.** Everything lives in `~/.agent-monitor/`.
+
+Read more:
+
+- [docs/DESIGN.md](docs/DESIGN.md): the reasons behind these choices and what we do not build.
+- [docs/V3-SPEC.md](docs/V3-SPEC.md): the API and protocol reference.
+- [docs/CHANGES.md](docs/CHANGES.md): what this branch adds.
+
+## Install and quick start
+
+```bash
+go build -o agent-monitor ./cmd/agent-monitor   # web/dist is committed, so go build alone works
+./agent-monitor install                          # hooks and MCP entries for Claude Code and Codex
+./agent-monitor                                  # the daemon, on http://localhost:7777
+```
+
+Run `bin/build.sh` after you change anything under `web/`. It runs the markdown check, `npm run build`
 and `go build`, so the new web app is embedded in the binary.
 
 Required native helper: `rust/am-helper/build.sh ~/agent-monitor` builds `am-helper` and puts it next to
-the binary. It serves `mcp-perm-server`, `run` and `__pty-leader`; the Go binary has no copy of these modes and
-exits with an error when `am-helper` is missing. See `rust/am-helper/PROTOCOL.md`.
+the binary. It serves `mcp-perm-server`, `run` and `__pty-leader`. The Go binary has no copy of these modes
+and exits with an error when `am-helper` is missing. See `rust/am-helper/PROTOCOL.md`.
 
 Lifecycle:
 
@@ -451,11 +583,21 @@ Everything lives in `~/.agent-monitor/` (or `AGENT_MONITOR_HOME`): `orch.db` (dr
   the published schema and a fake agent in the tests.
 - Merge needs git 2.38 or later.
 
-## More
+## Repository layout
 
-- [V3-SPEC.md](V3-SPEC.md): the API and protocol reference.
-- [DESIGN.md](DESIGN.md): why panes are registered and not guessed, and other design notes.
-- [CHANGES.md](CHANGES.md): what this branch adds.
+| Folder | Content |
+|---|---|
+| `cmd/agent-monitor` | The Go daemon (package main) |
+| `web` | The React and Vite app. `web/embed.go` embeds it in the binary |
+| `ios` | The SwiftUI iPhone app |
+| `rust/am-helper` | The native helper: MCP permission server, `run` and the pty leader |
+| `desk`, `mac` | The Mac apps |
+| `tv` | The TV view |
+| `bin` | Scripts: hooks, build scripts, shell functions |
+| `docs` | Design notes, API spec, change log, diagram |
+| `site` | The website |
+| `e2e` | End-to-end tests |
+| `demo` | Demo material |
 
 ## License
 

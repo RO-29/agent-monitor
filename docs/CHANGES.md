@@ -202,7 +202,7 @@ worktrees share one repository, so the branch is visible there.
 ```bash
 cd ~/agent-monitor
 git merge --ff-only feat/orchestrator     # v3-live is an ancestor of feat/orchestrator
-go build -o agent-monitor .               # web/dist is committed; ./build.sh also rebuilds it
+go build -o agent-monitor ./cmd/agent-monitor               # web/dist is committed; bin/build.sh also rebuilds it
 ./agent-monitor restart                   # or: ./agent-monitor stop, then start it as you usually do
 ```
 
