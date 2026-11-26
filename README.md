@@ -31,8 +31,9 @@ sends your answer back to the agent.
 - Pin, settle and snooze a thread. A thread that is done for more than 24 hours settles by itself.
 - Subagents: a driven thread can start child threads, and the right panel shows them as a tree.
 - A live activity line and a step trail in the chat show what the agent does now and which tool calls it ran.
-- A live row above the composer lists the subagents that run now, with type, task and elapsed time. Tap
-  one to read its transcript. This works for Claude Code subagents in watched sessions too.
+- In a watched session (a Claude Code or Codex session started in a terminal), a live row above the
+  composer lists the subagents that run now, with type, task and elapsed time. Tap one to read its
+  transcript.
 - Empty watched sessions (no messages) hide behind a "Show N empty sessions" link.
 
 **Approvals and rules**
@@ -332,8 +333,11 @@ children at once (fan-out).
   result. The results are fenced and marked as untrusted subagent output.
 - Closing a parent closes its children. Stop on a waiting parent interrupts the children too.
 
-The right panel shows the lineage as a tree. While any child runs, the chat shows a live row above the
-composer (web and iPhone) with each child's type, task and elapsed time, and the list refreshes every 5 s.
+The right panel shows the lineage as a tree.
+
+Subagents of a watched session (for example Claude Code's Agent tool) show in a live row above the
+composer, on the web and on the iPhone. The list is checked every 45 s on the web and every 20 s on the
+iPhone, and every 5 s while a child runs. Driven threads show their children in the right panel only.
 
 ## Git panel
 

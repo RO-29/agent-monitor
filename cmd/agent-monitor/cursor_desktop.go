@@ -128,15 +128,8 @@ func scanCursorDesktop(s *Store, since int64) (int64, error) {
 		if cwd := cursorWorkspaceFolder(ws); cwd != "" {
 			in.Cwd, in.HasCwd = cwd, true
 		}
-		// "New Agent" is Cursor's placeholder name; the first prompt names the chat better.
-		if name := h.Name; name == "" || name == "New Agent" {
-			if p := cursorFirstPrompt(db, id); p != "" {
-				in.Title, in.HasTitle = p, true
-			} else if name != "" {
-				in.Title, in.HasTitle = name, true
-			}
-		} else {
-			in.Title, in.HasTitle = name, true
+		if h.Name != "" {
+			in.Title, in.HasTitle = h.Name, true
 		}
 		s.Upsert(in)
 		newest = max(newest, updated)
@@ -215,38 +208,6 @@ type cursorBubbleHead struct {
 }
 
 // cursorConvHeaders reads the paged composerConvHeaders:<chat>:<page> records of the newest layout.
-// cursorFirstPrompt returns the first line of the chat's first user message, or "".
-func cursorFirstPrompt(db *sql.DB, composerID string) string {
-	var raw []byte
-	if db.QueryRow(`SELECT value FROM cursorDiskKV WHERE key=?`, "composerData:"+composerID).Scan(&raw) != nil {
-		return ""
-	}
-	var cd struct {
-		Headers []cursorBubbleHead `json:"fullConversationHeadersOnly"`
-	}
-	_ = json.Unmarshal(raw, &cd)
-	heads := cd.Headers
-	if len(heads) == 0 {
-		heads = cursorConvHeaders(db, composerID)
-	}
-	for i, h := range heads {
-		if i >= 6 {
-			break
-		}
-		var b []byte
-		if db.QueryRow(`SELECT value FROM cursorDiskKV WHERE key=?`, "bubbleId:"+composerID+":"+h.BubbleID).Scan(&b) != nil {
-			continue
-		}
-		var bub cursorBubble
-		if json.Unmarshal(b, &bub) == nil && bub.Type == 1 {
-			if t := firstLine(strings.TrimSpace(bub.Text)); t != "" {
-				return clipString(t, 80)
-			}
-		}
-	}
-	return ""
-}
-
 func cursorConvHeaders(db *sql.DB, composerID string) []cursorBubbleHead {
 	p := "composerConvHeaders:" + composerID + ":"
 	rows, err := db.Query(`SELECT value FROM cursorDiskKV WHERE key >= ? AND key < ? ORDER BY key`, p, p+"~")
