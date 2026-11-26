@@ -123,6 +123,7 @@ func runServer() {
 	if dropped := paneRegistry.DedupeByPane(); len(dropped) > 0 {
 		log.Printf("pane dedupe: dropped %d duplicate-on-pane registration(s)", len(dropped))
 	}
+	startTmuxBadges()
 	go func() {
 		// 15s: notices hookless CLIs exiting without forking ps and tmux too often.
 		t := time.NewTicker(15 * time.Second)

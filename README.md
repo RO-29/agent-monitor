@@ -296,6 +296,11 @@ Option-click a thread in the list, or pick Open beside in its menu, to show it n
 thread (`/w/<id>?beside=<id2>`). It needs a window wider than 1100 px. Swap makes it the main
 thread, and Close ends the split.
 
+The daemon marks each tmux window that holds an agent: the window option `@am_badge` is `● `
+when an agent there needs you and `◐ ` while it works, and it is empty otherwise. Add
+`#{@am_badge}` to `window-status-format` or `set-titles-string` in `~/.tmux.conf` to see it.
+`AGENT_MONITOR_NO_TMUX_BADGES=1` turns it off.
+
 Create PR fills the description from the thread: the agent's last answer as the summary, then the
 messages that asked for the work.
 
