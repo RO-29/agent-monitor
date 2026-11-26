@@ -707,8 +707,10 @@ struct ODrivenDetail: Decodable {
     var items: [WItem] { lossy?.compactMap(\.value) ?? [] }
     /// The event seq at the snapshot; the stream resumes after it. Older daemons omit it.
     var seq: Int64?
+    /// Child threads this one started (delegate_task or a fan-out).
+    var children: [ODriven]?
     private var lossy: [Lossy<WItem>]?
-    private enum CodingKeys: String, CodingKey { case thread, seq, lossy = "items" }
+    private enum CodingKeys: String, CodingKey { case thread, seq, children, lossy = "items" }
 }
 
 /// One event from GET /api/orch/stream (orch_hub.go): thread.updated, item.started, item.completed, item.delta and others.

@@ -29,6 +29,7 @@ struct ThreadChatView: View {
     @State private var showLinked = false
     @State private var kids: [SessionChild] = []
     @State private var driven: ODriven?
+    @State private var drivenKids: [ODriven] = []
     @State private var atBottom = true
     /// When the bottom marker last left the screen; a composer that grows pushes it out without a scroll.
     @State private var bottomLeftAt = Date.distantPast
@@ -634,6 +635,9 @@ struct ThreadChatView: View {
                 } else if !fullscreen {
                     VStack(spacing: 6) {
                     if drivenID == nil, let sid = sessionID { RunningKidsBar(sessionID: sid, kids: kids) }
+                    if drivenID != nil {
+                        RunningDrivenBar(kids: drivenKids) { store.workspacePath.append(store.resolveThreadID($0)) }
+                    }
                     Composer(target: target, agent: agent,
                              busyCLI: running || session?.state == .awaitingPermission,
                              model: session?.model ?? thread?.model, cwd: session?.cwd ?? thread?.cwd ?? driven?.cwd ?? "",
@@ -769,9 +773,17 @@ struct ThreadChatView: View {
             }
             if hasStream, let after = seq {
                 do {
-                    for try await ev in api.orchStream(after: after) where ev.threadId == id {
-                        applyEvent(ev)
-                        wait = 1
+                    for try await ev in api.orchStream(after: after) {
+                        if ev.threadId == id {
+                            applyEvent(ev)
+                            wait = 1
+                        } else if ev.type == "thread.updated", let t = ev.data?.thread, t.parentId == id {
+                            if let i = drivenKids.firstIndex(where: { $0.id == t.id }) {
+                                if drivenKids[i] != t { drivenKids[i] = t }
+                            } else {
+                                drivenKids.append(t)
+                            }
+                        }
                     }
                 } catch let e as APIError where e.status == 404 || e.status == 405 || e.status == 501 {
                     hasStream = false
@@ -793,6 +805,8 @@ struct ThreadChatView: View {
     // Assigns only what changed, so an idle poll does not re-render the list.
     private func applyDetail(_ d: ODrivenDetail) {
         if driven != d.thread { driven = d.thread }
+        let k = d.children ?? []
+        if k != drivenKids { drivenKids = k }
         var next: [String: WItem] = [:]
         for it in d.items { next[it.id] = it }
         if next != items { items = next }

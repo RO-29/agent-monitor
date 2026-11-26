@@ -151,8 +151,12 @@ go build -o agent-monitor ./cmd/agent-monitor   # web/dist is committed, so go b
 ./agent-monitor                                  # the daemon, on http://localhost:7777
 ```
 
-Run `bin/build.sh` after you change anything under `web/`. It runs the markdown check, `npm run build`
-and `go build`, so the new web app is embedded in the binary.
+Run `bin/build.sh` after you change anything under `web/`. It runs the CSS collision check, the
+markdown check, `npm run build` and `go build`, so the new web app is embedded in the binary.
+
+The CSS collision check (`bin/css-collisions.py`) fails when a change defines a selector one more time,
+or styles a global class inside a new context. Both broke the layout before. If the override is
+intended, run `bin/css-collisions.py --update` and commit `web/css-baseline.txt`.
 
 Required native helper: `rust/am-helper/build.sh ~/agent-monitor` builds `am-helper` and puts it next to
 the binary. It serves `mcp-perm-server`, `run` and `__pty-leader`. The Go binary has no copy of these modes
@@ -337,7 +341,8 @@ The right panel shows the lineage as a tree.
 
 Subagents of a watched session (for example Claude Code's Agent tool) show in a live row above the
 composer, on the web and on the iPhone. The list is checked every 45 s on the web and every 20 s on the
-iPhone, and every 5 s while a child runs. Driven threads show their children in the right panel only.
+iPhone, and every 5 s while a child runs. In a driven thread, the web chat shows a subagent card with
+each child's state and time, and the iPhone shows a live row above the composer for the children that run.
 
 ## Git panel
 

@@ -1,0 +1,158 @@
+# Known CSS collisions with their rule count; bin/css-collisions.py fails when one is new or grows.
+dup: .v3 x2
+dup: .v3 .drail .rb x2
+dup: .v3 .ell x2
+dup: .v3 .gaxis x2
+dup: .v3 .grow x2
+dup: .v3 .md pre.mdcode x2
+dup: .v3 .md td x3
+dup: .v3 .md th x3
+dup: .v3 .msgv .mopts input x2
+dup: .v3 .nt .viewhead x2
+dup: .v3 .nt-g x2
+dup: .v3 .p7-run x2
+dup: .v3 .peer-need x2
+dup: .v3 .stack::after x2
+dup: .v3 .stack::before x2
+dup: .v3 .sx-copy-r .inp x2
+dup: .v3 .tbl th x2
+dup: .v3 .tl4 .tax x2
+dup: .v3 .tl4 .tln x2
+dup: .v3 .wask x2
+dup: .v3 .wcpy x2
+dup: .v3 .wqchip .k x2
+dup: .v3 .ws x3
+dup: .v3 .ws .wagent x2
+dup: .v3 .ws .wbang-c x2
+dup: .v3 .ws .wbang-c .wcpy x2
+dup: .v3 .ws .wbar x2
+dup: .v3 .ws .wbox x2
+dup: .v3 .ws .wbox h4 x2
+dup: .v3 .ws .wbrand x2
+dup: .v3 .ws .wbrand small x2
+dup: .v3 .ws .wchat x2
+dup: .v3 .ws .wchat > .wstatus x2
+dup: .v3 .ws .wchip x2
+dup: .v3 .ws .wcmd-c x2
+dup: .v3 .ws .wcmd-o x3
+dup: .v3 .ws .wcomp x3
+dup: .v3 .ws .wcomp.off x2
+dup: .v3 .ws .wcp-c x2
+dup: .v3 .ws .wcrumb x2
+dup: .v3 .ws .wcrumb .rp x2
+dup: .v3 .ws .wcrumb b x3
+dup: .v3 .ws .wdots x2
+dup: .v3 .ws .wdots:focus-visible x2
+dup: .v3 .ws .wfan-opts x2
+dup: .v3 .ws .wfan-p x2
+dup: .v3 .ws .wfeed x2
+dup: .v3 .ws .wfeed > * x2
+dup: .v3 .ws .wfiles x2
+dup: .v3 .ws .wgrp x2
+dup: .v3 .ws .wgrp.need x2
+dup: .v3 .ws .wic.ok x2
+dup: .v3 .ws .witem x2
+dup: .v3 .ws .wkids x2
+dup: .v3 .ws .wkv x2
+dup: .v3 .ws .wkv .k x2
+dup: .v3 .ws .wlay-lshow x2
+dup: .v3 .ws .wlist x2
+dup: .v3 .ws .wlist-top x2
+dup: .v3 .ws .wmissing x2
+dup: .v3 .ws .wmore x2
+dup: .v3 .ws .wmore:hover x2
+dup: .v3 .ws .wnew x2
+dup: .v3 .ws .wnew:hover x2
+dup: .v3 .ws .wnone x2
+dup: .v3 .ws .wopen-m x2
+dup: .v3 .ws .wopen-m button x2
+dup: .v3 .ws .worked x2
+dup: .v3 .ws .worked-row x2
+dup: .v3 .ws .wout x2
+dup: .v3 .ws .wseg x2
+dup: .v3 .ws .wseg button x2
+dup: .v3 .ws .wside x2
+dup: .v3 .ws .wsr-hits .k x2
+dup: .v3 .ws .wsteps x2
+dup: .v3 .ws .wth x2
+dup: .v3 .ws .wth .ti x2
+dup: .v3 .ws .wth-w.has-menu > .wth .r1 x2
+dup: .v3 .ws .wth-w:hover .wdots x2
+dup: .v3 .ws .wth.wsubrow x2
+dup: .v3 .ws .wth.wsubrow .ti x2
+dup: .v3 .ws .wth:hover x2
+dup: .v3 .ws .wth[aria-selected="true"] x2
+dup: .v3 .ws .wth[aria-selected="true"] + .wdots x2
+dup: .v3 .ws .wtodo x2
+dup: .v3 .ws .wtrail-mini x2
+dup: .v3 .ws .wu x2
+dup: .v3 .ws .wu-wrap x2
+dup: .v3 .ws h4.wh x3
+dup: .v3 .ws.no-side x2
+dup: .v3 h2 x2
+dup: .v3 h3 x2
+leak: .ag x7
+leak: .appr x3
+leak: .btn x15
+leak: .chip x2
+leak: .composer x2
+leak: .dhead x2
+leak: .diff x4
+leak: .dot x3
+leak: .ell x5
+leak: .f-agent x2
+leak: .f-bash x2
+leak: .f-edit x2
+leak: .f-mcp x2
+leak: .f-model x2
+leak: .f-other x2
+leak: .f-read x2
+leak: .f-web x2
+leak: .fg2 x2
+leak: .inp x15
+leak: .kbd x4
+leak: .lane x2
+leak: .legend x2
+leak: .main x2
+leak: .mono x7
+leak: .muted x6
+leak: .now x2
+leak: .nt-ic x6
+leak: .p7-run x3
+leak: .pill x3
+leak: .ribbon x2
+leak: .searchbar x2
+leak: .spb x2
+leak: .state x4
+leak: .stream x2
+leak: .sx-col x3
+leak: .sx-confirm x2
+leak: .sx-sw-t x2
+leak: .sx-switch x5
+leak: .sx-track x5
+leak: .tabbar x2
+leak: .tc x2
+leak: .ticks x2
+leak: .toast x2
+leak: .trunc x9
+leak: .uloc-h x2
+leak: .umt-r x3
+leak: .umt-t x3
+leak: .viewhead x3
+leak: .vox-mic x2
+leak: .wag x4
+leak: .wask x4
+leak: .wcpm x2
+leak: .wcpy x7
+leak: .wf x2
+leak: .wfull x2
+leak: .why x2
+leak: .wplan x2
+leak: .wq x2
+leak: .wq-a x2
+leak: .wq-b x6
+leak: .wq-box x2
+leak: .wq-t x3
+leak: .wtstart x2
+leak: .wtstart-h x2
+leak: .xs x2

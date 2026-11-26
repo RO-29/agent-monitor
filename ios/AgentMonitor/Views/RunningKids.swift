@@ -64,3 +64,58 @@ struct RunningKidsBar: View {
         return s < 60 ? "\(s)s" : s < 3600 ? "\(s / 60)m \(s % 60)s" : "\(s / 3600)h \(s / 60 % 60)m"
     }
 }
+
+/// The child threads of a driven thread that run now; a tap opens the child.
+struct RunningDrivenBar: View {
+    let kids: [ODriven]
+    let open: (String) -> Void
+    @State private var all = false
+
+    var body: some View {
+        let list = kids.filter { $0.status == "running" || $0.status == "starting" }
+            .sorted { ($0.createdAt ?? 0) < ($1.createdAt ?? 0) }
+        if !list.isEmpty {
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(Tok.accent)
+                            .symbolEffect(.pulse, options: .repeating)
+                        Text(list.count == 1 ? "1 subagent running" : "\(list.count) subagents running")
+                            .font(.footnote.weight(.semibold)).foregroundStyle(Tok.fg)
+                    }
+                    ForEach(all ? list : Array(list.prefix(3)), id: \.id) { c in
+                        Button { open(c.id) } label: {
+                            HStack(spacing: 8) {
+                                Text(agentName(c.agent))
+                                    .font(.caption2.weight(.medium)).foregroundStyle(Tok.fg2)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 5))
+                                Text(c.title ?? "Subagent").font(.footnote).foregroundStyle(Tok.fg2).lineLimit(1)
+                                Spacer(minLength: 4)
+                                Text(elapsed(c, ctx.date)).font(.caption.monospacedDigit()).foregroundStyle(Tok.muted)
+                            }
+                            .frame(minHeight: 32).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(c.title ?? "Subagent"), running for \(elapsed(c, ctx.date))")
+                    }
+                    if list.count > 3 {
+                        Button(all ? "Show fewer" : "Show all \(list.count)") { all.toggle() }
+                            .font(.footnote).foregroundStyle(Tok.accent)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Tok.panel, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Tok.line, lineWidth: 1))
+                .padding(.horizontal, 12)
+            }
+        }
+    }
+
+    private func elapsed(_ c: ODriven, _ now: Date) -> String {
+        guard let ms = c.createdAt, ms > 0 else { return "" }
+        let s = max(0, Int(now.timeIntervalSince1970) - Int(ms / 1000))
+        return s < 60 ? "\(s)s" : s < 3600 ? "\(s / 60)m \(s % 60)s" : "\(s / 3600)h \(s / 60 % 60)m"
+    }
+}

@@ -18,6 +18,7 @@ ssh "$HOST" bash -s <<EOF
 set -euo pipefail
 export PATH=\$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin
 cd ~/$DIR && git checkout -q --detach $SHA
+python3 bin/css-collisions.py
 ( cd web && npm ci --no-audit --no-fund >/dev/null && npx tsc -b && npm run build >/dev/null )
 go vet ./... && go build -o agent-monitor ./cmd/agent-monitor
 ( cd rust/am-helper && cargo build --release -q )
