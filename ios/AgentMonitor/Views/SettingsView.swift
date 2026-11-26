@@ -117,6 +117,9 @@ struct SettingsView: View {
                 .listRowBackground(Tok.panel)
 
                 Section {
+                    NavigationLink(value: SettingsRoute.rules) {
+                        row("Suggested rules", "checkmark.shield", Tok.ok, badge: 0, total: nil)
+                    }
                     NavigationLink(value: SettingsRoute.agents) {
                         row("Agents", "cpu", Tok.run, badge: store.attentionCount, total: store.sessionsByID.count)
                     }
@@ -129,7 +132,7 @@ struct SettingsView: View {
                 } header: {
                     header("Advanced")
                 } footer: {
-                    Text("Raw agent sessions, agent to agent talks and the tmux panes the daemon can drive.")
+                    Text("Rules the audit log suggests, raw agent sessions, agent to agent talks and the tmux panes the daemon can drive.")
                 }
                 .listRowBackground(Tok.panel)
 
@@ -154,6 +157,7 @@ struct SettingsView: View {
                 case .storage: StorageSettingsView()
                 case .commands: HistoryView()
                 case .machines: MachinesSettingsView()
+                case .rules: RuleSuggestionsView()
                 }
             }
             .sensoryFeedback(.success, trigger: pairedHaptic)

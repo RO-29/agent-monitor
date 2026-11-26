@@ -50,6 +50,7 @@ struct AlertSettingsView: View {
                     Text("During quiet hours alerts still arrive, with no sound.")
                 }
                 .listRowBackground(Tok.panel)
+                ReminderSection()
             }
         }
         .scrollContentBackground(.hidden)

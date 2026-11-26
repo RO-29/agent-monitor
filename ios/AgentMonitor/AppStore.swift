@@ -8,7 +8,7 @@ enum AppTab: Hashable {
 
 /// Screens pushed inside the Settings tab.
 enum SettingsRoute: Hashable {
-    case server, agents, talks, panes, alerts, storage, commands, machines
+    case server, agents, talks, panes, alerts, storage, commands, machines, rules
 }
 
 enum ConnectionState: Equatable {
