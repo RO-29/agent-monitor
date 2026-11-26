@@ -34,7 +34,7 @@ export function ScrollJump({ el }: { el: RefObject<HTMLDivElement | null> }) {
   const toNew = () => el.current?.querySelector<HTMLElement>(".wnewline")?.scrollIntoView({ block: "start" });
   if (!pos.top && !pos.bottom && !pos.fresh) return null;
   const chev = (up: boolean) => (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d={up ? "M4 10l4-4 4 4" : "M4 6l4 4 4-4"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d={up ? "M8 13V3M3.5 7.5L8 3l4.5 4.5" : "M8 3v10M3.5 8.5L8 13l4.5-4.5"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
   );
   return (
     <div className="wjump">
