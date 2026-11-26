@@ -14,6 +14,7 @@ struct WorkspaceView: View {
                     Section { InlineError(message: err).listRowSeparator(.hidden) }
                         .listRowBackground(Tok.bg)
                 }
+                if let at = store.needsYouAt { StaleNote(at: at) }
                 if query.isEmpty { needsYou }
                 let searching = !query.isEmpty
                 let working = filtered(store.threads(in: .working))
@@ -412,6 +413,22 @@ private struct MessageSearchRows: View {
             state = "done"
         } catch {
             if q == query { state = "error" }
+        }
+    }
+}
+
+/// Says how old the list is when refreshes stop, so old rows never look live.
+private struct StaleNote: View {
+    let at: Date
+    @Environment(\.scenePhase) private var phase
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { ctx in
+            let age = ctx.date.timeIntervalSince(at)
+            if phase == .active && age > 15 {
+                Label("Last updated \(at.formatted(.relative(presentation: .named)))", systemImage: "clock.arrow.circlepath")
+                    .font(.footnote).foregroundStyle(Tok.muted)
+                    .listRowBackground(Tok.bg).listRowSeparator(.hidden)
+            }
         }
     }
 }

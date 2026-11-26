@@ -258,6 +258,24 @@ function filterTree(tree: WTree, q: string): WTree {
   return { top, kids };
 }
 
+/** A watched session with no message (an empty Cursor "New Agent", for one) is noise in the list. */
+const isEmptyRow = (r: WRow) => r.mode === "watched" && r.watched?.session?.messageCount === 0 && (r.watched.thread?.sessions?.length ?? 1) <= 1;
+
+function dropEmpty(tree: WTree, keep: string | undefined): { tree: WTree; n: number } {
+  let n = 0;
+  const top = new Map(
+    [...tree.top].map(([g, list]) => [
+      g,
+      list.filter((r) => {
+        const drop = isEmptyRow(r) && r.id !== keep;
+        if (drop) n++;
+        return !drop;
+      }),
+    ]),
+  );
+  return { tree: { top, kids: tree.kids }, n };
+}
+
 /** Rows of one machine only; "" keeps all. Local rows have no machine field. */
 function byMachine(tree: WTree, m: string, self: string): WTree {
   if (!m) return tree;
@@ -268,8 +286,8 @@ function byMachine(tree: WTree, m: string, self: string): WTree {
 const TRANSCRIPT_SHOWN = 20;
 
 /** A thread group whose header folds it; closed keeps the open thread in view. A filter opens every group. */
-function Group({ gkey, label, count, filtering, keep, children }: { gkey: string; label: string; count: number; filtering: boolean; keep: WRow[]; children: (only: WRow[] | null) => React.ReactNode }) {
-  const [stored, toggle] = useFold(`threads:${gkey}`);
+function Group({ gkey, label, count, filtering, keep, defClosed, children }: { gkey: string; label: string; count: number; filtering: boolean; keep: WRow[]; defClosed?: boolean; children: (only: WRow[] | null) => React.ReactNode }) {
+  const [stored, toggle] = useFold(`threads:${gkey}`, defClosed);
   const closed = stored && !filtering;
   return (
     <div className={`wgrp-w ${closed ? "fold-c" : ""}`}>
@@ -307,7 +325,25 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   };
   const selfName = fleet.machines.find((m) => m.self)?.name || "";
   const mFilter = fleet.machines.length > 1 && fleet.machines.some((m) => m.name === onlyM) ? onlyM : "";
-  const shown = useMemo(() => byMachine(filterTree(tree, q), mFilter, selfName), [tree, q, mFilter, selfName]);
+  const [showEmpty, setShowEmpty] = useState(() => {
+    try {
+      return localStorage.getItem("threads:empty") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const flipEmpty = () => {
+    setShowEmpty(!showEmpty);
+    try {
+      localStorage.setItem("threads:empty", showEmpty ? "0" : "1");
+    } catch {
+      /* private mode */
+    }
+  };
+  const lean = useMemo(() => (showEmpty ? { tree, n: 0 } : dropEmpty(tree, sel)), [tree, showEmpty, sel]);
+  const emptyN = useMemo(() => (showEmpty ? dropEmpty(tree, sel).n : lean.n), [tree, showEmpty, sel, lean.n]);
+  const shown = useMemo(() => byMachine(filterTree(lean.tree, q), mFilter, selfName), [lean.tree, q, mFilter, selfName]);
+  const active = (shown.top.get("need")?.length || 0) + (shown.top.get("working")?.length || 0) > 0;
   const nav = useNavigate();
   const v = useV3();
   const orchStatus = useOrch().status;
@@ -401,7 +437,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
           const cut = g.key === "settled" && !q && all.length > settledShown + 2;
           const list = cut ? all.filter((r, i) => i < settledShown || r.id === sel) : all;
           return (
-            <Group key={g.key} gkey={g.key} label={g.label} count={all.length} filtering={!!q} keep={list.filter((r) => r.id === sel || r.openId === sel)}>
+            <Group key={g.key} gkey={g.key} label={g.label} count={all.length} filtering={!!q} defClosed={g.key === "settled" && active} keep={list.filter((r) => r.id === sel || r.openId === sel)}>
               {(rowsIn) => (
                 <>
                   {(rowsIn || list).map((r) => (
@@ -417,6 +453,11 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
             </Group>
           );
         })}
+        {emptyN > 0 && !q && (
+          <button className="wmore" onClick={flipEmpty}>
+            {showEmpty ? `Hide ${emptyN} empty sessions` : `Show ${emptyN} empty sessions`}
+          </button>
+        )}
         {q.trim().length >= 2 && (
           <div className="wgrp-w wtrans" aria-busy={ts.loading}>
             <div className="wgrp">

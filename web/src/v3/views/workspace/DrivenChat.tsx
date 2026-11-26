@@ -22,7 +22,7 @@ import { agentName, useV3 } from "../../live";
 import { childMap, cmdLabel, descendants, drivenLabel, drivenThreads, permModeLabel, WORKSPACE_LABEL, workspaceOf } from "./rows";
 import { askFromApproval, askFromRequest, AskAnnouncer, WsApproval, type AskInfo } from "./WsApproval";
 import { DiffView } from "./Diff";
-import { StepTrail, trailSegments } from "./StepTrail";
+import { StepTrail, TrailBar, trailSegments } from "./StepTrail";
 import { gitKey, isLoopback, runDiff, useDiffNav, useGit, type DiffNav } from "./git";
 import { openIn } from "./GitBox";
 import { drivenTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
@@ -601,6 +601,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff, idle }: { run?:
             {tail}
             <span className="muted"> · {work.length} {work.length === 1 ? "step" : "steps"}</span>
             {cost && <span className="muted"> · {cost}</span>}
+            {!expanded && <TrailBar items={work} now={now} />}
             <span className="wchev">{expanded ? "▾" : "▸"}</span>
           </button>
           {diff && onDiff && (

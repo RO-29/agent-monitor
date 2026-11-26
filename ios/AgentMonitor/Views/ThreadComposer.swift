@@ -230,13 +230,15 @@ struct Composer: View {
                     // A driven turn stops through the daemon; Esc in the terminal stops a watched one.
                     Button { Task { if let d = drivenID { await stopDriven(d) } else { await pressEsc() } } } label: {
                         Image(systemName: "stop.fill").font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Tok.fg)
+                            .foregroundStyle(Tok.err)
                             .frame(width: 36, height: 36)
-                            .background(Tok.panel3, in: Circle())
+                            .background(Tok.err.opacity(0.15), in: Circle())
+                            .overlay(Circle().stroke(Tok.err.opacity(0.35), lineWidth: 1).frame(width: 36, height: 36))
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .padding(.trailing, 8)
                     .disabled(acting)
                     .accessibilityLabel(drivenID != nil ? "Stop the turn" : "Stop with Esc")
                 }

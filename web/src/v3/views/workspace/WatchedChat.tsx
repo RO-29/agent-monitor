@@ -34,7 +34,7 @@ import { askFromApproval, AskAnnouncer, WsApproval } from "./WsApproval";
 import { HitCtx, useHitFocus, type HitReq } from "./hit";
 import { firstRealLine } from "../../../lib/format";
 import { TermQuestionCard, termQuestionShown, useTermQuestion } from "./TermQuestion";
-import { ChildCtx, childCtxOf } from "./children";
+import { ChildCtx, childCtxOf, RunningKids } from "./children";
 import type { SessionChildren } from "../../api/p7";
 import { ResumeChip, SelectBar, SelectCtx, useSelection } from "./MsgActions";
 import { LinkedChip, LinkedPage, sessionLinks, type LinkedEntry } from "./linked";
@@ -453,6 +453,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           </Fragment>
         ))}
         {!oldTab && <PendingBubbles list={sent.list} drop={sent.drop} />}
+        {!oldTab && <RunningKids sid={tab || latestSession(row)} data={kids} />}
         {!oldTab && (q.activity || running) && (
           <div className="wactivity" role="status" aria-live="polite">
             <span className="wic run wpulse">●</span> {q.activity || `${cliName} is working…`}

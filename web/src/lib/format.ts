@@ -10,7 +10,7 @@ export const toolColorVar = (t: Tool | string) => `var(--tool-${t})`;
 export const famLabel = (f: SpanFamily | string): string =>
   ({ bash: "Bash", read: "Read/Grep", edit: "Edit/Write", agent: "Agent", mcp: "MCP", web: "Web", other: "Other", model: "model", user: "you" } as Record<string, string>)[f] || f;
 
-export const modelShort = (m?: string) => (m || "").replace(/^claude-/, "").replace(/-20\d{6}.*$/, "").replace("[1m]", "").trim();
+export const modelShort = (m?: string) => (m === "<synthetic>" ? "" : m || "").replace(/^claude-/, "").replace(/-20\d{6}.*$/, "").replace("[1m]", "").trim();
 
 export const agentTag = (s: { sessionId?: string; id: string }) =>
   (s.sessionId || s.id).replace(/[^a-z0-9]/gi, "").slice(0, 4).toLowerCase();

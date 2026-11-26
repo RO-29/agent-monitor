@@ -632,6 +632,8 @@ struct ThreadChatView: View {
                         .background(Tok.panel, in: RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 12).padding(.bottom, 8)
                 } else if !fullscreen {
+                    VStack(spacing: 6) {
+                    if drivenID == nil, let sid = sessionID { RunningKidsBar(sessionID: sid, kids: kids) }
                     Composer(target: target, agent: agent,
                              busyCLI: running || session?.state == .awaitingPermission,
                              model: session?.model ?? thread?.model, cwd: session?.cwd ?? thread?.cwd ?? driven?.cwd ?? "",
@@ -646,6 +648,7 @@ struct ThreadChatView: View {
                             withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                         }
                     })
+                    }
                 }
             }
             .task(id: target) {
@@ -833,7 +836,7 @@ struct ThreadChatView: View {
         }
     }
 
-    /// Subagent count for the toolbar badge; refreshed every 20 s.
+    /// Subagents for the toolbar badge and the running row: every 5 s while one runs, else every 20 s.
     private func kidsLoop() async {
         guard drivenID == nil, let sid = sessionID else { return }
         #if DEBUG
@@ -841,7 +844,8 @@ struct ThreadChatView: View {
         #endif
         while !Task.isCancelled {
             if let r = try? await api.children(sid) { kids = r.children }
-            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            let busy = kids.contains { $0.status == "running" }
+            try? await Task.sleep(nanoseconds: busy ? 5_000_000_000 : 20_000_000_000)
         }
     }
 }

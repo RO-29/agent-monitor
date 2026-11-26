@@ -12,7 +12,7 @@ const asList = <T,>(d: unknown, key: string): T[] => (Array.isArray(d) ? (d as T
 
 export default function Rules() {
   return (
-    <div className="view pad">
+    <div className="view pad sx">
       <div className="viewhead">
         <div>
           <h2>Rules</h2>

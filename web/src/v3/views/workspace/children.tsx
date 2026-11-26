@@ -6,7 +6,7 @@ import { isMissing, useApi, type ApiState } from "../../api/client";
 import { req, type OItem, type ORun } from "../../api/orch";
 import { p7, type SessionChild, type SessionChildren, type WatchedItems } from "../../api/p7";
 import { agentName } from "../../live";
-import { blocksOf, RunBlock } from "./DrivenChat";
+import { blocksOf, RunBlock, useTick } from "./DrivenChat";
 import { FoldBox } from "../../components/fold";
 import { CopyMenu, promptEntries, useSelectCtx } from "./MsgActions";
 import { exportMarkdown } from "../../../lib/chatExport";
@@ -14,7 +14,13 @@ import { toPlain, toSlack } from "../../../lib/slack";
 
 /** Children of one session; polled faster while the session runs. */
 export function useSessionChildren(sessionId: string, running: boolean): ApiState<SessionChildren> {
-  return useApi(() => p7.sessionChildren(sessionId), [sessionId, running], { poll: running ? 8_000 : 45_000, skip: !sessionId });
+  // A background subagent can run after its parent's turn ends: poll fast while any child runs.
+  const [busy, setBusy] = useState(false);
+  const fast = running || busy;
+  const st = useApi(() => p7.sessionChildren(sessionId), [sessionId, fast], { poll: fast ? 5_000 : 45_000, skip: !sessionId });
+  const any = !!st.data?.children?.some((c) => c.status === "running");
+  useEffect(() => setBusy(any), [any]);
+  return st;
 }
 
 interface ChildCtxValue {
@@ -218,11 +224,11 @@ function ChildRow({ sid, c, nested, now, parentCwd }: { sid: string; c: SessionC
           {head}
         </div>
       )}
-      <div className="wcx-m">
-        {meta.join(" · ")}
-        {meta.length > 0 && " · "}
-        <span title={tip}>by {c.linkBasis}</span>
-      </div>
+      {meta.length > 0 && (
+        <div className="wcx-m" title={tip}>
+          {meta.join(" · ")}
+        </div>
+      )}
       {open && c.agentId && <SubTranscript sid={sid} c={c} />}
       {nested.length > 0 && (
         <div className="ch">
@@ -281,5 +287,49 @@ export function ChildrenBox({ sid, data, cwd }: { sid: string; data: SessionChil
         </div>
       ))}
     </FoldBox>
+  );
+}
+
+const KID_ROWS = 4;
+/** The subagents that run now, above the composer: the chat shows work even when the parent waits. */
+export function RunningKids({ sid, data }: { sid: string; data: SessionChildren | null | undefined }) {
+  const list = (data?.children || []).filter((c) => c.status === "running").sort((a, b) => a.startedAt - b.startedAt);
+  const now = useTick(list.length > 0);
+  const [open, setOpen] = useState("");
+  const [all, setAll] = useState(false);
+  if (!list.length) return null;
+  const shown = all ? list : list.slice(0, KID_ROWS);
+  const openKid = list.find((c) => c.key === open);
+  return (
+    <div className="wkids" role="status" aria-live="polite">
+      <div className="wkids-h">
+        <span className="wic run wpulse" aria-hidden>●</span>
+        {list.length === 1 ? "1 subagent running" : `${list.length} subagents running`}
+      </div>
+      {shown.map((c) => {
+        const body = (
+          <>
+            <span className="wkids-t">{c.subagentType || (c.kind === "subagent" ? "Subagent" : agentName(c.agent))}</span>
+            <span className="trunc">{titleOf(c)}</span>
+            <span className="wkids-d">{durOf(c, now)}</span>
+          </>
+        );
+        return c.sessionId ? (
+          <Link key={c.key} className="wkids-r" to={childHref(c)} title={titleOf(c)}>
+            {body}
+          </Link>
+        ) : (
+          <button key={c.key} type="button" className="wkids-r" onClick={() => setOpen(open === c.key ? "" : c.key)} aria-expanded={open === c.key} disabled={!c.agentId} title={titleOf(c)}>
+            {body}
+          </button>
+        );
+      })}
+      {list.length > KID_ROWS && (
+        <button type="button" className="wkids-more" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show all ${list.length}`}
+        </button>
+      )}
+      {openKid?.agentId && <SubTranscript sid={sid} c={openKid} />}
+    </div>
   );
 }

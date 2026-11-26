@@ -106,3 +106,16 @@ export function trailSegments(items: OItem[]): (OItem | OItem[])[] {
   flush();
   return out;
 }
+
+/** The trail of a folded turn as a small bar in its summary row; the row opens the steps. */
+export function TrailBar({ items, now }: { items: OItem[]; now: number }) {
+  const calls = items.filter(inTrail);
+  if (calls.length < 2) return null;
+  return (
+    <span className="wtrail-mini" aria-hidden>
+      {calls.slice(-60).map((it) => (
+        <span key={it.id} className={`wtseg t-${kindOf(it).cls} ${failedOf(it) ? "bad" : ""}`} style={{ flexGrow: 1 + Math.log2(1 + durOf(it, now) / 1000) }} />
+      ))}
+    </span>
+  );
+}

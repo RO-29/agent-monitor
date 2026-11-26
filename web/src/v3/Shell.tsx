@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NavIcon } from "./components/NavIcon";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import type { Session } from "../api/types";
 import { Boundary } from "./components/Boundary";
@@ -286,15 +287,19 @@ export default function V3Shell() {
           <nav className="drail" aria-label="Places">
             <Link to="/w" className="logo" aria-label="agent-monitor home" title="agent-monitor" />
             <Link to="/w" className={`rb ${placeOn("work") ? "on" : ""}`} title={`Threads (g h)${need ? ` · ${need} need you` : ""}`}>
+              <NavIcon name="threads" />
               Threads{need > 0 && <i className="nd" aria-label={`${need} need you`} />}
             </Link>
             <Link to="/w/search" className={`rb ${path === "/w/search" ? "on" : ""}`} title="Search every transcript (⌘K for the quick search)">
+              <NavIcon name="search" />
               Search
             </Link>
             <Link to="/notifications" className={`rb ${placeOn("alerts") ? "on" : ""}`} title={`Notifications (g a)${nt.unread ? ` · ${nt.unread} unread` : ""}`}>
+              <NavIcon name="alerts" />
               Alerts{nt.unread > 0 && <em className="un">{nt.unread > 99 ? "99+" : nt.unread}</em>}
             </Link>
             <Link to="/settings/devices" className={`rb ${placeOn("settings") ? "on" : ""}`} title="Devices, notifications, limits">
+              <NavIcon name="settings" />
               Settings
             </Link>
             <span className="sp" />
@@ -333,16 +338,16 @@ export default function V3Shell() {
         </div>
         <nav className="tabbar" aria-label="Places">
           <Link to="/w" className={placeOn("work") ? "on" : ""}>
-            <span className="ti">☰</span>Threads{need > 0 && <i className="nd" aria-label={`${need} need you`} />}
+            <span className="ti"><NavIcon name="threads" /></span>Threads{need > 0 && <i className="nd" aria-label={`${need} need you`} />}
           </Link>
           <Link to="/w/search" className={path === "/w/search" ? "on" : ""}>
-            <span className="ti">⌕</span>Search
+            <span className="ti"><NavIcon name="search" /></span>Search
           </Link>
           <Link to="/notifications" className={placeOn("alerts") ? "on" : ""} aria-label={`Alerts${nt.unread ? `, ${nt.unread} unread` : ""}`}>
-            <span className="ti">◔</span>Alerts{nt.unread > 0 && <span className="bd un">{nt.unread > 99 ? "99+" : nt.unread}</span>}
+            <span className="ti"><NavIcon name="alerts" /></span>Alerts{nt.unread > 0 && <span className="bd un">{nt.unread > 99 ? "99+" : nt.unread}</span>}
           </Link>
           <Link to="/more" className={placeOn("more") || placeOn("settings") ? "on" : ""}>
-            <span className="ti">⋯</span>More
+            <span className="ti"><NavIcon name="more" /></span>More
           </Link>
         </nav>
         {pal && <Palette initial={pal} onClose={() => setPal(null)} />}

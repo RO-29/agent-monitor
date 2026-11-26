@@ -19,11 +19,7 @@ struct AgentMonitorApp: App {
                 .task {
                     Notifier.shared.onRoute = { [store] r in store.open(r) }
                     NotifyAction.replyTarget = { [store] id in await store.replyTargetLoaded(id) }
-                    #if DEBUG
-                    if DebugRoute.screen == nil { Notifier.shared.requestAuthorization() }
-                    #else
-                    Notifier.shared.requestAuthorization()
-                    #endif
+                    Notifier.shared.prepare()
                     store.start()
                     // A cold launch can open already active, so the phase change below never fires.
                     if scenePhase == .active { store.setForeground(true) }

@@ -168,5 +168,8 @@ func sessionPlace(id string) SessionPlace {
 	if n := len(p.Journey); n > 0 && p.Kind == "ended" && p.Detail == "last in Unknown" {
 		p.Detail = "last in " + p.Journey[n-1].Label
 	}
+	if p.Detail == "last in Unknown" {
+		p.Detail = ""
+	}
 	return p
 }

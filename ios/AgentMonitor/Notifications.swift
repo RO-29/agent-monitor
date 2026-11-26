@@ -131,6 +131,25 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         NotifyAction.register()
     }
 
+    /// Sets the delegate and reads the permission without the system prompt; askIfNeeded shows it later.
+    func prepare() {
+        UNUserNotificationCenter.current().delegate = self
+        NotifyAction.register()
+        Task { await refreshAuthorization() }
+    }
+
+    /// The system prompt shows once, when something first needs the user, so the reason is clear.
+    func askIfNeeded() {
+        guard !asked else { return }
+        asked = true
+        Task {
+            if await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined {
+                requestAuthorization()
+            }
+        }
+    }
+    private var asked = false
+
     func requestAuthorization() {
         let center = UNUserNotificationCenter.current()
         center.delegate = self

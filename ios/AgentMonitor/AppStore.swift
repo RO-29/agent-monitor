@@ -45,7 +45,14 @@ final class AppStore {
     var approvalsByID: [String: Approval] = [:] { didSet { recomputeNeedThreads() } }
 
     // The daemon's one "needs you" list; nil until loaded, and nil on an older daemon (404).
-    var needsYouList: [NeedsYouItem]? { didSet { recomputeNeedThreads() } }
+    var needsYouList: [NeedsYouItem]? {
+        didSet {
+            recomputeNeedThreads()
+            if !(needsYouList ?? []).isEmpty { Notifier.shared.askIfNeeded() }
+        }
+    }
+    /// When the needs-you list last loaded; the Threads tab says so when it is old.
+    var needsYouAt: Date?
     var needsYouSupported: Bool?
     private var needsYouTotal = 0
     private var needsYouPoll: Task<Void, Never>?
@@ -417,6 +424,7 @@ final class AppStore {
             needsYouSupported = true
             notifyNeeds(items)
             needsYouList = items
+            needsYouAt = Date()
             needsYouTotal = r.count ?? items.count
         } catch let e as APIError where e.status == 404 {
             guard mine > needsYouApplied else { return }
@@ -752,9 +760,11 @@ final class AppStore {
             var attempt = 0
             while !Task.isCancelled {
                 guard let self else { return }
+                let began = Date()
                 do {
                     try await self.readAlertStream()
-                    attempt = 0
+                    // A stream that closes at once must not reconnect every 2 s for ever.
+                    attempt = Date().timeIntervalSince(began) > 5 ? 0 : attempt + 1
                 } catch let e as APIError where e.status == 404 {
                     return  // an older daemon without the notification centre
                 } catch {
