@@ -1163,7 +1163,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         onEmptyUp={() => qref.current?.selectNewest() ?? false}
         disabled={closed || wtGone}
         autoFocus={!closed && !wtGone && detail.runs.length === 0 && !ho.terminal}
-        placeholder={closed ? "This thread is closed." : wtGone ? `The worktree was removed. The branch ${t.worktree?.branch || ""} stays.` : queueing ? (narrowScreen() ? "Queue a message. /side asks now" : "Queue a message for when it is idle. /side asks without waiting, ! runs a command") : `Ask a follow-up. @ files${t.agent === "claude" || t.agent === "codex" ? ", $ skills" : ""}, / commands`}
+        placeholder={closed ? "This thread is closed." : wtGone ? `The worktree was removed. The branch ${t.worktree?.branch || ""} stays.` : queueing ? (narrowScreen() ? "Queue a message. /side asks now" : "Queue a message. /side asks now, ! runs a command") : `Ask a follow-up. @ files${t.agent === "claude" || t.agent === "codex" ? ", $ skills" : ""}, / commands`}
         cwd={t.worktree && !t.worktree.removed ? t.worktree.path : t.cwd}
         agent={t.agent}
         files
