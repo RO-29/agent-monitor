@@ -198,7 +198,7 @@ function Item({ r, sel, onClick }: { r: Row; sel: boolean; onClick: () => void }
         {(r.needs || r.bucket === "running") && <span className={`pill ${info.pill}`}>{pill}</span>}
         <span className="trunc">
           {t ? repoOf(t) : projectName(r.cwd)}
-          {t?.model ? ` · ${modelShort(t.model)}` : ""}
+          {modelShort(t?.model) ? ` · ${modelShort(t?.model)}` : ""}
           {t && t.turns > 1 ? ` · ${t.turns.toLocaleString()} turns` : ""}
           {(t?.childCount || 0) > 1 ? ` · ${t!.childCount} child runs` : ""}
         </span>

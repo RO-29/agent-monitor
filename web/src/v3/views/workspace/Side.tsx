@@ -285,7 +285,7 @@ export function WatchedSide({ row, feed, onClose, sid, kids: sessionKids, kidsMi
         <KV k="Repo" v={t?.repo} />
         <KV k="Folder" v={shortCwd(row.cwd)} mono />
         <TermKV row={row} />
-        <KV k="Model" v={t?.model ? `${agentName(row.agent)} · ${modelShort(t.model)}` : agentName(row.agent)} />
+        <KV k="Model" v={modelShort(t?.model) ? `${agentName(row.agent)} · ${modelShort(t?.model)}` : agentName(row.agent)} />
       </FoldBox>
       <WatchedGitBox
         t={t}

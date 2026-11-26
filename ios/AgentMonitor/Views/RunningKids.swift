@@ -11,7 +11,16 @@ struct RunningKidsBar: View {
 
     var body: some View {
         let list = running
-        if !list.isEmpty {
+        // The sheet sits outside the if, so it stays open when the last subagent ends.
+        Group {
+            if !list.isEmpty { bar(list) }
+        }
+        .sheet(item: $open) { c in
+            NavigationStack { SubagentTranscriptView(sessionID: sessionID, child: c) }
+        }
+    }
+
+    private func bar(_ list: [SessionChild]) -> some View {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -48,10 +57,6 @@ struct RunningKidsBar: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Tok.line, lineWidth: 1))
                 .padding(.horizontal, 12)
             }
-            .sheet(item: $open) { c in
-                NavigationStack { SubagentTranscriptView(sessionID: sessionID, child: c) }
-            }
-        }
     }
 
     private func elapsed(_ c: SessionChild, _ now: Date) -> String {

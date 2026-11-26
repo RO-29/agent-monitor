@@ -441,7 +441,7 @@ function ThreadDetail({ it, denyOpen, onDenyClosed, onPane }: { it: Item; denyOp
         <h3>{it.title}</h3>
         {statePill}
         <span className="pill p-mut">{it.repo}</span>
-        {model && <span className="pill p-mut">{modelShort(model)}</span>}
+        {modelShort(model) && <span className="pill p-mut">{modelShort(model)}</span>}
         <Link className="bbtn ml-auto" to={`/t/${encodeURIComponent(it.key)}`}>
           Open <kbd>↵</kbd>
         </Link>

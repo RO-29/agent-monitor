@@ -138,14 +138,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         Task { await refreshAuthorization() }
     }
 
-    /// The system prompt shows once, when something first needs the user, so the reason is clear.
-    func askIfNeeded() {
+    /// The system prompt shows once, at the first banner, so the reason is clear; that banner posts after a grant.
+    private func askIfNeeded(then: @escaping @MainActor () -> Void) {
+        #if DEBUG
+        if DebugRoute.screen != nil { return }
+        #endif
         guard !asked else { return }
         asked = true
         Task {
-            if await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined {
-                requestAuthorization()
-            }
+            guard await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined else { return }
+            let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            authorized = granted
+            if granted { then() }
         }
     }
     private var asked = false
@@ -168,7 +172,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func post(id: String, kind: NotifyKind, title: String, body: String, info: [String: String], force: Bool = false, category: String? = nil) {
-        guard authorized || force, force || NotifyPrefs.on(kind) else { return }
+        guard force || NotifyPrefs.on(kind) else { return }
+        guard authorized || force else {
+            askIfNeeded { [weak self] in self?.post(id: id, kind: kind, title: title, body: body, info: info, category: category) }
+            return
+        }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

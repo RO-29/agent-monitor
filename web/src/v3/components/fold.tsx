@@ -3,27 +3,27 @@ import { useState, type ReactNode } from "react";
 
 const PREFIX = "am-fold:";
 
-function readFold(id: string, def: boolean): boolean {
+function readFold(id: string): boolean | null {
   try {
     const v = localStorage.getItem(PREFIX + id);
-    return v === null ? def : v === "1";
+    return v === null ? null : v === "1";
   } catch {
-    return def;
+    return null;
   }
 }
 
-/** Returns [closed, toggle]. */
+/** Returns [closed, toggle]. Until the user toggles, a changing defClosed applies live. */
 export function useFold(id: string, defClosed = false): [boolean, () => void] {
-  const [closed, setClosed] = useState(() => readFold(id, defClosed));
-  const toggle = () =>
-    setClosed((c) => {
-      try {
-        localStorage.setItem(PREFIX + id, c ? "0" : "1");
-      } catch {
-        /* storage blocked */
-      }
-      return !c;
-    });
+  const [saved, setSaved] = useState(() => readFold(id));
+  const closed = saved ?? defClosed;
+  const toggle = () => {
+    try {
+      localStorage.setItem(PREFIX + id, closed ? "0" : "1");
+    } catch {
+      /* storage blocked */
+    }
+    setSaved(!closed);
+  };
   return [closed, toggle];
 }
 

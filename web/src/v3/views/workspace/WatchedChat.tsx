@@ -546,7 +546,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           <span className="wchip">
             <span className={`wag ${row.agent === "codex" ? "cx" : row.agent === "claude" ? "cl" : ""}`} />
             {agentName(row.agent)}
-            {t?.model && !q.statusLine?.length ? ` · ${modelShort(t.model)}` : ""}
+            {modelShort(t?.model) && !q.statusLine?.length ? ` · ${modelShort(t?.model)}` : ""}
           </span>
           <ResumeChip tool={session?.tool || row.agent} sessionId={session?.sessionId || sid.slice(sid.indexOf(":") + 1)} cwd={session?.cwd || row.cwd} />
           <span className="sp" />

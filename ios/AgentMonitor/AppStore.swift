@@ -45,12 +45,7 @@ final class AppStore {
     var approvalsByID: [String: Approval] = [:] { didSet { recomputeNeedThreads() } }
 
     // The daemon's one "needs you" list; nil until loaded, and nil on an older daemon (404).
-    var needsYouList: [NeedsYouItem]? {
-        didSet {
-            recomputeNeedThreads()
-            if !(needsYouList ?? []).isEmpty { Notifier.shared.askIfNeeded() }
-        }
-    }
+    var needsYouList: [NeedsYouItem]? { didSet { recomputeNeedThreads() } }
     /// When the needs-you list last loaded; the Threads tab says so when it is old.
     var needsYouAt: Date?
     var needsYouSupported: Bool?

@@ -5,6 +5,9 @@ struct WorkspaceView: View {
     @Environment(AppStore.self) private var store
     @State private var query = ""
     @State private var settledLimit = 100
+    @Environment(\.scenePhase) private var phase
+    @State private var now = Date()
+    @State private var activeAt = Date()
 
     var body: some View {
         @Bindable var store = store
@@ -14,7 +17,12 @@ struct WorkspaceView: View {
                     Section { InlineError(message: err).listRowSeparator(.hidden) }
                         .listRowBackground(Tok.bg)
                 }
-                if let at = store.needsYouAt { StaleNote(at: at) }
+                // Old rows must not look live; the first 10 s after a return give the poll time to run.
+                if let at = store.needsYouAt, phase == .active, now.timeIntervalSince(at) > 15, now.timeIntervalSince(activeAt) > 10 {
+                    Label("Last updated \(at.formatted(.relative(presentation: .named)))", systemImage: "clock.arrow.circlepath")
+                        .font(.footnote).foregroundStyle(Tok.muted)
+                        .listRowBackground(Tok.bg).listRowSeparator(.hidden)
+                }
                 if query.isEmpty { needsYou }
                 let searching = !query.isEmpty
                 let working = filtered(store.threads(in: .working))
@@ -95,6 +103,13 @@ struct WorkspaceView: View {
             .background(Tok.bg)
 
             .searchable(text: $query, prompt: "Search threads")
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(5))
+                    now = Date()
+                }
+            }
+            .onChange(of: phase) { _, p in if p == .active { activeAt = Date(); now = Date() } }
             .navigationTitle("Threads")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { ConnectionChip(onlyWhenDown: true) }
@@ -417,18 +432,3 @@ private struct MessageSearchRows: View {
     }
 }
 
-/// Says how old the list is when refreshes stop, so old rows never look live.
-private struct StaleNote: View {
-    let at: Date
-    @Environment(\.scenePhase) private var phase
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { ctx in
-            let age = ctx.date.timeIntervalSince(at)
-            if phase == .active && age > 15 {
-                Label("Last updated \(at.formatted(.relative(presentation: .named)))", systemImage: "clock.arrow.circlepath")
-                    .font(.footnote).foregroundStyle(Tok.muted)
-                    .listRowBackground(Tok.bg).listRowSeparator(.hidden)
-            }
-        }
-    }
-}

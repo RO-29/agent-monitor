@@ -267,7 +267,7 @@ function dropEmpty(tree: WTree, keep: string | undefined): { tree: WTree; n: num
     [...tree.top].map(([g, list]) => [
       g,
       list.filter((r) => {
-        const drop = isEmptyRow(r) && r.id !== keep;
+        const drop = g !== "need" && g !== "working" && isEmptyRow(r) && r.id !== keep;
         if (drop) n++;
         return !drop;
       }),
@@ -340,9 +340,10 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
       /* private mode */
     }
   };
-  const lean = useMemo(() => (showEmpty ? { tree, n: 0 } : dropEmpty(tree, sel)), [tree, showEmpty, sel]);
-  const emptyN = useMemo(() => (showEmpty ? dropEmpty(tree, sel).n : lean.n), [tree, showEmpty, sel, lean.n]);
-  const shown = useMemo(() => byMachine(filterTree(lean.tree, q), mFilter, selfName), [lean.tree, q, mFilter, selfName]);
+  const mtree = useMemo(() => byMachine(tree, mFilter, selfName), [tree, mFilter, selfName]);
+  const lean = useMemo(() => (showEmpty ? { tree: mtree, n: 0 } : dropEmpty(mtree, sel)), [mtree, showEmpty, sel]);
+  const emptyN = useMemo(() => (showEmpty ? dropEmpty(mtree, sel).n : lean.n), [mtree, showEmpty, sel, lean.n]);
+  const shown = useMemo(() => filterTree(lean.tree, q), [lean.tree, q]);
   const active = (shown.top.get("need")?.length || 0) + (shown.top.get("working")?.length || 0) > 0;
   const nav = useNavigate();
   const v = useV3();

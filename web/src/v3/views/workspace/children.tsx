@@ -15,11 +15,15 @@ import { toPlain, toSlack } from "../../../lib/slack";
 /** Children of one session; polled faster while the session runs. */
 export function useSessionChildren(sessionId: string, running: boolean): ApiState<SessionChildren> {
   // A background subagent can run after its parent's turn ends: poll fast while any child runs.
-  const [busy, setBusy] = useState(false);
-  const fast = running || busy;
-  const st = useApi(() => p7.sessionChildren(sessionId), [sessionId, fast], { poll: fast ? 5_000 : 45_000, skip: !sessionId });
-  const any = !!st.data?.children?.some((c) => c.status === "running");
-  useEffect(() => setBusy(any), [any]);
+  // The fast poll is a second timer: a changed useApi dep would clear the data and loop.
+  const st = useApi(() => p7.sessionChildren(sessionId), [sessionId], { poll: 45_000, skip: !sessionId });
+  const fast = running || !!st.data?.children?.some((c) => c.status === "running");
+  const { reload } = st;
+  useEffect(() => {
+    if (!fast || !sessionId) return;
+    const t = window.setInterval(() => !document.hidden && reload(), 5_000);
+    return () => window.clearInterval(t);
+  }, [fast, sessionId, reload]);
   return st;
 }
 
@@ -297,14 +301,15 @@ export function RunningKids({ sid, data }: { sid: string; data: SessionChildren 
   const now = useTick(list.length > 0);
   const [open, setOpen] = useState("");
   const [all, setAll] = useState(false);
-  if (!list.length) return null;
+  // An open transcript stays after its subagent ends, so it never closes under the reader.
+  const openKid = (data?.children || []).find((c) => c.key === open);
+  if (!list.length && !openKid) return null;
   const shown = all ? list : list.slice(0, KID_ROWS);
-  const openKid = list.find((c) => c.key === open);
   return (
-    <div className="wkids" role="status" aria-live="polite">
-      <div className="wkids-h">
-        <span className="wic run wpulse" aria-hidden>●</span>
-        {list.length === 1 ? "1 subagent running" : `${list.length} subagents running`}
+    <div className="wkids">
+      <div className="wkids-h" role="status" aria-live="polite">
+        {list.length > 0 && <span className="wic run wpulse" aria-hidden>●</span>}
+        {list.length === 0 ? "No subagents running" : list.length === 1 ? "1 subagent running" : `${list.length} subagents running`}
       </div>
       {shown.map((c) => {
         const body = (
@@ -329,7 +334,16 @@ export function RunningKids({ sid, data }: { sid: string; data: SessionChildren 
           {all ? "Show fewer" : `Show all ${list.length}`}
         </button>
       )}
-      {openKid?.agentId && <SubTranscript sid={sid} c={openKid} />}
+      {openKid?.agentId && (
+        <>
+          {openKid.status !== "running" && (
+            <button type="button" className="wkids-more" onClick={() => setOpen("")}>
+              Close the {openKid.status} subagent
+            </button>
+          )}
+          <SubTranscript sid={sid} c={openKid} />
+        </>
+      )}
     </div>
   );
 }
