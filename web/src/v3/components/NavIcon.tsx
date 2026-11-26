@@ -9,7 +9,7 @@ const PATHS: Record<string, string> = {
 
 export function NavIcon({ name }: { name: keyof typeof PATHS | string }) {
   return (
-    <svg className="navi" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <svg className="navico" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
       <path d={PATHS[name] || ""} fill="none" stroke="currentColor" strokeWidth={name === "more" ? 3 : 1.6} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

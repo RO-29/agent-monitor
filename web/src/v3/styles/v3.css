@@ -591,5 +591,5 @@
 .v3 .agroup{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
 .v3 .agroup ul{margin:0;padding-left:18px;max-height:180px;overflow:auto;font-size:12px}
 .v3 .drail .rb{height:auto;min-height:48px;padding:6px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px}
-.v3 .drail .rb .navi{width:19px;height:19px}
-.v3 .tabbar .ti .navi{width:21px;height:21px;display:block}
+.v3 .drail .rb .navico{width:19px;height:19px}
+.v3 .tabbar .ti .navico{width:21px;height:21px;display:block}

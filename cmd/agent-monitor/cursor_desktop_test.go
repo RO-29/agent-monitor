@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -40,5 +42,29 @@ func TestCursorStateOrder(t *testing.T) {
 	}
 	if cursorStateOrder("") != nil || cursorStateOrder("~not base64!") != nil {
 		t.Fatal("bad state must give no ids")
+	}
+}
+
+func TestCursorFirstPrompt(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "s.vscdb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, q := range []string{
+		`CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value BLOB)`,
+		`INSERT INTO cursorDiskKV VALUES ('composerData:c1', '{"fullConversationHeadersOnly":[{"bubbleId":"b0","type":2},{"bubbleId":"b1","type":1}]}')`,
+		`INSERT INTO cursorDiskKV VALUES ('bubbleId:c1:b0', '{"type":2,"text":"assistant first"}')`,
+		`INSERT INTO cursorDiskKV VALUES ('bubbleId:c1:b1', '{"type":1,"text":"  Fix the login page\nwith details"}')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := cursorFirstPrompt(db, "c1"); got != "Fix the login page" {
+		t.Fatalf("first prompt = %q", got)
+	}
+	if got := cursorFirstPrompt(db, "missing"); got != "" {
+		t.Fatalf("missing chat = %q", got)
 	}
 }
