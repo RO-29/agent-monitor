@@ -33,22 +33,25 @@ export function ScrollJump({ el }: { el: RefObject<HTMLDivElement | null> }) {
   };
   const toNew = () => el.current?.querySelector<HTMLElement>(".wnewline")?.scrollIntoView({ block: "start" });
   if (!pos.top && !pos.bottom && !pos.fresh) return null;
+  const chev = (up: boolean) => (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d={up ? "M4 10l4-4 4 4" : "M4 6l4 4 4-4"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  );
   return (
     <div className="wjump">
-      <div className="wjump-b">
+      <div className="wjump-b" role="group" aria-label="Scroll">
         {pos.fresh && (
-          <button type="button" className="btn sm" onClick={toNew} aria-label="Go to the first new message" title="Go to the first new message">
-            New {pos.fresh === "up" ? "↑" : "↓"}
+          <button type="button" className="wjump-new" onClick={toNew} title="Go to the first new message">
+            New {chev(pos.fresh === "up")}
           </button>
         )}
         {pos.top && (
-          <button type="button" className="btn sm" onClick={() => go("top")} aria-label="Go to top" title="Go to top">
-            ↑
+          <button type="button" onClick={() => go("top")} aria-label="Go to top" title="Go to top">
+            {chev(true)}
           </button>
         )}
         {pos.bottom && (
-          <button type="button" className="btn sm" onClick={() => go("bottom")} aria-label="Go to bottom" title="Go to bottom">
-            ↓
+          <button type="button" onClick={() => go("bottom")} aria-label="Go to bottom" title="Go to bottom">
+            {chev(false)}
           </button>
         )}
       </div>

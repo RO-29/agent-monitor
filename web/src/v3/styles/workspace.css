@@ -835,8 +835,12 @@
 }
 .v3 .ws .wcx-tb{display:flex;justify-content:flex-end;position:sticky;top:-8px;z-index:6;margin:-4px 0 4px}
 .v3 .ws .wjump{position:relative;height:0;z-index:3}
-.v3 .ws .wjump-b{position:absolute;right:18px;bottom:10px;display:flex;flex-direction:column;gap:6px}
-.v3 .ws .wjump-b .btn{width:34px;height:34px;padding:0;border-radius:50%;box-shadow:0 2px 8px color-mix(in srgb,var(--fg) 14%,transparent);background:var(--panel)}
+.v3 .ws .wjump-b{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:stretch;height:30px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);box-shadow:0 4px 14px color-mix(in srgb,var(--fg) 12%,transparent);overflow:hidden}
+.v3 .ws .wjump-b button{display:flex;align-items:center;gap:4px;padding:0 10px;border:0;background:none;color:var(--fg-2);font:500 12.5px var(--f-ui);cursor:pointer}
+.v3 .ws .wjump-b button + button{border-left:1px solid var(--line)}
+.v3 .ws .wjump-b button:hover{background:var(--panel-3);color:var(--fg)}
+.v3 .ws .wjump-b button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.v3 .ws .wjump-b .wjump-new{color:var(--accent);font-weight:600}
 .v3 .ws .werr .werr-n{font-weight:600;font-family:var(--f-mono);white-space:nowrap}
 .v3 .wq-live{margin:6px 0 0;padding:6px 8px;max-height:12em;overflow:auto;white-space:pre-wrap;word-break:break-word;font:11.5px/1.45 var(--f-mono);color:var(--fg-2);background:var(--panel);border:1px solid var(--line);border-radius:6px}
 .v3 .ws .wdraft{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 28px 6px;padding:6px 10px;border:1px dashed var(--line);border-radius:10px;background:var(--panel)}
