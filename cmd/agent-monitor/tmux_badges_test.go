@@ -4,8 +4,8 @@ import "testing"
 
 func TestWindowBadgesTakeTheHighestState(t *testing.T) {
 	panes := []TmuxPane{{PaneID: "%1", WindowID: "@1"}, {PaneID: "%2", WindowID: "@1"}, {PaneID: "%3", WindowID: "@2"}, {PaneID: "%4", WindowID: "@3"}}
-	got := windowBadges(map[string]State{"%1": StateRunning, "%2": StateAwaitingPermission, "%3": StateRunning, "%4": StateIdle}, panes)
-	if got["@1"] != badgeNeedsYou || got["@2"] != badgeWorking || got["@3"] != badgeNone {
+	got := windowBadges(map[string]State{"%1": StateRunning, "%2": StateAwaitingPermission, "%3": StateRunning, "%4": StateAwaitingInput}, panes)
+	if got["@1"] != badgeNeedsYou || got["@2"] != badgeWorking || got["@3"] != badgeYourTurn {
 		t.Fatalf("badges = %v", got)
 	}
 }

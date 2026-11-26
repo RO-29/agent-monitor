@@ -7,21 +7,24 @@ import (
 	"time"
 )
 
-// The window option @am_badge shows the state of the agents in a tmux window: "● " needs you, "◐ " works.
-// Show it with #{@am_badge} in window-status-format or set-titles-string. AGENT_MONITOR_NO_TMUX_BADGES=1 turns it off.
+// The window option @am_badge shows the state of the agents in a tmux window: "● " waits for an approval,
+// "◐ " works, "✓ " ended its turn.
 
 const (
 	badgeNone = iota
+	badgeYourTurn
 	badgeWorking
 	badgeNeedsYou
 )
 
-var badgeText = map[int]string{badgeWorking: "◐ ", badgeNeedsYou: "● "}
+var badgeText = map[int]string{badgeYourTurn: "✓ ", badgeWorking: "◐ ", badgeNeedsYou: "● "}
 
 func badgeRank(s State) int {
 	switch s {
-	case StateAwaitingPermission, StateAwaitingInput:
+	case StateAwaitingPermission:
 		return badgeNeedsYou
+	case StateAwaitingInput:
+		return badgeYourTurn
 	case StateRunning:
 		return badgeWorking
 	}

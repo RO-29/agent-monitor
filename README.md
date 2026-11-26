@@ -297,7 +297,8 @@ thread (`/w/<id>?beside=<id2>`). It needs a window wider than 1100 px. Swap make
 thread, and Close ends the split.
 
 The daemon marks each tmux window that holds an agent: the window option `@am_badge` is `● `
-when an agent there needs you and `◐ ` while it works, and it is empty otherwise. Add
+when an agent there waits for an approval or an answer, `◐ ` while it works, `✓ ` when it ended its
+turn, and empty otherwise. Add
 `#{@am_badge}` to `window-status-format` or `set-titles-string` in `~/.tmux.conf` to see it.
 `AGENT_MONITOR_NO_TMUX_BADGES=1` turns it off.
 
