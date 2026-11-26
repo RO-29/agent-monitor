@@ -306,38 +306,38 @@ export function RunningKids({ sid, data }: { sid: string; data: SessionChildren 
   if (!list.length && !openKid) return null;
   const shown = all ? list : list.slice(0, KID_ROWS);
   return (
-    <div className="wkids">
-      <div className="wkids-h" role="status" aria-live="polite">
+    <div className="wrkids">
+      <div className="wrkids-h" role="status" aria-live="polite">
         {list.length > 0 && <span className="wic run wpulse" aria-hidden>●</span>}
         {list.length === 0 ? "No subagents running" : list.length === 1 ? "1 subagent running" : `${list.length} subagents running`}
       </div>
       {shown.map((c) => {
         const body = (
           <>
-            <span className="wkids-t">{c.subagentType || (c.kind === "subagent" ? "Subagent" : agentName(c.agent))}</span>
+            <span className="wrkids-t">{c.subagentType || (c.kind === "subagent" ? "Subagent" : agentName(c.agent))}</span>
             <span className="trunc">{titleOf(c)}</span>
-            <span className="wkids-d">{durOf(c, now)}</span>
+            <span className="wrkids-d">{durOf(c, now)}</span>
           </>
         );
         return c.sessionId ? (
-          <Link key={c.key} className="wkids-r" to={childHref(c)} title={titleOf(c)}>
+          <Link key={c.key} className="wrkids-r" to={childHref(c)} title={titleOf(c)}>
             {body}
           </Link>
         ) : (
-          <button key={c.key} type="button" className="wkids-r" onClick={() => setOpen(open === c.key ? "" : c.key)} aria-expanded={open === c.key} disabled={!c.agentId} title={titleOf(c)}>
+          <button key={c.key} type="button" className="wrkids-r" onClick={() => setOpen(open === c.key ? "" : c.key)} aria-expanded={open === c.key} disabled={!c.agentId} title={titleOf(c)}>
             {body}
           </button>
         );
       })}
       {list.length > KID_ROWS && (
-        <button type="button" className="wkids-more" onClick={() => setAll(!all)}>
+        <button type="button" className="wrkids-more" onClick={() => setAll(!all)}>
           {all ? "Show fewer" : `Show all ${list.length}`}
         </button>
       )}
       {openKid?.agentId && (
         <>
           {openKid.status !== "running" && (
-            <button type="button" className="wkids-more" onClick={() => setOpen("")}>
+            <button type="button" className="wrkids-more" onClick={() => setOpen("")}>
               Close the {openKid.status} subagent
             </button>
           )}
