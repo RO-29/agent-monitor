@@ -582,8 +582,11 @@ struct MarkdownTable: View {
     private func widths(_ n: Int) -> [CGFloat] {
         let ch = (size - 2) * 0.55
         return (0..<n).map { c in
-            let longest = rows.map { c < $0.count ? $0[c].count : 0 }.max() ?? 0
-            return min(260, max(70, CGFloat(longest) * ch + 20))
+            let cells = rows.map { c < $0.count ? $0[c] : "" }
+            let longest = cells.map(\.count).max() ?? 0
+            // Never narrower than the longest word: a word never splits ("Medi um").
+            let word = cells.flatMap { $0.split(whereSeparator: \.isWhitespace) }.map(\.count).max() ?? 0
+            return max(min(260, max(70, CGFloat(longest) * ch + 20)), min(320, CGFloat(word) * ch * 1.1 + 24))
         }
     }
 
