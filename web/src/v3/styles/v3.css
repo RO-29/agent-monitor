@@ -561,6 +561,7 @@
   .v3 .ptop{display:flex;align-items:center;gap:10px;height:48px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:none;position:relative}
   .v3 .ptop .logo{width:20px;height:20px;border-radius:6px;background:conic-gradient(from 200deg,var(--need),var(--run),var(--accent),var(--need))}
   .v3 .ptop .dmenu{right:12px;top:44px}
+  .v3 .ptop.pchat{display:none}
   .v3 .desk-col{padding:16px 16px 40px;gap:18px}
   .v3 .hello h2{font-size:22px}
   .v3 .ask{padding:12px}

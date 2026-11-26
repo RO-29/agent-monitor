@@ -154,6 +154,40 @@ func (m *OrchManager) spendTotals(threadID string, now time.Time) spendTotals {
 	return st
 }
 
+// ThreadCosts returns the spend of every thread with a cost, in USD rounded to cents.
+func (m *OrchManager) ThreadCosts() map[string]float64 {
+	cfg := m.spendSettings()
+	out := map[string]float64{}
+	_ = m.store.read(func(tx *sql.Tx) error {
+		threads, err := scanJSONRows[OThread](tx.Query(`SELECT json FROM threads`))
+		if err != nil {
+			return err
+		}
+		by := map[string]*OThread{}
+		for i := range threads {
+			by[threads[i].ID] = &threads[i]
+		}
+		runs, err := scanJSONRows[ORun](tx.Query(`SELECT json FROM runs WHERE json_extract(json,'$.usage') IS NOT NULL`))
+		if err != nil {
+			return err
+		}
+		for i := range runs {
+			if th := by[runs[i].ThreadID]; th != nil {
+				out[th.ID] += runCost(th, &runs[i], cfg)
+			}
+		}
+		return nil
+	})
+	for id, c := range out {
+		if c < 0.005 {
+			delete(out, id)
+		} else {
+			out[id] = round2(c)
+		}
+	}
+	return out
+}
+
 // spendGate refuses a new turn when a limit is reached; threadID "" checks the day only.
 // An "allow once" grant lets one turn through and is used up here.
 func (m *OrchManager) spendGate(threadID string) error {

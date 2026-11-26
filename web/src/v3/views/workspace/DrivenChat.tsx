@@ -16,6 +16,7 @@ import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
 import { ApiError } from "../../api/client";
 import { EditTitle, startRename } from "../../components/EditTitle";
+import { CopyBtn } from "../../components/CopyBtn";
 import { agentCls, agentLabel, agentVar, allowOnce, closeThread, continueInParent, interruptThread, pinThread, renameThread, sendMessage, settleThread, spendBlockOf, toMs, useOrch, type ODetail, type OItem, type ORun, type OThread, type SpendBlock } from "../../api/orch";
 import { Markdown } from "../../components/Markdown";
 import { Boundary } from "../../components/Boundary";
@@ -1081,7 +1082,6 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
             <span className="muted nowrap">· {WORKSPACE_LABEL[workspaceOf(t)]}</span>
           </div>
         )}
-        {t.error && <div className="werr">{t.error}</div>}
         {past.loadEarlier && (
           <button className="wearlier" disabled={past.earlierBusy} onClick={() => (keepPlace(), past.loadEarlier?.())}>
             {past.earlierBusy ? "Loading earlier turns…" : "Show earlier turns"}
@@ -1108,6 +1108,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
           </Fragment>
         ))}
         <PendingBubbles list={sent.list} drop={sent.drop} />
+        {t.error && t.status === "error" && !running && <ErrorCard t={t} runs={detail.runs} />}
         {[...cards.keys()].filter((k) => !usedCards.has(k)).map((k) => (
           <SubagentCard key={k} list={cards.get(k)!} kids={kids} needIds={needIds} now={now} />
         ))}
@@ -1337,5 +1338,46 @@ export function NotFoundChat({ status, onBack }: { status: string; onBack?: () =
         )}
       </div>
     </section>
+  );
+}
+
+/** The error that ended the thread, at the end of the chat where the reader is, with a retry of the last prompt. */
+function ErrorCard({ t, runs }: { t: OThread; runs: ORun[] }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const last = [...runs].reverse().find((r) => r.prompt && !r.prompt.startsWith("!"))?.prompt || "";
+  const lines = t.error!.split("\n");
+  const long = lines.length > 6;
+  const retry = async () => {
+    setBusy(true);
+    try {
+      await sendMessage(t.id, last);
+    } catch (e) {
+      showToast("Retry failed", (e as Error).message, { kind: "alert" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="werrcard" role="alert">
+      <div className="werrcard-h">
+        <span className="werrcard-t">{agentName(t.agent)} stopped with an error</span>
+        <CopyBtn text={t.error!} label="Copy error" className="btn sm ghost" />
+      </div>
+      <pre className="werrcard-m">{open || !long ? t.error : lines.slice(0, 6).join("\n")}</pre>
+      {long && (
+        <button className="btn sm ghost" onClick={() => setOpen(!open)}>
+          {open ? "Show less" : `Show all ${lines.length} lines`}
+        </button>
+      )}
+      <div className="werrcard-a">
+        {last && (
+          <button className="btn sm pri" disabled={busy} onClick={() => void retry()} title={last}>
+            {busy ? "Sending…" : "Try again"}
+          </button>
+        )}
+        <span className="muted">{last ? "Sends your last message again." : "Send a message to start the agent again."}</span>
+      </div>
+    </div>
   );
 }

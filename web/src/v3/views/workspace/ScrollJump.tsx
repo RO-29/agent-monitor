@@ -12,7 +12,9 @@ export function ScrollJump({ el }: { el: RefObject<HTMLDivElement | null> }) {
       const y = nl ? nl.getBoundingClientRect().top - f.getBoundingClientRect().top : 0;
       const fresh = !nl ? "" : y < 0 ? "up" : y > f.clientHeight ? "down" : "";
       setPos((p) => {
-        const n = { top: f.scrollTop > far, bottom: f.scrollHeight - f.scrollTop - f.clientHeight > far, fresh } as const;
+        const below = f.scrollHeight - f.scrollTop - f.clientHeight;
+        // At the bottom, where people read, a Top button only covers the newest text.
+        const n = { top: f.scrollTop > far && below > 160, bottom: below > far, fresh } as const;
         return p.top === n.top && p.bottom === n.bottom && p.fresh === n.fresh ? p : n;
       });
     };

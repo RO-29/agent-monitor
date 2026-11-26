@@ -136,6 +136,7 @@ var accessRules = []accessRule{
 	{"GET HEAD", "/api/orch/agents$", "", LevelView},
 	{"GET HEAD", "/api/orch/stream$", "", LevelView},
 	{"GET HEAD", "/api/orch/threads", "", LevelView},
+	{"GET HEAD", "/api/orch/costs$", "", LevelView},
 	{"GET HEAD", "/api/queue/", "", LevelView},
 	{"GET HEAD", "/api/notify", "", LevelView},
 	{"POST", "/api/notify/read$", "", LevelView},   // read marks only: a paired phone clears its own unread count

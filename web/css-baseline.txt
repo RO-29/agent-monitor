@@ -211,7 +211,8 @@ leak: .wq x2
 leak: .wq-a x4
 leak: .wq-b x7
 leak: .wq-box x2
-leak: .wq-t x3
+leak: .wq-t x2
+leak: .wq-tx x2
 leak: .ws x10
 leak: .wtstart x2
 leak: .wtstart-h x2

@@ -133,3 +133,15 @@ func TestSpendCodexRates(t *testing.T) {
 		t.Fatalf("a configured rate wins over the stored estimate %v", c)
 	}
 }
+
+func TestOrchThreadCosts(t *testing.T) {
+	e := newOrchEnv(t)
+	th := e.create("hello")
+	e.waitRunEnd()
+	_ = e.m.store.write(func(tx *orchTx) error {
+		return tx.putRun(&ORun{ID: "r_cost", ThreadID: th.ID, Index: 9, Status: "completed", Usage: &OUsage{InTokens: 2_000_000, OutTokens: 500_000, CostUSD: 1.234}})
+	})
+	if got := e.m.ThreadCosts()[th.ID]; got <= 0 {
+		t.Fatalf("cost = %v, want more than 0", got)
+	}
+}

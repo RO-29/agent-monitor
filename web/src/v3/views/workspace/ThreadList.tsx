@@ -1,10 +1,10 @@
 import { AgentIcon } from "../../components/AgentIcon";
 // Left column: driven and watched threads grouped as Needs you, Working, Ready, Settled, with subagents nested.
 import { ListHideBtn } from "./barToggles";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
-import { fmtAgo } from "../../../lib/format";
+import { fmtAgo, fmtUsd } from "../../../lib/format";
 import { pinThread, settleThread, snoozeThread, useOrch } from "../../api/orch";
 import { typing } from "../../ctx";
 import { overlayOpen } from "../../keys";
@@ -88,7 +88,7 @@ const PLACE: Record<string, string> = { "claude-desktop": "Desktop", cli: "Termi
 
 /** Where a thread runs, in a word or two; a session that moved shows its path, for example "Desktop → Terminal". */
 export function placeText(r: { driven?: unknown; watched?: { session?: { entrypoint?: string; places?: string[] } } }): string {
-  if (r.driven) return "Thread";
+  if (r.driven) return ""; // the same word on every driven row told nothing
   const s = r.watched?.session;
   const steps = (s?.places || []).map((p) => PLACE[p] || p);
   if (steps.length > 1) return steps.slice(-3).join(" → ");
@@ -104,7 +104,10 @@ export function TermIcon() {
   );
 }
 
+const CostCtx = createContext<Map<string, number>>(new Map());
+
 function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: boolean; onMenu: (r: WRow, x: number, y: number, anchor?: HTMLElement) => void }) {
+  const cost = useContext(CostCtx).get(r.id);
   const note = noteOf(r);
   const dc = dotCls(r);
   const menuBtn = r.driven ? (
@@ -144,6 +147,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
             <span className="trunc">{r.repo || "no project"}</span>
             {r.branch && !note && <span className="trunc br">{r.branch}</span>}
             {note && <span className={`nt ${note.cls}`}>{note.text}</span>}
+            {cost != null && cost >= 0.1 && <span className="wrcost" title="Spent in this thread">{fmtUsd(cost)}</span>}
           </span>
         )}
         {child && <span className="r2"><AgentIcon agent={r.agent} size={13} />{note && <span className={`nt ${note.cls}`}>{note.text}</span>}</span>}
@@ -347,7 +351,8 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   const active = (shown.top.get("need")?.length || 0) + (shown.top.get("working")?.length || 0) > 0;
   const nav = useNavigate();
   const v = useV3();
-  const orchStatus = useOrch().status;
+  const orch = useOrch();
+  const orchStatus = orch.status;
   const ts = useTranscriptSearch(q);
   const titleOf = useTitleOf();
   const groups = useMemo(() => groupHits(ts.res?.hits || [], v.threadOf), [ts.res, v.threadOf]);
@@ -386,6 +391,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
 
   const total = GROUPS.reduce((n, g) => n + (shown.top.get(g.key) || []).length, 0);
   return (
+    <CostCtx.Provider value={orch.costs}>
     <aside className="wlist-col" aria-label="Threads">
       <div className="wlist-top">
         <div className="wbrand">
@@ -484,5 +490,6 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
       <UsageMini focus={rows.find((r) => r.id === sel || (!!r.openId && r.openId === sel))?.agent} />
       {menu && <RowMenu r={rows.find((x) => x.id === menu.r.id) || menu.r} x={menu.x} y={menu.y} onClose={closeMenu} />}
     </aside>
+    </CostCtx.Provider>
   );
 }

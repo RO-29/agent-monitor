@@ -317,7 +317,8 @@ export default function V3Shell() {
             )}
           </nav>
           <div className="main">
-            <header className="ptop">
+            {/* An open chat has its own bar with Back and a menu; two bars cost the phone a tenth of its height. */}
+            <header className={`ptop ${/^\/w\/(?!new$|search$)[^/]+/.test(path) ? "pchat" : ""}`}>
               <Link to="/w" className="logo" aria-label="Threads" />
               <b>{titleOf(path)}</b>
               <span className="ml-auto" />

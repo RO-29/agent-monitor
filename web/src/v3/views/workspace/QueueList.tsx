@@ -224,7 +224,7 @@ export const QueueList = forwardRef<QueueListHandle, Props>(function QueueList({
                         {!bash && <span className="wq-pos">{pos === 0 ? "next" : `#${pos + 1}`}</span>}
                         <span className="wq-src">{bash ? "in the terminal" : `in ${cli.name}`}</span>
                       </div>
-                      <div className="wq-t">{it.text || "(no text, for example an image)"}</div>
+                      <div className="wq-tx">{it.text || "(no text, for example an image)"}</div>
                       {bash && it.live && <pre className="wq-live">{it.live}</pre>}
                     </div>
                     {bash && (
@@ -306,7 +306,7 @@ export const QueueList = forwardRef<QueueListHandle, Props>(function QueueList({
                     <span className="wq-pos">{j === 0 && !failed && !cliItems.length ? "next" : `#${i + 1}`}</span>
                     {it.attachments?.length ? <span className="wq-pos">{it.attachments.length} {it.attachments.length === 1 ? "image" : "images"}</span> : null}
                   </div>
-                  <div className="wq-t">{it.text}</div>
+                  <div className="wq-tx">{it.text}</div>
                   {failed && it.error && <div className="wq-err">{it.error}</div>}
                   {!failed && it.error && <div className="wq-warn">{it.error}</div>}
                 </div>
@@ -335,7 +335,7 @@ export const QueueList = forwardRef<QueueListHandle, Props>(function QueueList({
           {q.terminal.map((t, i) => (
             <div key={i} className="wq-it ro">
               <div className="wq-b">
-                <div className="wq-t">{t}</div>
+                <div className="wq-tx">{t}</div>
               </div>
             </div>
           ))}

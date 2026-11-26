@@ -354,6 +354,7 @@ export const orchApi = {
   // phase 6
   allowOnce: (id: string) => req<{ ok?: boolean; thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/allow-once`),
   continueParent: (id: string) => req<{ ok?: boolean; thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/worktree/parent`),
+  costs: () => req<{ costs: Record<string, number> }>("GET", "/api/orch/costs"),
   spend: (threadId?: string) => req<OSpendStatus>("GET", `/api/orch/spend${threadId ? `?thread=${enc(threadId)}` : ""}`),
   terminal: (b: OTerminalBody) => req<{ ok?: boolean } & OTerminalStart>("POST", "/api/orch/terminal", b),
   host: (hostId: string) => req<OHostInfo>("GET", `/api/hosts/${enc(hostId)}`),
@@ -511,6 +512,7 @@ export interface OrchState {
   mock: boolean;
   version: number;
   blocked: Map<string, SpendBlock>; // threads whose last send hit a spend limit
+  costs: Map<string, number>; // USD spent per thread, from GET /api/orch/costs
 }
 
 const s: OrchState = {
@@ -524,6 +526,7 @@ const s: OrchState = {
   mock: false,
   version: 0,
   blocked: new Map(),
+  costs: new Map(),
 };
 let snap: OrchState = { ...s };
 const listeners = new Set<() => void>();
@@ -566,6 +569,7 @@ function applyOne(e: OEvent) {
   if (e.type === "thread.updated" && d.thread) {
     s.threads = new Map(s.threads).set(d.thread.id, d.thread);
   }
+  if (e.type === "run.ended") loadCostsSoon();
   const det = s.details.get(e.threadId);
   if (det && e.seq > det.seq) {
     const n: ODetail = { ...det, seq: e.seq };
@@ -665,8 +669,25 @@ function openStream() {
   };
 }
 
+let costTimer = 0;
+// Run ends come in bursts (a fan-out); one fetch after the last of them.
+function loadCostsSoon() {
+  window.clearTimeout(costTimer);
+  costTimer = window.setTimeout(loadCosts, 2000);
+}
+async function loadCosts() {
+  if (s.mock) return;
+  try {
+    s.costs = new Map(Object.entries((await orchApi.costs()).costs || {}));
+    emit();
+  } catch {
+    // an older daemon has no /costs route: rows just show no spend
+  }
+}
+
 export async function loadOrchThreads() {
   if (s.mock) return;
+  void loadCosts();
   try {
     const r = await orchApi.threads();
     s.threads = new Map((r.threads || []).map((t) => [t.id, t]));
@@ -752,6 +773,7 @@ export function seedStore(threads: OThread[], details: ODetail[], hooks: MockHoo
   s.threads = new Map(threads.map((t) => [t.id, t]));
   s.details = new Map(details.map((d) => [d.thread.id, d]));
   s.seq = Math.max(0, ...details.map((d) => d.seq));
+  s.costs = new Map(details.map((d) => [d.thread.id, d.runs.reduce((n, r) => n + (r.usage?.costUsd || 0), 0)]));
   mockHooks = hooks;
   emit();
 }

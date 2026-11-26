@@ -106,6 +106,9 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 		}
 		writeJSON(w, map[string]any{"threads": threads, "seq": seq})
 	})
+	mux.HandleFunc("GET /api/orch/costs", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"costs": m.ThreadCosts()})
+	})
 	mux.HandleFunc("POST /api/orch/threads", func(w http.ResponseWriter, r *http.Request) {
 		var in orchCreate
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {

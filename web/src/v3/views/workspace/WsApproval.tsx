@@ -300,7 +300,7 @@ function RiskLine({ ask }: { ask: AskInfo }) {
 }
 
 /** Full text with a visible cut marker and a Show all toggle; never cuts in silence. */
-export function FullText({ text, label, lines = 14, chars = 1500 }: { text: string; label: string; lines?: number; chars?: number }) {
+export function FullText({ text, label, lines = 8, chars = 600 }: { text: string; label: string; lines?: number; chars?: number }) {
   const [all, setAll] = useState(false);
   const ls = text.split("\n");
   const long = ls.length > lines || text.length > chars;
