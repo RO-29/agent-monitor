@@ -109,6 +109,16 @@ func startTmuxBadges() {
 		return
 	}
 	b := newTmuxBadger()
+	// Badges from an earlier daemon are unknown to this one, so clear every window once.
+	if panes, err := listTmuxPanes(); err == nil {
+		seen := map[string]bool{}
+		for _, p := range panes {
+			if !seen[p.WindowID] {
+				seen[p.WindowID] = true
+				_ = b.set(p.WindowID, "")
+			}
+		}
+	}
 	go func() {
 		failed := false
 		for range time.Tick(3 * time.Second) {
