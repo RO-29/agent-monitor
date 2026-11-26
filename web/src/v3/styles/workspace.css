@@ -463,6 +463,8 @@
 .v3 .ws .wcrumb b{font-size:14px}
 .v3 .ws .wcrumb .rp{font-size:12.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 8 auto}
 .v3 .ws .wcrumb b{flex:0 1 auto}
+.v3 .ws .wcrumb .wtitle-ed{cursor:text}
+.v3 .ws .wcrumb .wtitle-in{flex:1 1 auto;min-width:0;max-width:560px;font:inherit;font-size:14px;font-weight:600;padding:2px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--bg);color:var(--fg)}
 .v3 .ws .wstat{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg-2);white-space:nowrap;flex:none}
 .v3 .ws .wstat::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
 .v3 .ws .wstat.need::before{background:var(--need)} .v3 .ws .wstat.run::before{background:var(--run);animation:wpulse 1.4s ease-in-out infinite}

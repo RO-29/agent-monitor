@@ -27,6 +27,7 @@ import { nativeSid } from "./handover";
 import { p7 } from "../../api/p7";
 import { isMissing, v3 } from "../../api/client";
 import { Composer, useAttachments } from "./Composer";
+import { EditTitle, startRename } from "../../components/EditTitle";
 import { cliApi, queueApi, useQueue } from "../../api/queue";
 import { QueueList, type QueueListHandle } from "./QueueList";
 import { Boundary } from "../../components/Boundary";
@@ -195,6 +196,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const t = row.thread;
   const sid = latestSession(row);
   const session: Session | undefined = row.session || lv.sessions.get(sid);
+  const renameId = sid && lv.sessions.has(sid) ? sid : "";
   const live = watchedLiveness(row, lv.connected);
   const running = live.running;
   // A live registered pane owns the session even after an hour idle marks it completed.
@@ -353,9 +355,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         )}
         <ListShowBtn />
         <div className="wcrumb">
-          <b className="trunc" title={row.title}>
-            {row.title}
-          </b>
+          {renameId ? <EditTitle title={row.title} save={(v) => v3.renameSession(renameId, v)} /> : <b className="trunc" title={row.title}>{row.title}</b>}
         </div>
         {status && (quietMin >= 2 && session && owned ? (
           <button className={`wstat ${status.cls} wstat-btn`} onClick={() => shell.openPane(session)} title={`No output since ${new Date(session.lastActivityAt).toLocaleTimeString()}. Open the pane to look.`}>
@@ -377,6 +377,11 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
           <BarMenu>
             <TopBarItem />
             <NarrowBarItems status={status} onSide={onSide} />
+            {renameId && (
+              <button role="menuitem" onClick={startRename}>
+                Rename
+              </button>
+            )}
             {row.cwd && (
               <button role="menuitem" className="wmenu-narrow" onClick={() => void openSessionDiff()}>
                 Diff

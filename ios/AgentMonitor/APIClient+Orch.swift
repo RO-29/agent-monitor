@@ -87,6 +87,16 @@ extension APIClient {
         try await post("/api/queue/\(enc(id))", body: body)
     }
 
+    /// Renames a driven thread.
+    func drivenRename(_ id: String, title: String) async throws {
+        try await post("/api/orch/threads/\(enc(id))/rename", body: ["title": title])
+    }
+
+    /// Saves the user's title for a watched session (store id such as claude:<uuid>).
+    func sessionRename(_ id: String, title: String) async throws {
+        try await post("/api/session-title", body: ["id": id, "title": title])
+    }
+
     /// Settles a driven thread: it leaves "needs you" until it changes again.
     func drivenSettle(_ id: String) async throws {
         try await post("/api/orch/threads/\(enc(id))/settle", body: ["settled": true])

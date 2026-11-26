@@ -23,6 +23,12 @@ func registerOrchRoutes(mux *http.ServeMux) {
 	orchMgr = newOrchManager(store, approvalStore)
 	drivenSessionFn = orchMgr.DrivenLive
 	go func() {
+		time.Sleep(5 * time.Second) // the HTTP server and its MCP routes must answer first
+		if ids := orchMgr.ContinueInterrupted(); len(ids) > 0 {
+			log.Printf("orch: continued %d turns the restart ended", len(ids))
+		}
+	}()
+	go func() {
 		for {
 			if n, err := store.Prune(time.Now()); err != nil {
 				log.Printf("orch: prune: %v", err)
@@ -209,6 +215,19 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 				return
 			}
 			_, err = m.UpdateMeta(id, func(th *OThread, now int64) { th.Pinned = in.Pinned })
+		case "rename":
+			var in struct {
+				Title string `json:"title"`
+			}
+			if !decodeOptional(w, r, &in) {
+				return
+			}
+			title := cleanTitle(in.Title)
+			if title == "" {
+				orchWriteErr(w, orchBadRequest("title is required"))
+				return
+			}
+			_, err = m.UpdateMeta(id, func(th *OThread, now int64) { th.Title = title })
 		default:
 			http.NotFound(w, r)
 			return

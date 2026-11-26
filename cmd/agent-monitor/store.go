@@ -21,12 +21,17 @@ type Store struct {
 	sessions  map[string]*Session
 	listeners map[int]Listener
 	nextID    int
+
+	titlePath   string
+	titles      map[string]string // titles the user set; see session_titles.go
+	agentTitles map[string]string // the agent's own title of a renamed session
 }
 
 func NewStore() *Store {
 	return &Store{
-		sessions:  map[string]*Session{},
-		listeners: map[int]Listener{},
+		sessions:    map[string]*Session{},
+		listeners:   map[int]Listener{},
+		agentTitles: map[string]string{},
 	}
 }
 
@@ -104,6 +109,9 @@ func (s *Store) LoadHistorical(sessions []*Session) int {
 			continue
 		}
 		cp := *sess
+		if t := s.titles[sess.ID]; t != "" {
+			cp.Title = t
+		}
 		s.sessions[sess.ID] = &cp
 		added++
 	}
@@ -276,6 +284,12 @@ func (s *Store) Upsert(in UpsertInput) *Session {
 		next.Title = in.Title
 	case prev != nil:
 		next.Title = prev.Title
+	}
+	if t := s.titles[id]; t != "" {
+		if in.HasTitle {
+			s.agentTitles[id] = in.Title
+		}
+		next.Title = t
 	}
 	switch {
 	case in.HasFirst:

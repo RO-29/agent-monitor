@@ -85,10 +85,14 @@ func enrichV4(out []ThreadV3, v *threadView, now int64) []Stack {
 	for i := range out {
 		t := &out[i]
 		t.Repo = repoBase(t.Cwd)
-		t.Display = memo("d\x00"+t.Title+"\x00"+t.Repo+"\x00"+firstPromptOf(v, t.Sessions), func(k string) string {
-			f := strings.SplitN(k, "\x00", 4)
-			return displayTitle(f[1], f[2], f[3])
-		})
+		if ut := store.userTitle(t.Sessions); ut != "" {
+			t.Title, t.Display = ut, ut
+		} else {
+			t.Display = memo("d\x00"+t.Title+"\x00"+t.Repo+"\x00"+firstPromptOf(v, t.Sessions), func(k string) string {
+				f := strings.SplitN(k, "\x00", 4)
+				return displayTitle(f[1], f[2], f[3])
+			})
+		}
 		t.OutcomeLine = memo("o\x00"+firstOf(t.LastOutcome, t.LastPoint), func(k string) string { return outcomeLine(k[2:]) })
 		if t.Kind == "driven" {
 			t.ErrorsOpen = t.Errors

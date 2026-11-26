@@ -761,11 +761,18 @@ func (m *OrchManager) SendWith(id, text string, attachments []string) (string, e
 	if err != nil {
 		return "", err
 	}
-	mode, err := d.send(takeBangContext(id)+text, imgs)
+	ctx, seq := m.store.bangContext(id)
+	mode, err := d.send(ctx+text, imgs)
+	if err == nil {
+		m.store.dropBangContext(id, seq)
+	}
 	return mode, err
 }
 
 func (m *OrchManager) Interrupt(id string) error {
+	if stopBang(id) {
+		return nil
+	}
 	d, err := m.driver(id)
 	if err != nil {
 		return err

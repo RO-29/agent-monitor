@@ -108,6 +108,7 @@ func runServer() {
 
 	startMemGuard()
 	store = NewStore()
+	store.LoadTitles(filepath.Join(stateDir(), "titles.json"))
 	permStore = NewPermStore()
 	paneRegistry = NewPaneRegistry()
 	hostRegistry = NewHostRegistry(filepath.Join(stateDir(), "hosts.json"))
@@ -174,6 +175,7 @@ func runServer() {
 	registerTraceRoutes(mux)
 	registerV3Routes(mux)
 	startWiring()
+	mux.HandleFunc("/api/session-title", handleSessionTitle)
 	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
 		all := store.All()
 		// ?waiting=1 returns only sessions waiting on the user; the full list is several MB.

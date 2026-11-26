@@ -160,6 +160,10 @@ a change defines a selector one more time (inside `@media` too), or styles a glo
 `bin/css-collisions.py --update` and commit `web/css-baseline.txt`. The check counts rules only: a
 change that removes one rule and adds another for the same selector passes.
 
+`bin/screenshots.sh` takes 16 screenshots of the web app on the build Mac after `bin/remote-build.sh`:
+four screens, desktop and phone, dark and light. It uses the sample data of `?mock=1` and points the
+dev server at a port with no daemon, so no real session can show.
+
 Required native helper: `rust/am-helper/build.sh ~/agent-monitor` builds `am-helper` and puts it next to
 the binary. It serves `mcp-perm-server`, `run` and `__pty-leader`. The Go binary has no copy of these modes
 and exits with an error when `am-helper` is missing. See `rust/am-helper/PROTOCOL.md`.
@@ -275,8 +279,18 @@ Messages can carry images (paste or drop them in the composer). The composer com
 
 A message that starts with `!` runs as a shell command in the thread's folder, as in Claude Code's
 bash mode. The output shows in the chat at once, no turn starts, and the agent sees the command and its
-output with your next message. A command stops after 10 minutes. This also works in a session you
-continued with Continue here, which has no terminal.
+output with your next message. Stop ends a running command, and a command stops by itself after 10
+minutes. The daemon keeps the output in its database until the agent gets it, so a daemon restart does
+not lose it. This also works in a session you continued with Continue here, which has no terminal.
+
+A daemon restart ends every driven turn that runs at that moment. The new daemon sends each of these
+threads one message that tells the agent to continue (turns older than 6 hours are skipped).
+`bin/install-build.sh` lists these threads before it restarts. Set `AGENT_MONITOR_NO_RESUME=1` in the
+daemon's environment to turn this off.
+
+Rename a thread with a double-click on its title, or with Rename in the thread menu (web and iPhone).
+A renamed terminal session keeps your title when the agent sets a new one; an empty title goes back to
+the agent's title. The titles live in `~/.agent-monitor/titles.json`.
 
 A message sent while a driven thread works waits in the queue above the composer and goes when the agent
 is idle, one message per turn. For a terminal session that agent-monitor can reach (a session host or a

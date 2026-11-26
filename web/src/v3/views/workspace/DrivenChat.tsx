@@ -15,7 +15,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtDuration, fmtUsd, shortCwd } from "../../../lib/format";
 import { ApiError } from "../../api/client";
-import { agentCls, agentLabel, agentVar, allowOnce, closeThread, continueInParent, interruptThread, pinThread, sendMessage, settleThread, spendBlockOf, toMs, useOrch, type ODetail, type OItem, type ORun, type OThread, type SpendBlock } from "../../api/orch";
+import { EditTitle, startRename } from "../../components/EditTitle";
+import { agentCls, agentLabel, agentVar, allowOnce, closeThread, continueInParent, interruptThread, pinThread, renameThread, sendMessage, settleThread, spendBlockOf, toMs, useOrch, type ODetail, type OItem, type ORun, type OThread, type SpendBlock } from "../../api/orch";
 import { Markdown } from "../../components/Markdown";
 import { Boundary } from "../../components/Boundary";
 import { agentName, useV3 } from "../../live";
@@ -797,6 +798,8 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const needIds = useMemo(() => drivenNeedIds(ny.items, v.approvals.values()), [ny.version, v.approvals]); // eslint-disable-line react-hooks/exhaustive-deps
   const parent = t.parentId ? threads.get(t.parentId) : undefined;
   const running = t.status === "running" || t.status === "starting";
+  // A "!" command runs outside the agent turn; Stop ends it first.
+  const bashRun = detail.runs.some((r) => r.status === "running" && r.id.startsWith("ob_"));
   const waitingOn = myKids.filter((c) => c.status === "running" || c.status === "starting" || c.status === "waiting");
   const now = useTick(running || waitingOn.length > 0 || detail.runs.some((r) => r.status === "running"));
   const feed = useRef<HTMLDivElement>(null);
@@ -924,8 +927,9 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
   const commands: PickCommand[] = [
     ...(canReview ? [{ key: "review", label: "Review the changes", run: () => setReviewing(true) }] : []),
     ...(noGit ? [] : [{ key: "diff", label: "Show the thread diff", run: () => dnav.open({ from: "base", to: "worktree", label: "Thread" }) }]),
-    ...(running ? [{ key: "stop", label: "Stop the running turn", run: () => void stop() }] : []),
+    ...(running || bashRun ? [{ key: "stop", label: bashRun ? "Stop the running ! command" : "Stop the running turn", run: () => void stop() }] : []),
     { key: "terminal", label: termOpen ? "Hide the terminal" : "Open a terminal here", run: toggleTerm },
+    { key: "rename", label: "Rename this thread", run: startRename },
     { key: t.pinned ? "unpin" : "pin", label: t.pinned ? "Unpin this thread" : "Pin this thread", run: () => void pinThread(t.id, !t.pinned).catch((e: Error) => showToast("Pin failed", e.message, { kind: "alert" })) },
     { key: t.group === "settled" ? "unsettle" : "settle", label: t.group === "settled" ? "Move back to the active list" : "Settle this thread", run: () => void settleThread(t.id, t.group !== "settled").catch((e: Error) => showToast("Settle failed", e.message, { kind: "alert" })) },
     ...(closed ? [] : [{ key: "close", label: "Close this thread", run: () => setConfirmClose(true) }]),
@@ -981,9 +985,7 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
         )}
         <ListShowBtn />
         <div className="wcrumb">
-          <b className="trunc" title={t.title}>
-            {t.title}
-          </b>
+          <EditTitle title={t.title} save={(v) => renameThread(t.id, v)} />
           {parent && (
             <Link className="rp wparent trunc hidephone" to={`/w/${encodeURIComponent(parent.id)}`} title={`Subagent of ${parent.title}`}>
               ↳ {parent.title}
@@ -1180,8 +1182,8 @@ export function DrivenChat({ detail, onBack, onSide, hit, linkedPage }: { detail
           <span className="wchip">{t.agent === "codex" ? t.sandbox || "read-only" : permModeLabel(t.permissionMode || "manual")}</span>
           <ResumeChip tool={t.agent} sessionId={t.nativeId} cwd={t.worktree && !t.worktree.removed ? t.worktree.path : t.cwd} />
           <span className="sp" />
-          {running && (
-            <button className="btn sm" onClick={() => stop()} title="Interrupt the running turn">
+          {(running || bashRun) && (
+            <button className="btn sm" onClick={() => stop()} title={bashRun ? "Stop the running ! command" : "Interrupt the running turn"}>
               ■ Stop
             </button>
           )}

@@ -14,6 +14,13 @@ cp "$SRC/am-helper" "$LIVE/.am-helper.new" && mv -f "$LIVE/.am-helper.new" "$LIV
 if [[ "${2:-}" == --app ]]; then
   rm -rf "$HOME/Applications/agent-monitor.app" && ditto "$SRC/agent-monitor.app" "$HOME/Applications/agent-monitor.app"
 fi
+# The restart ends every running driven turn; the new daemon sends each one a continue message.
+curl -fsS --max-time 3 http://127.0.0.1:7777/api/orch/threads 2>/dev/null | python3 -c '
+import json, sys
+ts = [t for t in json.load(sys.stdin).get("threads", []) if t.get("status") in ("running", "starting")]
+for t in ts: print("restart ends the running turn of: " + (t.get("title") or t["id"])[:70])
+if ts: print("they continue by themselves after the restart (AGENT_MONITOR_NO_RESUME=1 turns this off)")
+' || true
 launchctl kickstart -k "gui/$(id -u)/com.rohit.agent-monitor"
 # The daemon loads every session before it listens: wait for it (up to 60 s) before the smoke test.
 for _ in $(seq 1 60); do curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:7777/api/health 2>/dev/null && break; sleep 1; done

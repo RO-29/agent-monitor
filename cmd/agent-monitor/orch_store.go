@@ -194,6 +194,8 @@ type OrchStore struct {
 	deltas  map[string]*orchDelta
 	order   []string
 	flushAt *time.Timer
+
+	interrupted []string // threads whose agent turn the last daemon stop ended
 }
 
 type orchDelta struct {
@@ -224,6 +226,8 @@ func openOrchStore(dir string, hub *OrchHub) (*OrchStore, error) {
 		`CREATE INDEX IF NOT EXISTS checkpoints_thread ON checkpoints(thread_id)`,
 		`CREATE TABLE IF NOT EXISTS queue(id TEXT PRIMARY KEY, thread_id TEXT, ord REAL, json TEXT)`,
 		`CREATE INDEX IF NOT EXISTS queue_thread ON queue(thread_id, ord)`,
+		`CREATE TABLE IF NOT EXISTS bang_ctx(seq INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT, block TEXT)`,
+		`CREATE INDEX IF NOT EXISTS bang_ctx_thread ON bang_ctx(thread_id, seq)`,
 	} {
 		if _, err := db.Exec(q); err != nil {
 			db.Close()
@@ -635,8 +639,14 @@ func (s *OrchStore) RecoverAfterRestart() error {
 		if err != nil {
 			return err
 		}
+		seen := map[string]bool{}
 		for i := range runs {
 			r := &runs[i]
+			// A "!" command is not an agent turn, and a turn older than 6 h is stale work.
+			if !strings.HasPrefix(r.ID, "ob_") && t.now-r.StartedAt < (6*time.Hour).Milliseconds() && !seen[r.ThreadID] {
+				seen[r.ThreadID] = true
+				s.interrupted = append(s.interrupted, r.ThreadID)
+			}
 			r.Status, r.EndedAt = "interrupted", t.now
 			if err := t.putRun(r); err != nil {
 				return err

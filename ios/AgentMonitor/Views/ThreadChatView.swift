@@ -14,6 +14,9 @@ struct ThreadChatView: View {
     private var fullscreen: Bool { store.chatFullscreen }
 
     @State private var items: [String: WItem] = [:]
+    @State private var renamed: String?
+    @State private var renaming = false
+    @State private var renameText = ""
     /// Turns of the CLI session a driven thread continued, before the thread existed.
     @State private var prior: [String: WItem] = [:]
     /// Code Mode scripts whose tool calls are shown.
@@ -70,7 +73,7 @@ struct ThreadChatView: View {
         return sessionID.map { .watched($0) }
     }
     private var session: Session? { peer != nil ? nil : sessionID.flatMap { store.sessionsByID[$0] } }
-    private var title: String { thread?.name ?? driven?.title ?? session?.headline ?? "Thread" }
+    private var title: String { renamed ?? thread?.name ?? driven?.title ?? session?.headline ?? "Thread" }
     private var agent: String { thread?.agent ?? driven?.agent ?? session?.tool ?? "claude" }
     private var asks: [Approval] {
         if let t = thread { return store.approvals(forThread: t) }
@@ -79,7 +82,11 @@ struct ThreadChatView: View {
     }
     private var running: Bool {
         if peer != nil { return thread?.state == .running }
-        if drivenID != nil { return driven?.status == "running" || driven?.status == "starting" }
+        // A "!" command runs outside the agent turn; Stop ends it too.
+        if drivenID != nil {
+            return driven?.status == "running" || driven?.status == "starting"
+                || items.values.contains { $0.id.hasPrefix("ob_") && $0.status == "started" }
+        }
         return session?.state == .running
     }
     private var sorted: [WItem] {
@@ -421,10 +428,18 @@ struct ThreadChatView: View {
                     Button { Task { await resume(sid) } } label: { Label("Resume in Terminal", systemImage: "play.circle") }
                 }
             }
+            if peer == nil, drivenID != nil || session != nil {
+                Button { renameText = title; renaming = true } label: { Label("Rename", systemImage: "pencil") }
+            }
             Divider()
             Button { showDetails = true } label: { Label("Thread Details", systemImage: "info.circle") }
         } label: {
             Image(systemName: "ellipsis.circle")
+        }
+        .alert("Rename", isPresented: $renaming) {
+            TextField("Title", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { Task { await rename() } }
         }
         .confirmationDialog("End this session?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End Session", role: .destructive) { if let sid = sessionID { Task { await end(sid) } } }
@@ -441,6 +456,20 @@ struct ThreadChatView: View {
             ToastCenter.shared.show(ended ? "Session ended" : "Exit sent; check the terminal", icon: ended ? "stop.circle" : "exclamationmark.circle")
         } catch { ToastCenter.shared.show("Could not end: \(error.localizedDescription)", icon: "xmark.octagon") }
         await store.loadThreads()
+    }
+
+    private func rename() async {
+        let t = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, t != title else { return }
+        let was = renamed
+        renamed = t
+        do {
+            if let d = drivenID { try await api.drivenRename(d, title: t) } else if let sid = session?.id { try await api.sessionRename(sid, title: t) }
+            await store.loadThreads()
+        } catch {
+            renamed = was
+            ToastCenter.shared.show("Could not rename: \(error.localizedDescription)", icon: "xmark.octagon")
+        }
     }
 
     private func resume(_ sid: String) async {

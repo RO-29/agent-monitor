@@ -155,6 +155,25 @@ func TestOrchStoreRecoverAfterRestart(t *testing.T) {
 	}
 }
 
+func TestOrchStoreRecoverListsTurnsToContinue(t *testing.T) {
+	s := newTestOrchStore(t)
+	now := time.Now().UnixMilli()
+	for _, id := range []string{"fresh", "old", "bang"} {
+		putTestThread(t, s, &OThread{ID: id, Status: "running"})
+	}
+	_ = s.write(func(tx *orchTx) error {
+		_ = tx.putRun(&ORun{ID: "r1", ThreadID: "fresh", Status: "running", StartedAt: now - 60_000})
+		_ = tx.putRun(&ORun{ID: "r2", ThreadID: "old", Status: "running", StartedAt: now - (7 * time.Hour).Milliseconds()})
+		return tx.putRun(&ORun{ID: "ob_1", ThreadID: "bang", Status: "running", StartedAt: now})
+	})
+	if err := s.RecoverAfterRestart(); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.interrupted) != 1 || s.interrupted[0] != "fresh" {
+		t.Fatalf("interrupted = %v, want [fresh]", s.interrupted)
+	}
+}
+
 // readSSE returns a function that reads the next data event from a stream.
 func readSSE(t *testing.T, r *bufio.Reader) func() OEvent {
 	return func() OEvent {

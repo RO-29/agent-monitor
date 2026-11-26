@@ -24,14 +24,40 @@ func TestOrchBangRunsAShellCommand(t *testing.T) {
 	}
 	e.wait("run.ended", nil)
 
-	ctx := takeBangContext(th.ID)
+	ctx := e.m.store.takeBangContext(th.ID)
 	for _, want := range []string{"<bash-input>echo out-line; echo err-line 1>&2; exit 3</bash-input>", "<bash-stdout>out-line</bash-stdout>", "<bash-stderr>err-line</bash-stderr>"} {
 		if !strings.Contains(ctx, want) {
 			t.Fatalf("context %q lacks %q", ctx, want)
 		}
 	}
-	if again := takeBangContext(th.ID); again != "" {
+	if again := e.m.store.takeBangContext(th.ID); again != "" {
 		t.Fatalf("context sent twice: %q", again)
+	}
+}
+
+func TestOrchBangStopEndsTheCommand(t *testing.T) {
+	e := newOrchEnv(t)
+	th := e.create("hello")
+	e.waitRunEnd()
+
+	if _, err := e.m.Send(th.ID, "! sleep 30"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.Send(th.ID, "! echo second"); err == nil {
+		t.Fatal("a second command started while the first runs")
+	}
+	if err := e.m.Interrupt(th.ID); err != nil {
+		t.Fatalf("Interrupt = %v", err)
+	}
+	ended := e.wait("run.ended", func(d map[string]any) bool { return field(d, "run", "status") == "interrupted" })
+	if ended == nil {
+		t.Fatal("no interrupted run")
+	}
+	if bangRunning(th.ID) {
+		t.Fatal("command still listed as running")
+	}
+	if ctx := e.m.store.takeBangContext(th.ID); !strings.Contains(ctx, "stopped by the user") {
+		t.Fatalf("context = %q", ctx)
 	}
 }
 

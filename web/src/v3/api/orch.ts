@@ -345,6 +345,7 @@ export const orchApi = {
   settle: (id: string, settled: boolean) => req<{ thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/settle`, { settled }),
   snooze: (id: string, until: number) => req<{ thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/snooze`, { until }),
   pin: (id: string, pinned: boolean) => req<{ thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/pin`, { pinned }),
+  rename: (id: string, title: string) => req<{ thread?: OThread }>("POST", `/api/orch/threads/${enc(id)}/rename`, { title }),
   children: (id: string) => req<OThreadDetail>("GET", `/api/orch/threads/${enc(id)}`).then((r) => r.children || []),
   close: (id: string) => req<unknown>("POST", `/api/orch/threads/${enc(id)}/close`),
   continue: (sessionId: string, prompt?: string) => req<{ thread?: OThread; terminal?: { session: string } }>("POST", "/api/orch/continue", { sessionId, prompt: prompt || undefined }),
@@ -863,6 +864,9 @@ export function snoozeThread(id: string, until: number) {
 }
 export function pinThread(id: string, pinned: boolean) {
   return optimistic(id, { pinned }, () => orchApi.pin(id, pinned));
+}
+export function renameThread(id: string, title: string) {
+  return optimistic(id, { title }, () => orchApi.rename(id, title));
 }
 /** Closes a thread; the daemon also closes its descendants (cascade is the default). */
 export async function closeThread(id: string) {
