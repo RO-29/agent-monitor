@@ -596,6 +596,7 @@ struct ThreadChatView: View {
             .defaultScrollAnchor(.bottom)
             .modifier(FindFollow(view: self, proxy: proxy))
             .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { hideKeyboard() })
             .modifier(FullscreenGestures(fullscreen: Binding(get: { store.chatFullscreen }, set: { store.chatFullscreen = $0 })))
             .onChange(of: sorted.last?.id) { _, _ in
                 // Follow new output only while the reader is at the bottom.

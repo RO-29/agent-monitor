@@ -206,7 +206,14 @@ struct Composer: View {
             }
             HStack(alignment: .bottom, spacing: 6) {
                 // The peer proxy passes JSON only, so files cannot reach another Mac.
-                if api.via == nil {
+                if focused {
+                    Button { focused = false } label: {
+                        Image(systemName: "keyboard.chevron.compact.down").font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Tok.fg2).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Hide keyboard")
+                } else if api.via == nil {
                     AttachButton(tray: tray)
                         .disabled(!reachable)
                 }
@@ -877,4 +884,9 @@ private struct SentLate: View {
             }
         }
     }
+}
+
+/// Ends text editing in any view, for a tap outside the composer.
+@MainActor func hideKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 }
