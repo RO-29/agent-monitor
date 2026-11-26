@@ -233,7 +233,7 @@ func cursorChatFirstPrompt(chatID, chatDir string) string {
 	}
 	for _, it := range items {
 		if it.Kind == "user" {
-			if t := cursorTitleLine(it.Text); t != "" {
+			if t := cursorPromptTitle(it.Text); t != "" {
 				t = clipString(t, 80)
 				cursorPromptCache.Store(chatDir, t)
 				return t
@@ -253,4 +253,36 @@ func cursorTitleLine(text string) string {
 		}
 	}
 	return ""
+}
+
+var reCursorLabel = regexp.MustCompile(`(?mi)^[ \t]*(follow-up question|user question|user request|question|user|task|original goal|sql query)[ \t]*:[ \t]*(.*)$`)
+
+// cursorPromptTitle names a chat from its first message. An app template (DataStoria, QueryDog) starts
+// with "You are" or a role header; its last question, else its goal, else its SQL names the chat.
+func cursorPromptTitle(text string) string {
+	first := cursorTitleLine(text)
+	if !strings.HasPrefix(first, "You are") && !reRoleHeader.MatchString(firstLine(text)) {
+		return clipString(first, 80)
+	}
+	best, rank := "", 0
+	for _, m := range reCursorLabel.FindAllStringSubmatchIndex(text, -1) {
+		label := strings.ToLower(text[m[2]:m[3]])
+		r := 1
+		if label == "original goal" {
+			r = 2
+		} else if label != "sql query" {
+			r = 3
+		}
+		v := strings.TrimSpace(text[m[4]:m[5]])
+		if v == "" {
+			v = cursorTitleLine(text[m[1]:])
+		}
+		if v != "" && r >= rank {
+			best, rank = v, r
+		}
+	}
+	if best == "" {
+		best = first
+	}
+	return clipString(strings.Join(strings.Fields(best), " "), 80)
 }
