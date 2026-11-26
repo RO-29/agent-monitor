@@ -4,14 +4,15 @@ import SwiftUI
 struct SavedRepliesBar: View {
     @Binding var text: String
     @AppStorage("chat.savedReplies") private var raw = "continue\nRun the tests and fix what fails\nCommit and open a draft PR\nSummarize what changed"
-    @State private var editing = false
+    // Owned by the composer: the sheet takes focus, and the bar shows only while the box has focus.
+    @Binding var editing: Bool
 
     private var list: [String] { raw.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(list, id: \.self) { r in
+                ForEach(Array(list.enumerated()), id: \.offset) { _, r in
                     Button { text = r } label: {
                         Text(r).font(.footnote).lineLimit(1)
                             .padding(.horizontal, 10).padding(.vertical, 6)

@@ -24,6 +24,8 @@ struct Composer: View {
     @State private var error: String?
     @State private var pane: WatchedPane?
     @State private var queue: CLIQueueView?
+    @State private var queueSeq = 0
+    @State private var editingReplies = false
     @State private var tray = AttachmentTray()
     @FocusState private var focused: Bool
     @State private var sentCount = 0
@@ -181,8 +183,8 @@ struct Composer: View {
                     }
                 }
             }
-            if text.isEmpty, clearedText == nil, focused, slashHits.isEmpty, reachable {
-                SavedRepliesBar(text: $text)
+            if text.isEmpty, clearedText == nil, focused || editingReplies, slashHits.isEmpty, reachable {
+                SavedRepliesBar(text: $text, editing: $editingReplies)
             }
             if !text.isEmpty || clearedText != nil {
                 HStack(spacing: 8) {
@@ -487,6 +489,7 @@ struct Composer: View {
     }
 
     private func send() async {
+        var refreshSid: String?
         guard !sending else { return }
         sending = true
         await dictation.settle(into: $text)
@@ -515,7 +518,7 @@ struct Composer: View {
                 if !sent.panel.isEmpty {
                     slashPanel = SlashPanel(command: String(body.split(separator: " ").first ?? ""), text: sent.panel, menu: sent.menu)
                 }
-                await loadQueue(sid)
+                refreshSid = sid
             }
             // Keep text typed while the send was in flight.
             histIdx = -1
@@ -530,6 +533,8 @@ struct Composer: View {
             }
             sentCount += 1
             error = nil
+            // The box clears first; the queue refresh must not hold the sent text on screen.
+            if let refreshSid { await loadQueue(refreshSid) }
         } catch let e as APIError where !ids.isEmpty && (e.status == 400 || e.status == 415) {
             error = "This daemon did not take the attachments (\(e.message)). Update agent-monitor on the Mac, or send text only."
             status = nil
@@ -575,8 +580,12 @@ struct Composer: View {
         return ok
     }
 
+    /// A failed poll keeps the last queue; an older reply never overwrites a newer one.
     private func loadQueue(_ sid: String) async {
-        queue = try? await api.cliQueue(sid)
+        queueSeq += 1
+        let seq = queueSeq
+        guard let q = try? await api.cliQueue(sid), seq == queueSeq else { return }
+        queue = q
     }
 
     /// Queue every 5 s, pane reachability every 15 s, while the chat is visible.
@@ -637,7 +646,7 @@ struct TermQuestionCard: View {
         .task(id: sessionID) {
             guard item == nil else { return }
             while !Task.isCancelled {
-                polled = try? await api.termQuestion(sessionID)
+                if let q = try? await api.termQuestion(sessionID) { polled = q }
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }

@@ -626,3 +626,25 @@ func TestNotifyRestartClosesEndedRequests(t *testing.T) {
 		t.Fatalf("a restored request did not resolve: %+v", r)
 	}
 }
+
+func TestNotifyNewAlertClosesARestoredOne(t *testing.T) {
+	zero := 0
+	cfg := &NotifySettings{BatchSec: &zero}
+	dir := t.TempDir()
+	n, err := openNotifier(dir, func() NotifySettings { return *cfg })
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.Emit(notifyEvent{Kind: "needs-you", Title: "before restart", Keys: []string{"tp:s1"}})
+	n.db.Close()
+	n, err = openNotifier(dir, func() NotifySettings { return *cfg })
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { n.db.Close() })
+	n.Emit(notifyEvent{Kind: "needs-you", Title: "after restart", Keys: []string{"tp:s1"}})
+	list, _, _ := n.List(0, 10)
+	if len(list) != 2 || list[0].Title != "after restart" || list[0].Resolved || !list[1].Resolved {
+		t.Fatalf("the restored alert stayed open: %+v", list)
+	}
+}

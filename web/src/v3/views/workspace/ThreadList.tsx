@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { showToast } from "../../../app/toast";
 import { fmtAgo } from "../../../lib/format";
-import { pinThread, settleThread, snoozeThread } from "../../api/orch";
+import { pinThread, settleThread, snoozeThread, useOrch } from "../../api/orch";
 import { typing } from "../../ctx";
 import { overlayOpen } from "../../keys";
 import { GROUPS, type WRow, type WTree } from "./rows";
@@ -310,6 +310,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
   const shown = useMemo(() => byMachine(filterTree(tree, q), mFilter, selfName), [tree, q, mFilter, selfName]);
   const nav = useNavigate();
   const v = useV3();
+  const orchStatus = useOrch().status;
   const ts = useTranscriptSearch(q);
   const titleOf = useTitleOf();
   const groups = useMemo(() => groupHits(ts.res?.hits || [], v.threadOf), [ts.res, v.threadOf]);
@@ -392,7 +393,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
       </div>
       {notice}
       <div className="wlist" role="listbox" aria-label="Threads">
-        {total === 0 && !q && <div className="wnone">No threads yet. Start one with the + button.</div>}
+        {total === 0 && !q && <div className="wnone">{orchStatus === "loading" ? "Loading threads…" : "No threads yet. Start one with the + button."}</div>}
         {total === 0 && q && <div className="wnone">No thread title matches.</div>}
         {GROUPS.map((g) => {
           const all = shown.top.get(g.key) || [];

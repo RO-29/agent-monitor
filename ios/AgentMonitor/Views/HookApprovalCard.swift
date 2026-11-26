@@ -24,7 +24,7 @@ struct HookApprovalCard: View {
     /// Pending requests that one Always rule would cover, this one included.
     private var sameGroup: [Approval] {
         guard let g = a.group, a.isPending else { return [] }
-        return store.approvalsByID.values.filter { $0.group == g && $0.isPending && !$0.highRisk && !$0.sentToTerminal }
+        return store.approvalsByID.values.filter { $0.group == g && $0.isPending && !$0.highRisk && !$0.sentToTerminal && store.pendingDecisions[$0.id] == nil }
             .sorted { $0.createdAt < $1.createdAt }
     }
 

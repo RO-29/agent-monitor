@@ -6,9 +6,9 @@ struct RuleSuggestion: Decodable, Identifiable, Hashable {
     let tool: String
     let pattern: String
     let cwdPrefix: String?
-    let count: Int
-    let lastAt: Int64
-    let example: String
+    var count: Int = 0
+    var lastAt: Int64 = 0
+    var example: String = ""
     var id: String { key }
 }
 
@@ -39,7 +39,9 @@ struct RuleSuggestionsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(s.tool) matching \(s.pattern)").font(.body.monospaced())
                             Text(meta(s)).font(.footnote).foregroundStyle(Tok.muted)
-                            Text(s.example).font(.footnote.monospaced()).foregroundStyle(Tok.muted).lineLimit(2)
+                            if !s.example.isEmpty {
+                                Text(s.example).font(.footnote.monospaced()).foregroundStyle(Tok.muted).lineLimit(2)
+                            }
                         }
                         .accessibilityElement(children: .combine)
                         HStack {

@@ -506,9 +506,10 @@ final class AppStore {
             let (sessions, perms, talks, panes) = try await (s, p, t, pn)
             // A full list: ended sessions go, so none lingers as "awaiting".
             sessionsByID = Dictionary(sessions.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
-            permissionsByID = Dictionary(uniqueKeysWithValues: perms.map { ($0.id, $0) })
-            talksByID = Dictionary(uniqueKeysWithValues: talks.map { ($0.id, $0) })
-            panesByID = Dictionary(uniqueKeysWithValues: panes.map { ($0.id, $0) })
+            // A duplicate id from the daemon must not crash the app.
+            permissionsByID = Dictionary(perms.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+            talksByID = Dictionary(talks.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+            panesByID = Dictionary(panes.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
             lastError = nil
         } catch {
             lastError = error.localizedDescription

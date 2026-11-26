@@ -487,8 +487,29 @@ function ScriptGroup({ it, kids }: { it: OItem; kids: OItem[] }) {
   );
 }
 
-export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun; items: OItem[]; now: number; after?: React.ReactNode; diff?: DiffNav | null; onDiff?: (d: DiffNav) => void }) {
-  const running = run?.status === "running" || items.some((i) => i.status === "started" && !i.bg);
+const LONG_LINES = 14;
+// A long pasted prompt folds to its first lines; terminal output keeps its columns in mono.
+function UserText({ text }: { text: string }) {
+  const [all, setAll] = useState(false);
+  const lines = text.split("\n");
+  const long = lines.length > LONG_LINES || text.length > 1500;
+  const paste = lines.length >= 3 && lines.filter((l) => /^ {2,}|[│─┌└├╭╰]/.test(l)).length >= 2;
+  const shown = long && !all ? lines.slice(0, LONG_LINES).join("\n").slice(0, 1500) : text;
+  return (
+    <>
+      <span className={paste ? "wu-paste" : undefined}>{shown}</span>
+      {long && (
+        <button type="button" className="wu-more" onClick={(e) => (e.stopPropagation(), setAll(!all))}>
+          {all ? "Show less" : `Show all ${lines.length} lines`}
+        </button>
+      )}
+    </>
+  );
+}
+
+export function RunBlock({ run, items, now, after, diff, onDiff, idle }: { run?: ORun; items: OItem[]; now: number; after?: React.ReactNode; diff?: DiffNav | null; onDiff?: (d: DiffNav) => void; idle?: boolean }) {
+  // idle: the session is not running, so a run with no end record must not show as working.
+  const running = !idle && (run?.status === "running" || items.some((i) => i.status === "started" && !i.bg));
   const allUsers = items.filter((i) => i.kind === "user" && (i.text || i.attachments?.length));
   // Messages typed while the agent worked show where they came, not folded into the steps.
   // Only a prompt before any agent work opens the turn; a turn opened by / or ! has none.
@@ -556,7 +577,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
             ))}
           </span>
         )}
-        {u.text}
+        <UserText text={u.text || ""} />
       </div>
       {!sel?.on && u.text?.trim() && <MsgCopy text={u.text} className="wu-cp" title="Copy this prompt" />}
     </div>

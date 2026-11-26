@@ -78,6 +78,8 @@ func TestPaneActivityReadsTheWorkingLine(t *testing.T) {
 		"✻ Brewed for 29s\n────\n❯ \n────\n":                                                                                      "",
 		"✽ Precipitating… (2m 31s · ↓ 10.3k tokens)\n────\n❯ \n────\n  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt\n": "Precipitating… (2m 31s · ↓ 10.3k tokens)",
 		"❯ \n────\n  ⏵⏵ auto mode on · 3 background tasks · esc to interrupt\n":                                                   "Working…",
+		"- Installing…\n* Fixing… (step 2)\n────\n❯ \n────\n":                                                                     "",
+		"· Tempering… (10s · ↓ 638 tokens)\n────\n❯ \n":                                                                           "Tempering… (10s · ↓ 638 tokens)",
 	} {
 		if got := paneActivity(in); got != want {
 			t.Errorf("paneActivity(%q) = %q, want %q", in, got, want)

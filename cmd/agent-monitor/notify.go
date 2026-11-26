@@ -306,6 +306,20 @@ func (n *Notifier) deliver(ev notifyEvent) {
 	if ev.ThreadID == "" && ev.Kind == "spend" {
 		no.URL = "/settings/limits"
 	}
+	// A new alert for a key that still has an open one (a restored alert, a repeated prompt) closes the old one.
+	if !ev.reminder {
+		n.mu.Lock()
+		var stale []string
+		for _, k := range ev.Keys {
+			if _, ok := n.keyOf[k]; ok {
+				stale = append(stale, k)
+			}
+		}
+		n.mu.Unlock()
+		for _, k := range stale {
+			n.Resolve(k)
+		}
+	}
 	for _, k := range ev.Keys {
 		no.Prompt = no.Prompt || strings.HasPrefix(k, "tp:")
 	}

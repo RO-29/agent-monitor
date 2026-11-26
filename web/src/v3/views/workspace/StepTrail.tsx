@@ -32,7 +32,7 @@ const durOf = (it: OItem, now: number) => {
 /** A run of tool calls as one strip: one segment per call, width by time, color by tool. */
 export function StepTrail({ items, kids, now, live, row }: { items: OItem[]; kids: Map<string, OItem[]>; now: number; live: boolean; row: (it: OItem) => ReactNode }) {
   const hl = useContext(HitCtx);
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState<boolean | null>(null);
   const [pick, setPick] = useState<string | null>(null);
   const counts = new Map<string, number>();
   let failed = 0;
@@ -47,7 +47,7 @@ export function StepTrail({ items, kids, now, live, row }: { items: OItem[]; kid
   const calls = items.length + items.reduce((n, it) => n + (kids.get(it.id)?.length || 0), 0);
   const last = items[items.length - 1];
   const hit = hl ? items.find((i) => i.id === hl || kids.get(i.id)?.some((k) => k.id === hl)) : undefined;
-  const shownAll = all || !!hit;
+  const shownAll = all ?? !!hit;
   const picked = !shownAll ? items.find((i) => i.id === pick) || (live && last.status === "started" ? last : undefined) : undefined;
   return (
     <div className="wtrail">
@@ -62,7 +62,7 @@ export function StepTrail({ items, kids, now, live, row }: { items: OItem[]; kid
               <button
                 key={it.id}
                 role="listitem"
-                className={`wseg t-${k.cls} ${bad ? "bad" : ""} ${it.status === "started" ? "wpulse" : ""} ${pick === it.id ? "on" : ""}`}
+                className={`wtseg t-${k.cls} ${bad ? "bad" : ""} ${it.status === "started" ? "wpulse" : ""} ${pick === it.id ? "on" : ""}`}
                 style={{ flexGrow: 1 + Math.log2(1 + d / 1000) }}
                 title={`${k.label}${d ? ` · ${fmtDuration(d)}` : ""}${bad ? " · failed" : ""}\n${first}`}
                 aria-label={`${k.label}${bad ? ", failed" : ""}: ${first}`}

@@ -17,7 +17,7 @@ var (
 
 var (
 	// A spinner glyph, then "Thinking… (12s · ↓ 300 tokens)" (Claude) or "Working (8s • esc to interrupt)" (Codex).
-	reWorkingLine  = regexp.MustCompile(`^[^\pL\pN\s]\s+(\pL+(?:…\s*\([^)]*\)|…$|\s+\([^)]*esc to interrupt[^)]*\)))`)
+	reWorkingLine  = regexp.MustCompile(`^(?:[·✢✳✶✻✽]\s+(\pL+…(?:\s*\([^)]*\))?)$|\S\s+(\pL+\s+\([^)]*esc to interrupt[^)]*\)))`)
 	reEscInterrupt = regexp.MustCompile(`(?i)\s*[·•]?\s*esc to interrupt`)
 	reEmptyParens  = regexp.MustCompile(`\(\s*\)`)
 )
@@ -29,7 +29,7 @@ func paneActivity(screen string) string {
 	for i := len(lines) - 1; i >= 0 && i >= len(lines)-30; i-- {
 		t := strings.TrimSpace(lines[i])
 		if m := reWorkingLine.FindStringSubmatch(t); m != nil {
-			return clipRunes(strings.TrimSpace(reEmptyParens.ReplaceAllString(strings.ReplaceAll(reEscInterrupt.ReplaceAllString(m[1], ""), "( ", "("), "")), 120)
+			return clipRunes(strings.TrimSpace(reEmptyParens.ReplaceAllString(strings.ReplaceAll(reEscInterrupt.ReplaceAllString(m[1]+m[2], ""), "( ", "("), "")), 120)
 		}
 		// The footer ("auto mode on · esc to interrupt") only says a turn runs.
 		if strings.Contains(strings.ToLower(t), "esc to interrupt") {

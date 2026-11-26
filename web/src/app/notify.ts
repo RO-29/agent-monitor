@@ -45,6 +45,7 @@ export function playBeep() {
 
 // With Web Push on, the service worker shows the daemon's alert; a page copy would be the second one.
 let pushOn = false;
+export const setPushOn = (on: boolean) => void (pushOn = on);
 if (typeof navigator !== "undefined" && "serviceWorker" in navigator)
   void navigator.serviceWorker.getRegistration().then((r) => r?.pushManager?.getSubscription().then((s) => (pushOn = !!s))).catch(() => {});
 
@@ -54,8 +55,9 @@ export function closeOsNotify(tag: string) {
   shown.delete(tag);
 }
 
-function osNotify(title: string, body: string, tag: string, onClick?: () => void) {
-  if (!pref(KEYS.notify, true) || pushOn) return;
+// pushed: the daemon also sends this alert by Web Push, so the page skips its own copy.
+function osNotify(title: string, body: string, tag: string, onClick?: () => void, pushed = true) {
+  if (!pref(KEYS.notify, true) || (pushOn && pushed)) return;
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   try {
     const n = new Notification(title, { body, tag, requireInteraction: true });
@@ -121,7 +123,7 @@ export function useNotifications(navigate: (path: string) => void) {
         playBeep();
       } else if (e.kind === "talk-request") {
         const go = () => navigate(`/session/${encodeURIComponent(e.talk.toAgent)}?tab=pane`);
-        osNotify(`Talk from ${e.talk.fromLabel}`, e.talk.message.slice(0, 140), `talk-${e.talk.id}`, go);
+        osNotify(`Talk from ${e.talk.fromLabel}`, e.talk.message.slice(0, 140), `talk-${e.talk.id}`, go, false);
         playBeep();
       }
     });

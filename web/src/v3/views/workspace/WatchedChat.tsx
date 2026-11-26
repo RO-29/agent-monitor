@@ -248,7 +248,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
   const awaiting = session?.state === "awaiting-permission" || session?.state === "awaiting-input";
   const cliName = row.agent === "claude" ? "Claude Code" : row.agent === "codex" ? "Codex" : agentName(row.agent);
   const [cliAll, setCliAll] = useState(false);
-  const q = useQueue(row.id, sid, owned, { cliAll, bump: session?.cliQueued || 0, fast: running || sent.list.length > 0 });
+  const q = useQueue(row.id, sid, owned, { cliAll, bump: session?.cliQueued || 0, fast: running || sent.list.some((p) => Date.now() - p.at < 120_000) });
   const usage = useUsageLimits(60_000);
   const credits = creditsLine(usage.data?.agents.find((a) => a.agent === row.agent));
   const qref = useRef<QueueListHandle>(null);
@@ -449,7 +449,7 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         {shownBlocks.map((b) => (
           <Fragment key={b.key}>
             {b.key === newMark && b !== shownBlocks[0] && <NewLine since={sinceText(f?.items, newMark)} />}
-            <RunBlock run={b.run} items={b.items} now={now} />
+            <RunBlock run={b.run} items={b.items} now={now} idle={!running || b !== shownBlocks[shownBlocks.length - 1]} />
           </Fragment>
         ))}
         {!oldTab && <PendingBubbles list={sent.list} drop={sent.drop} />}

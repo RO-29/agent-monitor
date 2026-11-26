@@ -29,7 +29,7 @@ func rustHelperBin(t *testing.T) string {
 	t.Helper()
 	p := os.Getenv("AM_HELPER_BIN")
 	if p == "" {
-		p, _ = filepath.Abs(filepath.Join("rust", "am-helper", "target", "release", rustHelperName))
+		p, _ = filepath.Abs(filepath.Join("..", "..", "rust", "am-helper", "target", "release", rustHelperName))
 	}
 	if st, err := os.Stat(p); err != nil || st.Mode()&0o111 == 0 {
 		if os.Getenv("AM_HELPER_REQUIRED") == "1" {

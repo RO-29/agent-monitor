@@ -64,9 +64,19 @@ struct DiffSheet: View {
         if f.binary ?? false {
             note("Binary file: no text diff.")
         } else {
-            let lines = (f.patch ?? "").split(separator: "\n", omittingEmptySubsequences: false).filter { !isHeader($0) }
+            let lines = bodyLines(f.patch ?? "")
             ForEach(Array(lines.prefix(Self.maxLines).enumerated()), id: \.offset) { _, l in line(String(l)) }
             if lines.count > Self.maxLines || (f.truncated ?? false) { note("The diff is longer than this view shows. Open it on the Mac for the rest.") }
+        }
+    }
+
+    /// File headers show only before a file's first hunk, so a removed "-- comment" line stays.
+    private func bodyLines(_ patch: String) -> [Substring] {
+        var inHunk = false
+        return patch.split(separator: "\n", omittingEmptySubsequences: false).filter { l in
+            if l.hasPrefix("diff --git") { inHunk = false; return false }
+            if l.hasPrefix("@@") { inHunk = true }
+            return inHunk || !isHeader(l)
         }
     }
 

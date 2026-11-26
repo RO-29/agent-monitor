@@ -1,6 +1,6 @@
 // Phase 6 notifications: SSE /api/notify/stream, the notification list with read state, in-app toasts, Web Push.
 import { useEffect, useSyncExternalStore } from "react";
-import { closePushNotify, playBeep } from "../../app/notify";
+import { closePushNotify, playBeep, setPushOn } from "../../app/notify";
 import { showToast } from "../../app/toast";
 import { ApiError, isMissing } from "./client";
 import { mockWanted, toMs } from "./orch";
@@ -263,6 +263,7 @@ export async function enablePush(): Promise<PushState> {
   await navigator.serviceWorker.ready;
   const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) }));
   await notifyApi.subscribe(sub.toJSON());
+  setPushOn(true);
   return "on";
 }
 
@@ -280,5 +281,6 @@ export async function disablePush(): Promise<PushState> {
       await sub.unsubscribe();
     }
   }
+  setPushOn(false);
   return "off";
 }
