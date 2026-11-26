@@ -22,6 +22,7 @@ import { agentName, useV3 } from "../../live";
 import { childMap, cmdLabel, descendants, drivenLabel, drivenThreads, permModeLabel, WORKSPACE_LABEL, workspaceOf } from "./rows";
 import { askFromApproval, askFromRequest, AskAnnouncer, WsApproval, type AskInfo } from "./WsApproval";
 import { DiffView } from "./Diff";
+import { StepTrail, trailSegments } from "./StepTrail";
 import { gitKey, isLoopback, runDiff, useDiffNav, useGit, type DiffNav } from "./git";
 import { openIn } from "./GitBox";
 import { drivenTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
@@ -446,55 +447,6 @@ export function setFoldPref(v: boolean) {
   window.dispatchEvent(new Event("am-fold"));
 }
 
-const CMD_RUN = 3;
-// More than CMD_RUN commands in a row fold into one row.
-function groupCmds(items: OItem[]): (OItem | OItem[])[] {
-  const out: (OItem | OItem[])[] = [];
-  let run: OItem[] = [];
-  const flush = () => {
-    if (run.length > CMD_RUN) out.push(run);
-    else out.push(...run);
-    run = [];
-  };
-  for (const it of items) {
-    if (it.kind === "command" && it.by !== "user") run.push(it);
-    else {
-      flush();
-      out.push(it);
-    }
-  }
-  flush();
-  return out;
-}
-
-function CmdGroup({ items }: { items: OItem[] }) {
-  const hl = useContext(HitCtx);
-  const running = items.some((i) => i.status === "started");
-  const failed = items.filter((i) => i.status === "failed" || (i.exitCode !== undefined && i.exitCode !== 0)).length;
-  const [open, setOpen] = useState<boolean | null>(null);
-  const shown = open ?? (running || (!!hl && items.some((i) => i.id === hl)));
-  const ms = items.reduce((n, i) => n + (i.endedAt ? Math.max(0, toMs(i.endedAt) - toMs(i.startedAt)) : 0), 0);
-  return (
-    <div className="wcmdg">
-      <button className="wih wcmdg-h" onClick={() => setOpen(!shown)} aria-expanded={shown}>
-        <span className={`wic ${running ? "run wpulse" : failed ? "err" : "ok"}`}>{running ? "●" : failed ? "✗" : "✓"}</span>
-        <span className="trunc">
-          {items.length} commands{ms > 0 ? `, ${fmtDuration(ms)}` : ""}
-          {failed > 0 && <span className="muted"> · {failed} failed</span>}
-        </span>
-        <span className="wchev">{shown ? "▾" : "▸"}</span>
-      </button>
-      {shown && (
-        <div className="wcmdg-b">
-          {items.map((i) => (
-            <ItemRow key={i.id} it={i} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Splits a Code Mode script's tool calls from the list: they show inside their script's row. */
 function scriptTree(items: OItem[]): { top: OItem[]; kids: Map<string, OItem[]> } {
   const ids = new Set(items.map((i) => i.id));
@@ -562,6 +514,7 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
   const laterBefore = finalAt >= 0 ? later.filter((u) => items.indexOf(u) < finalAt) : [];
   const laterAfter = finalAt >= 0 ? later.filter((u) => items.indexOf(u) > finalAt) : later;
   const { top, kids } = scriptTree(work);
+  const stepRow = (g: OItem) => (kids.has(g.id) ? <ScriptGroup it={g} kids={kids.get(g.id)!} /> : <ItemRow it={g} />);
   const [open, setOpen] = useState<boolean | null>(null);
   const hl = useContext(HitCtx);
   const sel = useSelectCtx();
@@ -637,8 +590,8 @@ export function RunBlock({ run, items, now, after, diff, onDiff }: { run?: ORun;
           </div>
           {expanded && (
             <div className="wsteps">
-              {groupCmds(top).map((g) =>
-                Array.isArray(g) ? <CmdGroup key={g[0].id} items={g} /> : kids.has(g.id) ? <ScriptGroup key={g.id} it={g} kids={kids.get(g.id)!} /> : <ItemRow key={g.id} it={g} />,
+              {trailSegments(top).map((g, n, segs) =>
+                Array.isArray(g) ? <StepTrail key={g[0].id} items={g} kids={kids} now={now} live={running && n === segs.length - 1} row={stepRow} /> : <Fragment key={g.id}>{stepRow(g)}</Fragment>,
               )}
             </div>
           )}

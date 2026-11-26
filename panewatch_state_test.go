@@ -73,9 +73,11 @@ func TestPaneScreenShowsCursorAndOpenCodePrompts(t *testing.T) {
 
 func TestPaneActivityReadsTheWorkingLine(t *testing.T) {
 	for in, want := range map[string]string{
-		"✻ Thinking… (12s · ↓ 300 tokens · esc to interrupt)\n\n────\n❯ \n────\n": "Thinking… (12s · ↓ 300 tokens)",
-		"• Working (8s • esc to interrupt)\n› \n":                                 "Working (8s)",
-		"✻ Brewed for 29s\n────\n❯ \n────\n":                                      "",
+		"✻ Thinking… (12s · ↓ 300 tokens · esc to interrupt)\n\n────\n❯ \n────\n":                                                 "Thinking… (12s · ↓ 300 tokens)",
+		"• Working (8s • esc to interrupt)\n› \n":                                                                                 "Working (8s)",
+		"✻ Brewed for 29s\n────\n❯ \n────\n":                                                                                      "",
+		"✽ Precipitating… (2m 31s · ↓ 10.3k tokens)\n────\n❯ \n────\n  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt\n": "Precipitating… (2m 31s · ↓ 10.3k tokens)",
+		"❯ \n────\n  ⏵⏵ auto mode on · 3 background tasks · esc to interrupt\n":                                                   "Working…",
 	} {
 		if got := paneActivity(in); got != want {
 			t.Errorf("paneActivity(%q) = %q, want %q", in, got, want)

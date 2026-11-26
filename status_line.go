@@ -16,6 +16,8 @@ var (
 )
 
 var (
+	// A spinner glyph, then "Thinking… (12s · ↓ 300 tokens)" (Claude) or "Working (8s • esc to interrupt)" (Codex).
+	reWorkingLine  = regexp.MustCompile(`^[^\pL\pN\s]\s+(\pL+(?:…\s*\([^)]*\)|…$|\s+\([^)]*esc to interrupt[^)]*\)))`)
 	reEscInterrupt = regexp.MustCompile(`(?i)\s*[·•]?\s*esc to interrupt`)
 	reEmptyParens  = regexp.MustCompile(`\(\s*\)`)
 )
@@ -23,15 +25,19 @@ var (
 // paneActivity is the agent's working line ("✻ Thinking… (12s · esc to interrupt)") as "Thinking… (12s)"; "" when idle.
 func paneActivity(screen string) string {
 	lines := strings.Split(strings.TrimRight(reStatusANSI.ReplaceAllString(screen, ""), "\n"), "\n")
+	busy := false
 	for i := len(lines) - 1; i >= 0 && i >= len(lines)-30; i-- {
 		t := strings.TrimSpace(lines[i])
-		if !strings.Contains(strings.ToLower(t), "esc to interrupt") {
-			continue
+		if m := reWorkingLine.FindStringSubmatch(t); m != nil {
+			return clipRunes(strings.TrimSpace(reEmptyParens.ReplaceAllString(strings.ReplaceAll(reEscInterrupt.ReplaceAllString(m[1], ""), "( ", "("), "")), 120)
 		}
-		t = strings.TrimLeftFunc(t, func(r rune) bool { return !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') })
-		t = reEscInterrupt.ReplaceAllString(t, "")
-		t = strings.TrimSpace(reEmptyParens.ReplaceAllString(strings.ReplaceAll(t, "( ", "("), ""))
-		return clipRunes(t, 120)
+		// The footer ("auto mode on · esc to interrupt") only says a turn runs.
+		if strings.Contains(strings.ToLower(t), "esc to interrupt") {
+			busy = true
+		}
+	}
+	if busy {
+		return "Working…"
 	}
 	return ""
 }
