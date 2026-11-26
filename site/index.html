@@ -26,7 +26,7 @@
 <meta name="twitter:image" content="https://agent-monitor-5xo.pages.dev/og.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#f4efe3; --bg2:#ebe4d3; --card:#fbf8f0; --ink:#1c1b17; --muted:#5b574b; --line:#d6cdb6;
@@ -85,14 +85,175 @@ code{font-family:var(--mono);font-size:.9em;background:var(--bg2);padding:1px 6p
 .pain{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:30px}
 .pain div{border-left:3px solid var(--accent);padding:4px 0 4px 18px}
 .pain p{color:var(--muted)}
-/* features */
-.group{margin-top:44px}
-.group>h3{font:600 13px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:18px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;min-width:0}
 .card p{color:var(--muted);font-size:16px}
-.card .tag{font:500 12px var(--mono);color:var(--accent);display:block;margin-bottom:10px}
-.card ul{margin:10px 0 0 18px;color:var(--muted);font-size:16px}
+.card .tag{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:block}
+/* feature showcase */
+.feats{margin-top:56px;display:flex;flex-direction:column;gap:84px}
+.feat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:44px;align-items:center}
+.feat:nth-child(even) .copy{order:2}
+.feat .copy h3{font:700 clamp(22px,3vw,28px)/1.15 var(--serif);letter-spacing:-.01em;margin-bottom:12px}
+.feat .copy p{color:var(--muted)}
+.feat .copy ul{list-style:none;margin-top:16px;display:grid;gap:8px}
+.feat .copy li{position:relative;padding-left:20px;font-size:15.5px;color:var(--ink)}
+.feat .copy li::before{content:"";position:absolute;left:0;top:.7em;width:10px;height:2px;background:var(--accent)}
+.feat .copy .tag{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:10px}
+.feat .shot{min-width:0}
+.mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:84px}
+.mini .card{display:flex;flex-direction:column;gap:12px}
+.mini .card .am{margin-top:auto}
+.mini h3{margin-bottom:4px}
+.sub-h{font:600 13px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--line);margin-top:84px}
+@media(max-width:860px){
+  .feat{grid-template-columns:minmax(0,1fr);gap:22px}
+  .feat:nth-child(even) .copy{order:0}
+  .feats{gap:64px}
+}
+/* app frame: always the app's dark tokens */
+.am{--bg:#121210;--panel:#1a1a17;--panel-2:#1e1e1a;--panel-3:#282823;--line:#33322c;--line-2:#45443d;--fg:#ecebe6;--fg-2:#b0ada3;--muted:#918d82;
+  --accent:#86a3ff;--accent-soft:rgba(134,163,255,.12);--need:#f0ae4a;--need-soft:rgba(240,174,74,.13);--run:#4cc3d8;--run-soft:rgba(76,195,216,.12);
+  --ok:#5dc48a;--ok-soft:rgba(93,196,138,.12);--err:#f07068;--err-soft:rgba(240,112,104,.12);--claude:#e08562;--codex:#4cbf9c;--sub:#a88cf0;--sub-soft:rgba(168,140,240,.14);--on-ok:#0d2316;
+  --f-ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  background:var(--bg);color:var(--fg);font:400 13px/1.5 var(--f-ui);border:1px solid var(--line-2);border-radius:12px;overflow:hidden;
+  box-shadow:0 18px 50px -24px rgba(0,0,0,.55);text-align:left;min-width:0;max-width:100%}
+.am *{box-sizing:border-box}
+.am code{font-family:var(--f-mono);font-size:.92em;background:none;padding:0;color:inherit}
+.am .bar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);min-width:0}
+.am .bar b{color:var(--fg);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.am .bar .sp{flex:1}
+.am .body{padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.am .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.am .d-need{background:var(--need);box-shadow:0 0 0 3px var(--need-soft)}
+.am .d-run{background:var(--run);box-shadow:0 0 0 3px var(--run-soft);animation:ampulse 1.6s ease-in-out infinite}
+.am .d-ok{background:var(--ok)}.am .d-idle{background:#4a4943}
+@keyframes ampulse{50%{box-shadow:0 0 0 6px transparent}}
+@keyframes amfade{50%{opacity:.35}}
+.am .pulse{animation:amfade 1.4s ease-in-out infinite}
+.am .ag{width:15px;height:15px;border-radius:4px;display:inline-grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none;line-height:1}
+.am .ag.cl{background:var(--claude)}.am .ag.cx{background:var(--codex)}.am .ag.cu{background:#b9bfca;color:#222}.am .ag.oc{background:#e57aa8}
+.am .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap;line-height:1.5}
+.am .p-need{background:var(--need-soft);color:var(--need)}.am .p-ok{background:var(--ok-soft);color:var(--ok)}.am .p-run{background:var(--run-soft);color:var(--run)}.am .p-err{background:var(--err-soft);color:var(--err)}.am .p-mute{background:var(--panel-3);color:var(--fg-2)}
+.am .btn{border:1px solid var(--line-2);background:var(--panel);border-radius:7px;padding:4px 11px;font:500 12.5px/1.4 var(--f-ui);display:inline-flex;gap:6px;align-items:center;white-space:nowrap;color:var(--fg);transform:none}
+.am .btn.sm{padding:2px 8px;font-size:12px}
+.am .btn.pri{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+.am .btn.allow{background:var(--ok);border-color:var(--ok);color:var(--on-ok)}
+.am .btn.deny{color:var(--err)}
+.am .btn.ghost{border-color:transparent;background:transparent}
+.am .kbd{font:10.5px var(--f-mono);border:1px solid rgba(13,35,22,.5);border-radius:4px;padding:0 4px;line-height:1.4}
+.am .xs{font-size:11.5px}.am .muted{color:var(--muted)}
+.am .mono{font-family:var(--f-mono)}
+/* workspace */
+.am .ws{display:grid;grid-template-columns:96px minmax(0,1fr)}
+.am .rail{border-right:1px solid var(--line);padding:10px 6px;display:flex;flex-direction:column;gap:2px;background:var(--panel-2);font-size:12.5px;color:var(--fg-2)}
+.am .rail div{padding:5px 8px;border-radius:7px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.am .rail .on{background:var(--panel-3);color:var(--fg)}
+.am .rail em{font-style:normal;margin-left:auto;background:var(--need);color:#1a1200;font-size:10px;font-weight:700;border-radius:999px;padding:0 6px}
+.am .rail .gap{flex:1}
+.am .tl{padding:8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.am .grp{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:8px 8px 3px;display:flex;gap:6px;align-items:center}
+.am .grp b{font-weight:600;color:var(--fg-2)}
+.am .th{padding:6px 8px;border-radius:8px;min-width:0}
+.am .th.sel{background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-2)}
+.am .th .r1{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);min-width:0}
+.am .th .r1 .t{margin-left:auto;flex:none;font-variant-numeric:tabular-nums}
+.am .th .ti{font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0}
+.am .th .r3{display:flex;gap:6px;align-items:center;font:11.5px var(--f-mono);color:var(--muted);white-space:nowrap;min-width:0}
+.am .th .r3 .st{margin-left:auto;font:600 12px var(--f-ui);flex:none}
+.am .st.need{color:var(--need)}.am .st.run{color:var(--run)}.am .st.ok{color:var(--ok)}
+.am .th .r3 span:first-child{overflow:hidden;text-overflow:ellipsis}
+/* chat */
+.am .wu{align-self:flex-end;max-width:88%;background:var(--panel-3);border-radius:12px 12px 4px 12px;padding:8px 12px}
+.am .worked{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line);padding-bottom:8px;flex-wrap:wrap}
+.am .worked .run-t{color:var(--run)}
+.am .wactivity{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg-2);flex-wrap:wrap}
+.am .wactivity .run-t{color:var(--run)}
+.am .agent{color:var(--fg)}
+.am .trail-h{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);min-width:0;flex-wrap:wrap}
+.am .trail-bar{display:flex;gap:2px;flex:1 1 120px;min-width:80px;height:14px}
+.am .seg{flex-basis:6px;min-width:4px;border-radius:3px;background:var(--fg-2);opacity:.55}
+.am .seg.sh{background:var(--accent);opacity:.8}.am .seg.ed{background:var(--need);opacity:.85}.am .seg.mcp{background:var(--sub);opacity:.85}
+.am .seg.web{background:var(--run);opacity:.85}.am .seg.scr{background:var(--ok);opacity:.8}.am .seg.bad{background:var(--err);opacity:1}
+.am .seg.grow{animation:amgrow 3.2s ease-in-out infinite alternate}
+@keyframes amgrow{from{flex-grow:.4}to{flex-grow:4}}
+.am .trail-sum{font-size:12.5px;color:var(--fg-2)}
+.am .trail-sum .bad{color:var(--err)}
+.am .witem{border:1px solid var(--line);border-radius:8px;background:var(--panel-2);display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12.5px;min-width:0}
+.am .witem code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .witem .wim{margin-left:auto;font:11.5px var(--f-mono);color:var(--muted);flex:none}
+.am .witem .ic{width:14px;text-align:center;font-weight:700;flex:none}
+/* approval */
+.am .appr{border:1px solid color-mix(in srgb,var(--need) 45%,var(--line));background:linear-gradient(var(--need-soft),var(--need-soft)),var(--panel);border-radius:11px;padding:12px 14px;min-width:0}
+.am .appr .why{background:none;border:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
+.am .risk{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:4px}
+.am .risk.lo{background:var(--ok-soft);color:var(--ok)}.am .risk.md{background:var(--need-soft);color:var(--need)}.am .risk.hi{background:var(--err-soft);color:var(--err)}
+.am .appr pre{margin:0 0 10px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:12px/1.5 var(--f-mono);white-space:pre-wrap;word-break:break-word;color:var(--fg)}
+.am .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.am .agroup{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+.am .agroup ul{list-style:none;display:grid;gap:3px}
+.am .agroup li{font:12px var(--f-mono);color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .agroup li::before{content:"\00b7  "}
+/* rules */
+.am .sugbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.am .sug{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)}
+.am .sug .what{flex:1 1 180px;min-width:0}
+.am .sug .what code{background:var(--panel-3);padding:0 5px;border-radius:4px}
+.am .rule{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+/* alerts */
+.am .toast{border:1px solid var(--line-2);background:var(--panel);border-radius:10px;padding:9px 12px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 8px 24px rgba(0,0,0,.3);min-width:0}
+.am .toast .tt{font-weight:600;font-size:13px}
+.am .toast .tb{font-size:12px;color:var(--fg-2);word-break:break-word}
+.am .toast.mac{border-radius:14px;background:#2b2b28}
+.am .ibox{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px}
+.am .ibox h4{font:600 13px var(--f-ui);margin-bottom:4px}
+.am select.inp,.am .inp{border:1px solid var(--line-2);background:var(--panel-2);color:var(--fg);border-radius:7px;padding:3px 8px;font:12.5px var(--f-ui)}
+.am .chips{display:flex;gap:6px;flex-wrap:wrap}
+.am .chip{border:1px solid var(--line-2);border-radius:999px;padding:1px 9px;font-size:11.5px;color:var(--fg-2);background:var(--panel-2)}
+.am .chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+/* search */
+.am .seg2{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;background:var(--panel-2);align-self:flex-start}
+.am .seg2 span{border-radius:6px;padding:3px 12px;font:500 12.5px var(--f-ui);color:var(--fg-2)}
+.am .seg2 .on{background:var(--panel);color:var(--fg);box-shadow:0 0 0 1px var(--line-2)}
+.am .sbox{border:1px solid var(--line-2);border-radius:9px;background:var(--panel-2);padding:7px 11px;font:12.5px var(--f-mono);color:var(--fg);word-break:break-word}
+.am .hit{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:8px 10px;min-width:0}
+.am .hit .r1{display:flex;gap:6px;align-items:center;font-size:12px;min-width:0}
+.am .hit .r1 b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .hit .sn{font:12px var(--f-mono);color:var(--fg-2);margin-top:4px;word-break:break-word}
+.am mark{background:var(--need-soft);color:var(--need);border-radius:3px;padding:0 2px}
+.am .cite{color:var(--accent);font-size:11.5px;font-weight:600}
+.am .answer{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;font-size:13px}
+/* iphone */
+.phone{width:min(100%,300px);margin:0 auto;background:#0a0a09;border:2px solid #3a3933;border-radius:38px;padding:10px;box-shadow:0 18px 50px -24px rgba(0,0,0,.6)}
+.phone .am{border-radius:28px;border:0;box-shadow:none}
+.phone .notch{width:84px;height:20px;border-radius:12px;background:#0a0a09;margin:0 auto -20px;position:relative;z-index:2}
+.phone .bar{padding-top:26px}
+.phone .am .appr{padding:10px 12px}
+.am .ibtn{flex:1 1 0;text-align:center;justify-content:center;padding:8px 6px;border-radius:10px;font-weight:600}
+.am .queue{border:1px solid var(--line);border-radius:9px;background:var(--panel-2);padding:6px 10px;font-size:12px;color:var(--fg-2)}
+.am .queue b{color:var(--fg)}
+.am .comp{display:flex;gap:6px;align-items:center}
+.am .comp .in{flex:1;border:1px solid var(--line-2);border-radius:18px;background:var(--panel-2);padding:7px 12px;color:var(--muted);font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.am .comp .go{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;flex:none}
+.am .comp .stop{background:var(--err-soft);color:var(--err);border:1px solid var(--err)}
+.am .comp .send{background:var(--accent);color:#0c1330}
+.am .diff{font:11.5px var(--f-mono);border:1px solid var(--line);border-radius:7px;background:var(--panel);overflow:hidden}
+.am .diff div{padding:1px 10px;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.am .diff .a{background:var(--ok-soft);color:var(--ok)}.am .diff .r{background:var(--err-soft);color:var(--err)}.am .diff .h{color:var(--muted);background:var(--panel-2)}
+.am .fl{display:flex;gap:8px;font:12px var(--f-mono);align-items:center;min-width:0}
+.am .fl .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg-2);min-width:0}
+.am .fl .n{margin-left:auto;white-space:nowrap}
+.am .add{color:var(--ok)}.am .del{color:var(--err)}
+.am .meter{height:6px;border-radius:3px;background:var(--panel-3);overflow:hidden}
+.am .meter i{display:block;height:100%;background:var(--need)}
+.am .term{font:12px/1.6 var(--f-mono);background:#080806;padding:8px 10px;border-radius:7px;color:#e9e3d0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.am .term b{color:var(--accent);font-weight:500}
+@media(max-width:480px){
+  .am .ws{grid-template-columns:70px minmax(0,1fr)}
+  .am .rail{font-size:11.5px}.am .rail div{padding:5px 5px;gap:3px}
+  .am .body{padding:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .am .d-run,.am .pulse,.am .seg.grow{animation:none}
+}
 /* how */
 ol.steps{list-style:none;counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:30px}
 ol.steps li{counter-increment:s;border:1px solid var(--line);border-radius:12px;padding:22px;background:var(--card)}
@@ -101,7 +262,7 @@ ol.steps p{color:var(--muted);font-size:16px}
 /* install */
 .install{background:var(--bg2);border-top:1px solid var(--line)}
 pre{background:var(--term);color:var(--term-ink);font:400 14.5px/1.8 var(--mono);padding:22px;border-radius:12px;overflow-x:auto;max-width:100%;margin-top:26px}
-pre .c{color:#8d8872}pre .d{color:var(--accent)}
+pre code{background:none;padding:0;border-radius:0;font:inherit;color:inherit}pre .c{color:#8d8872}pre .d{color:var(--accent)}
 .note{color:var(--muted);margin-top:18px;max-width:64ch}
 footer{padding:36px 0;border-top:1px solid var(--line);font:400 14px var(--mono);color:var(--muted)}
 footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
@@ -160,40 +321,197 @@ footer a{color:var(--ink)}
   <div class="wrap">
     <p class="eyebrow">Features</p>
     <h2>One place for every thread, prompt and diff.</h2>
+    <p class="lede">Each picture below copies a screen of the real app. The sample data is invented.</p>
 
-    <div class="group"><h3>Workspace</h3>
-      <div class="grid">
-        <article class="card"><span class="tag">WORKSPACE</span><h3>Live threads</h3><p>The Workspace lists watched sessions from your terminals and driven threads that agent-monitor starts. Threads group as Needs you, Working, Ready and Settled.</p></article>
-        <article class="card"><span class="tag">LIVE</span><h3>Activity line and step trail</h3><p>Each running thread shows what the agent does now. The step trail folds the tool calls of a turn into one short row that you can open.</p></article>
-        <article class="card"><span class="tag">ALERTS</span><h3>Needs-you alerts</h3><p>An alert arrives when a thread needs you, finishes or fails. An unanswered alert comes again once after a delay that you set. Open alerts return after a daemon restart.</p></article>
-      </div>
+    <div class="feats">
+
+      <article class="feat" id="f-workspace">
+        <div class="copy">
+          <span class="tag">Workspace</span>
+          <h3>Every session in one list</h3>
+          <p>The Workspace shows sessions that you start in a terminal (watched) and threads that agent-monitor starts (driven). They sit in one list. The groups tell you where to look first.</p>
+          <ul>
+            <li>Groups: Needs you, Working, Ready, Settled</li>
+            <li>Each row shows the title, the agent, the folder and the age</li>
+            <li>A thread that is done for 24 hours settles by itself</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="ws">
+            <div class="rail"><div class="on">Threads</div><div>Search</div><div>Alerts <em>2</em></div><div class="gap"></div><div>Settings</div></div>
+            <div class="tl">
+              <div class="grp"><span class="dot d-need"></span><b>Needs you</b> 2</div>
+              <div class="th sel"><div class="r1"><span class="ag cl">&#10043;</span><span>Claude</span><span class="t">2m</span></div><div class="ti">Fix flaky retry test</div><div class="r3"><span>api-server</span><span class="st need">Needs you</span></div></div>
+              <div class="th"><div class="r1"><span class="ag cx">&#9679;</span><span>Codex</span><span class="t">9h</span></div><div class="ti">Plan the schema change</div><div class="r3"><span>billing-svc</span><span class="st need">Plan</span></div></div>
+              <div class="grp"><span class="dot d-run"></span><b>Working</b> 1</div>
+              <div class="th"><div class="r1"><span class="ag cl">&#10043;</span><span>Claude</span><span class="t">now</span></div><div class="ti">Migrate the web-app router</div><div class="r3"><span>web-app</span><span class="st run">Working</span></div></div>
+              <div class="grp"><span class="dot d-ok"></span><b>Ready</b> 1</div>
+              <div class="th"><div class="r1"><span class="ag cu">C</span><span>Cursor</span><span class="t">1h</span></div><div class="ti">Add pagination to list API</div><div class="r3"><span>api-server</span><span class="st ok">Ready</span></div></div>
+              <div class="grp"><span class="dot d-idle"></span><b>Settled</b> 1</div>
+              <div class="th"><div class="r1"><span class="ag cl">&#10043;</span><span>Claude</span><span class="t">6d</span></div><div class="ti">Rename config keys</div><div class="r3"><span>infra-tools</span></div></div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+      <article class="feat" id="f-live">
+        <div class="copy">
+          <span class="tag">Live chat</span>
+          <h3>See what the agent does now</h3>
+          <p>A running thread shows one activity line with the state of the agent. After the turn, the tool calls fold into a step trail: one row of colored segments. Open it to read each call.</p>
+          <ul>
+            <li>Segment width shows how long a call took</li>
+            <li>Colors: Bash, Edit, MCP, Web, Script. A failed call is red.</li>
+            <li>The summary counts calls, tools and time</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="bar"><span class="ag cl">&#10043;</span><b>Migrate the web-app router</b><span class="sp"></span><span>web-app</span></div>
+          <div class="body">
+            <div class="wu">Move the routes to the new router and keep the tests green.</div>
+            <div class="worked"><span class="pulse run-t">&#9679;</span>Working for 1m 12s <span class="muted">&middot; 9 steps</span></div>
+            <div class="trail-h">
+              <div class="trail-bar"><i class="seg sh" style="flex-grow:2"></i><i class="seg ed" style="flex-grow:1.4"></i><i class="seg sh" style="flex-grow:1"></i><i class="seg scr" style="flex-grow:3"></i><i class="seg mcp" style="flex-grow:1.2"></i><i class="seg web" style="flex-grow:1.6"></i><i class="seg bad" style="flex-grow:1"></i><i class="seg ed" style="flex-grow:1.8"></i><i class="seg sh grow"></i></div>
+              <span class="trail-sum">14 calls &middot; Bash 6 &middot; Script 4 &middot; 2m 10s <span class="bad">&middot; 1 failed</span></span>
+            </div>
+            <div class="witem"><span class="ic" style="color:var(--ok)">&#10003;</span><code>go test ./...</code><span class="wim">38s</span></div>
+            <div class="witem"><span class="ic" style="color:var(--need)">&plusmn;</span><code>router/routes.ts</code><span class="wim">2s</span></div>
+            <div class="wactivity"><span class="pulse run-t">&#9679;</span> &#10043; Thinking&hellip; (12s &middot; &darr; 300 tokens)</div>
+          </div>
+        </div></div>
+      </article>
+
+      <article class="feat" id="f-approvals">
+        <div class="copy">
+          <span class="tag">Approvals</span>
+          <h3>Answer a request with the facts in view</h3>
+          <p>Each request shows a risk level and the reason. Allow runs the call once. Always adds a rule as wide as the call you saw. Deny stops it. Several equal requests from different sessions can go together.</p>
+          <ul>
+            <li>High risk, chained and piped commands have no Always</li>
+            <li>Allow these N lists every request before it sends anything</li>
+            <li>Permission, question and plan approvals use the same card</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="body">
+            <div class="appr">
+              <div class="why"><span class="risk md">Medium</span><span>Bash</span><span class="muted">in api-server</span></div>
+              <pre>go test ./internal/retry/...</pre>
+              <div class="acts"><span class="btn allow">Allow <span class="kbd">A</span></span><span class="btn">Always</span><span class="btn deny">Deny</span><span class="btn sm">Allow these 3&hellip;</span></div>
+              <div class="agroup">
+                <div class="xs muted">3 requests match <code>go test *</code> in api-server. Each one is allowed once; no rule is added.</div>
+                <ul><li>go test ./internal/retry/...</li><li>go test ./internal/queue/...</li><li>go test ./cmd/...</li></ul>
+                <div class="acts"><span class="btn sm pri">Allow all 3</span><span class="btn sm ghost">Cancel</span></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+      <article class="feat" id="f-rules">
+        <div class="copy">
+          <span class="tag">Suggested rules</span>
+          <h3>Turn repeated answers into rules</h3>
+          <p>The daemon reads 30 days of approvals. It suggests an allow rule for a call that you approved 3 or more times and never denied. You add the rule or dismiss it.</p>
+          <ul>
+            <li>A rule is only as wide as the calls you approved</li>
+            <li>Deny rules win over allow rules</li>
+            <li>Also on the iPhone, in Settings</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="body">
+            <div class="sugbox">
+              <div class="xs muted">Suggested: you allowed these by hand, and never denied them</div>
+              <div class="sug"><div class="what"><span class="ag cl">&#10043;</span> <code>Bash</code> matching <code>go test *</code><div class="xs muted">7&times; &middot; last 2h ago</div></div><span class="btn sm">Add</span><span class="btn sm ghost">Dismiss</span></div>
+              <div class="sug"><div class="what"><span class="ag cx">&#9679;</span> <code>Bash</code> matching <code>git status</code><div class="xs muted">12&times; &middot; last 1d ago</div></div><span class="btn sm">Add</span><span class="btn sm ghost">Dismiss</span></div>
+              <div class="sug"><div class="what"><span class="ag cl">&#10043;</span> <code>Bash</code> matching <code>npm run lint</code><div class="xs muted">4&times; &middot; last 3d ago</div></div><span class="btn sm">Add</span><span class="btn sm ghost">Dismiss</span></div>
+            </div>
+          </div>
+        </div></div>
+      </article>
+
+      <article class="feat" id="f-alerts">
+        <div class="copy">
+          <span class="tag">Needs-you alerts</span>
+          <h3>An alert that does not get lost</h3>
+          <p>An alert arrives when a thread needs you, finishes or fails. If nobody answers, it comes once more after a delay that you set. You answer on one device and the alert closes on all of them.</p>
+          <ul>
+            <li>Reminder after 5, 10, 15, 30 or 60 minutes, or off</li>
+            <li>Open alerts survive a daemon restart</li>
+            <li>Web Push and macOS notifications, plus toasts in the web app</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="body">
+            <div class="toast mac"><span class="ag cl">&#10043;</span><div><div class="tt">Needs you: api-server</div><div class="tb">Claude asks to run go test ./...</div></div></div>
+            <div class="toast"><span class="dot d-need" style="margin-top:5px"></span><div><div class="tt">Still waiting</div><div class="tb">Fix flaky retry test has waited 10 min for an answer.</div></div></div>
+            <div class="ibox"><h4>Reminder</h4><div class="xs muted" style="margin-bottom:8px">When nobody answers a request and nobody opens its notice, it comes once more as "Still waiting".</div>Remind after <span class="inp">10 min &#9662;</span></div>
+          </div>
+        </div></div>
+      </article>
+
+      <article class="feat" id="f-iphone">
+        <div class="copy">
+          <span class="tag">iPhone app</span>
+          <h3>Unblock an agent from your pocket</h3>
+          <p>The iPhone app is a SwiftUI app for the same daemon. Answer a request, stop a running turn, line up messages and read what changed. The app reaches the daemon over Tailscale.</p>
+          <ul>
+            <li>Stop ends the running turn. A message sent while the agent works goes to the queue.</li>
+            <li>The diff viewer lists each changed file with its added and removed lines</li>
+            <li>Saved replies send an answer that you use often</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="phone" aria-hidden="true"><div class="notch"></div><div class="am">
+          <div class="bar"><span class="ag cl">&#10043;</span><b>Fix flaky retry test</b><span class="sp"></span><span>api-server</span></div>
+          <div class="body">
+            <div class="appr">
+              <div class="why"><span class="risk md">Medium</span><span>Bash</span></div>
+              <pre>go test ./internal/retry/...</pre>
+              <div class="acts"><span class="btn allow ibtn">Allow</span><span class="btn ibtn">Always allow</span><span class="btn deny ibtn">Deny</span></div>
+            </div>
+            <div class="diff"><div class="h">retry/backoff.go  +4 &minus;1</div><div class="r">- delay := base</div><div class="a">+ delay := base &lt;&lt; attempt</div></div>
+            <div class="queue"><b>Queued 1</b> &middot; Then run the linter</div>
+            <div class="chips"><span class="chip on">Yes, go on</span><span class="chip">Run the tests</span><span class="chip">Stop</span></div>
+            <div class="comp"><span class="in">Queue a message</span><span class="go stop">&#9632;</span><span class="go send">&uarr;</span></div>
+          </div>
+        </div></div></div>
+      </article>
+
+      <article class="feat" id="f-search">
+        <div class="copy">
+          <span class="tag">Search</span>
+          <h3>Search every transcript</h3>
+          <p>One full-text index covers prompts, replies, commands, tool output and errors from every agent on the machine. Filter by agent, repo, tool and time. Ask mode answers a question in words and cites the sessions.</p>
+          <ul>
+            <li>Ask sends the 20 best lines to a model. It counts as a paid model call.</li>
+            <li>Agents search the same history with two read-only MCP tools: <code>search_sessions</code> and <code>session_context</code></li>
+            <li>Facets for agent, repo, tool and time</li>
+          </ul>
+        </div>
+        <div class="shot"><div class="am" aria-hidden="true">
+          <div class="body">
+            <div class="seg2"><span class="on">Search</span><span>Ask</span></div>
+            <div class="sbox">retry backoff agent:claude repo:api-server since:7d</div>
+            <div class="chips"><span class="chip on">Claude 14</span><span class="chip">Codex 6</span><span class="chip">Bash 9</span><span class="chip">api-server 14</span><span class="chip">7d</span></div>
+            <div class="hit"><div class="r1"><span class="ag cl">&#10043;</span><b>Fix flaky retry test</b><span class="muted" style="margin-left:auto">api-server &middot; 3 hits</span></div><div class="sn">&hellip;the <mark>retry</mark> <mark>backoff</mark> doubled the delay on every attempt&hellip;</div></div>
+            <div class="answer">The retry delay had no cap, so the test timed out. The fix limits it to 5 seconds. <span class="cite">[1]</span> <span class="cite">[2]</span></div>
+          </div>
+        </div></div>
+      </article>
+
     </div>
 
-    <div class="group"><h3>Approvals</h3>
-      <div class="grid">
-        <article class="card"><span class="tag">APPROVE</span><h3>Answer from any device</h3><p>Permission prompts, questions and plan approvals show in the web app, on the iPhone and in the terminal. Answer in one place and the card closes in the others. Each request has a risk level and a reason.</p></article>
-        <article class="card"><span class="tag">BATCH</span><h3>Allow these N</h3><p>When one Always rule covers several waiting requests, one button allows all of them. The list shows before anything is sent.</p></article>
-        <article class="card"><span class="tag">RULES</span><h3>Suggested rules</h3><p>agent-monitor suggests rules from the requests you approve. A rule is only as wide as the call you saw. Deny rules win over allow rules.</p></article>
-      </div>
-    </div>
-
-    <div class="group"><h3>iPhone app</h3>
-      <div class="grid">
-        <article class="card"><span class="tag">IPHONE</span><h3>Queue and Stop</h3><p>Work through waiting requests in a queue. Stop a running thread from your pocket.</p></article>
-        <article class="card"><span class="tag">REVIEW</span><h3>Diff viewer</h3><p>Read what an agent changed before you approve the next step.</p></article>
-        <article class="card"><span class="tag">FAST</span><h3>Saved replies</h3><p>Keep the answers that you send often. Send one with a tap.</p></article>
-      </div>
-    </div>
-
-    <div class="group"><h3>Find, review and control</h3>
-      <div class="grid">
-        <article class="card"><span class="tag">SEARCH</span><h3>Search every transcript</h3><p>A full-text index covers prompts, replies, commands, tool output and errors. Filter by agent, repo, tool and time. Agents can search the same history through MCP.</p></article>
-        <article class="card"><span class="tag">GIT</span><h3>Git panel and diff</h3><p>Driven threads get checkpoints, a diff between any two points, restore, commit, push and draft PRs. A read-only review child can check the diff.</p></article>
-        <article class="card"><span class="tag">TERMINAL</span><h3>Terminal sessions</h3><p>Type into the tmux pane of a watched session, or open a shell in the thread folder. Remote shells stay off until you turn them on and pair a device.</p></article>
-        <article class="card"><span class="tag">TALK</span><h3>Agent-to-agent talk</h3><p>Agents list each other, read panes and send messages through MCP tools. You see an Allow or Deny banner first.</p></article>
-        <article class="card"><span class="tag">LIMITS</span><h3>Spend limits</h3><p>Set a limit per thread and per day. You get a notice at 80%. At 100% the running driven threads stop.</p></article>
-        <article class="card"><span class="tag">AUTOMATE</span><h3>Templates and schedules</h3><p>Save a New thread form as a template with variables. Run it on a cron schedule inside the daemon. No cron entry is made.</p></article>
-      </div>
+    <h3 class="sub-h">Review and control</h3>
+    <div class="mini">
+      <article class="card"><span class="tag">GIT</span><h3>Git panel and diff</h3><p>Driven threads get checkpoints, a diff between any two points, restore, commit, push, Create PR and a read-only review.</p>
+        <div class="am" aria-hidden="true"><div class="body"><div class="fl"><span class="p">api/handler.go</span><span class="n"><span class="add">+12</span> <span class="del">&minus;3</span></span></div><div class="fl"><span class="p">api/handler_test.go</span><span class="n"><span class="add">+30</span></span></div><div class="acts"><span class="btn sm">Commit</span><span class="btn sm">Push</span><span class="btn sm">Create PR</span></div></div></div></article>
+      <article class="card"><span class="tag">TERMINAL AND TALK</span><h3>Terminals and agent-to-agent talk</h3><p>Type into the tmux pane of a watched session. Agents list each other, read panes and send messages through MCP tools. You see an Allow or Deny banner first.</p>
+        <div class="am" aria-hidden="true"><div class="body"><div class="term"><b>$</b> go build ./...</div><div class="appr" style="padding:8px 10px"><div class="why" style="margin:0"><span class="risk md">Talk</span><span>Claude asks to message Codex</span></div></div></div></div></article>
+      <article class="card"><span class="tag">LIMITS</span><h3>Spend limits</h3><p>Set a limit per thread and per day in US dollars. You get a notice at 80%. At 100% the running driven threads stop.</p>
+        <div class="am" aria-hidden="true"><div class="body"><div class="xs muted">Daily limit</div><div class="meter"><i style="width:80%"></i></div><div class="xs"><span class="pill p-need">80% notice</span> <span class="muted">stop at 100%</span></div></div></div></article>
+      <article class="card"><span class="tag">AUTOMATE</span><h3>Templates and schedules</h3><p>Save a New thread form as a template with variables. Run it on a cron schedule inside the daemon. No cron entry is made.</p>
+        <div class="am" aria-hidden="true"><div class="body"><div class="fl"><span class="p">Fix and review</span><span class="n muted">template</span></div><div class="fl"><span class="p mono">0 9 * * 1-5</span><span class="n muted">{{branch}}</span></div></div></div></article>
     </div>
   </div>
 </section>

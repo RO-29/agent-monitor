@@ -1,114 +1,204 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-labelledby="t d">
-<title id="t">agent-monitor flow</title>
-<desc id="d">An agent in a terminal asks for permission. The agent-monitor daemon catches the request and sends it to the phone and the web app. The user taps Allow, and the agent continues.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" role="img" aria-labelledby="t d">
+<title id="t">agent-monitor: one permission prompt, end to end</title>
+<desc id="d">Claude Code runs in a terminal and asks to run go test. agent-monitor moves the thread to Needs you and shows an approval card in the web app. The iPhone shows the same request. The user taps Allow on the iPhone, the card closes everywhere, and Claude continues. The step trail grows and the activity line updates.</desc>
 <style>
-  .bg{fill:#0f1218}
-  .card{fill:#171b23;stroke:#2a303c;stroke-width:1.2}
-  .mono{font:500 13px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#c9d1dc}
-  .ui{font:500 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#c9d1dc}
-  .h{font:600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#8b95a5;letter-spacing:.08em}
-  .big{font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;fill:#e8edf4}
-  .dim{fill:#7d8796}
-  .claude{fill:#e08562}
-  .ok{fill:#5dc48a}
-  .need{fill:#f0ae4a}
-  .wire{fill:none;stroke:#2a303c;stroke-width:2;stroke-dasharray:4 6}
-  .pkt{fill:#86a3ff;filter:drop-shadow(0 0 6px #86a3ff)}
-  .loop *{animation-duration:12s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+  .m{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .fg{fill:#ecebe6}.f2{fill:#b0ada3}.mu{fill:#918d82}
+  .cl{fill:#e08562}.ok{fill:#5dc48a}.nd{fill:#f0ae4a}.ac{fill:#86a3ff}
+  .pnl{fill:#1a1a17}.pnl2{fill:#1e1e1a}.pnl3{fill:#282823}
+  .ln{stroke:#33322c}.ln2{stroke:#45443d}
+  .wire{fill:none;stroke:#45443d;stroke-width:1.5;stroke-dasharray:3 6}
+  .pkt{fill:#86a3ff;filter:drop-shadow(0 0 5px #86a3ff)}
+  .a *,.a{animation-duration:14s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
   .typing{animation-name:typing}
-  .ask{animation-name:ask;opacity:0}
-  .p1{animation-name:p1;opacity:0}
-  .core{animation-name:core}
-  .p2{animation-name:p2;opacity:0}
-  .p3{animation-name:p3;opacity:0}
-  .alert{animation-name:alert;opacity:0}
-  .walert{animation-name:walert;opacity:0}
-  .tap{animation-name:tap;opacity:0}
-  .allow{animation-name:allow}
-  .p4{animation-name:p4;opacity:0}
-  .done{animation-name:done;opacity:0}
-  .cursor{animation:blink 1s steps(1) infinite}
-  @keyframes typing{0%{clip-path:inset(0 100% 0 0)}12%,100%{clip-path:inset(0 0 0 0)}}
-  @keyframes ask{0%,14%{opacity:0}17%,72%{opacity:1}76%,100%{opacity:0}}
-  @keyframes p1{0%,17%{opacity:0;transform:translate(0,0)}18%{opacity:1}28%{opacity:1;transform:translate(178px,0)}29%,100%{opacity:0;transform:translate(178px,0)}}
-  @keyframes core{0%,27%{transform:scale(1)}31%{transform:scale(1.06)}35%,100%{transform:scale(1)}}
-  @keyframes p2{0%,32%{opacity:0;transform:translate(0,0)}33%{opacity:1}42%{opacity:1;transform:translate(176px,-92px)}43%,100%{opacity:0;transform:translate(176px,-92px)}}
-  @keyframes p3{0%,32%{opacity:0;transform:translate(0,0)}33%{opacity:1}42%{opacity:1;transform:translate(176px,92px)}43%,100%{opacity:0;transform:translate(176px,92px)}}
-  @keyframes alert{0%,42%{opacity:0;transform:translateY(8px)}46%,84%{opacity:1;transform:translateY(0)}90%,100%{opacity:0;transform:translateY(0)}}
-  @keyframes walert{0%,42%{opacity:0;transform:translateY(8px)}46%,60%{opacity:1;transform:translateY(0)}64%,100%{opacity:0}}
-  @keyframes tap{0%,54%{opacity:0;transform:scale(.4)}57%{opacity:.9;transform:scale(1)}62%,100%{opacity:0;transform:scale(1.6)}}
-  @keyframes allow{0%,56%{fill:#2c7d4f}58%,84%{fill:#5dc48a}90%,100%{fill:#2c7d4f}}
-  @keyframes p4{0%,60%{opacity:0;transform:translate(0,0)}61%{opacity:1}72%{opacity:1;transform:translate(-354px,92px)}73%,100%{opacity:0;transform:translate(-354px,92px)}}
-  @keyframes done{0%,74%{opacity:0}78%,94%{opacity:1}100%{opacity:0}}
+  .tAsk{animation-name:tAsk;opacity:0}
+  .tDone{animation-name:tDone;opacity:0}
+  .p1{animation-name:p1;opacity:0}.p2{animation-name:p2;opacity:0}.p3{animation-name:p3;opacity:0}.p4{animation-name:p4;opacity:0}
+  .listW{animation-name:listW}.listN{animation-name:listN;opacity:0}
+  .badge{animation-name:badge;opacity:0}
+  .card{animation-name:card;opacity:0}
+  .act1{animation-name:act1}.act2{animation-name:act2;opacity:0}
+  .seg{animation-name:seg;transform-box:fill-box;transform-origin:left center;transform:scaleX(0)}
+  .phone{animation-name:phone;opacity:0}
+  .tap{animation-name:tap;opacity:0;transform-box:fill-box;transform-origin:center}
+  .pallow{animation-name:pallow}
+  .pulse{animation:pulse 1.4s ease-in-out infinite}
+  .caret{animation:blink 1s steps(1) infinite}
+  @keyframes typing{0%{clip-path:inset(0 100% 0 0)}9%,100%{clip-path:inset(0 0 0 0)}}
+  @keyframes tAsk{0%,13%{opacity:0}15%,66%{opacity:1}69%,100%{opacity:0}}
+  @keyframes tDone{0%,69%{opacity:0}72%,96%{opacity:1}100%{opacity:0}}
+  @keyframes p1{0%,15%{opacity:0;transform:translate(0,0)}16%{opacity:1}22%{opacity:1;transform:translate(52px,0)}23%,100%{opacity:0;transform:translate(52px,0)}}
+  @keyframes p2{0%,24%{opacity:0;transform:translate(0,0)}25%{opacity:1}31%{opacity:1;transform:translate(40px,0)}32%,100%{opacity:0;transform:translate(40px,0)}}
+  @keyframes p3{0%,53%{opacity:0;transform:translate(0,0)}54%{opacity:1}60%{opacity:1;transform:translate(-40px,0)}61%,100%{opacity:0;transform:translate(-40px,0)}}
+  @keyframes p4{0%,61%{opacity:0;transform:translate(0,0)}62%{opacity:1}68%{opacity:1;transform:translate(-52px,0)}69%,100%{opacity:0;transform:translate(-52px,0)}}
+  @keyframes listW{0%,22%{opacity:1}24%,60%{opacity:0}62%,100%{opacity:1}}
+  @keyframes listN{0%,22%{opacity:0}24%,60%{opacity:1}62%,100%{opacity:0}}
+  @keyframes badge{0%,22%{opacity:0}24%,60%{opacity:1}62%,100%{opacity:0}}
+  @keyframes card{0%,22%{opacity:0;transform:translateY(10px)}25%,58%{opacity:1;transform:translateY(0)}61%,100%{opacity:0;transform:translateY(0)}}
+  @keyframes act1{0%,69%{opacity:1}71%,100%{opacity:0}}
+  @keyframes act2{0%,69%{opacity:0}71%,96%{opacity:1}100%{opacity:0}}
+  @keyframes seg{0%,70%{transform:scaleX(0)}78%,96%{transform:scaleX(1)}100%{transform:scaleX(0)}}
+  @keyframes phone{0%,31%{opacity:0;transform:translateY(-12px)}34%,58%{opacity:1;transform:translateY(0)}62%,100%{opacity:0;transform:translateY(0)}}
+  @keyframes tap{0%,47%{opacity:0;transform:scale(.4)}50%{opacity:.9;transform:scale(1)}55%,100%{opacity:0;transform:scale(1.7)}}
+  @keyframes pallow{0%,49%{fill:#2c7d4f}51%,100%{fill:#5dc48a}}
+  @keyframes pulse{50%{opacity:.35}}
   @keyframes blink{50%{opacity:0}}
-  @media (prefers-reduced-motion:reduce){.loop *{animation:none!important}.ask,.alert,.walert,.done{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.a *,.a,.pulse,.caret{animation:none!important}.card,.listN,.badge,.phone,.tAsk{opacity:1}.listW,.act2,.tDone{opacity:0}.seg{transform:scaleX(1)}}
 </style>
-<rect class="bg" width="960" height="440" rx="18"/>
 
-<!-- wires -->
-<path class="wire" d="M300 214 H 404"/>
-<path class="wire" d="M560 214 C 610 214 620 122 676 122"/>
-<path class="wire" d="M560 214 C 610 214 620 306 676 306"/>
+<rect width="1200" height="640" rx="20" fill="#0d0d0c"/>
 
-<g class="loop">
-  <!-- terminal -->
-  <rect class="card" x="28" y="92" width="272" height="244" rx="12"/>
-  <circle cx="48" cy="112" r="5" fill="#f07068"/><circle cx="64" cy="112" r="5" fill="#f0ae4a"/><circle cx="80" cy="112" r="5" fill="#5dc48a"/>
-  <text class="h" x="100" y="116">TMUX · API-SERVER</text>
-  <text class="mono" x="46" y="150"><tspan class="claude">✻</tspan> claude</text>
-  <g class="typing"><text class="mono" x="46" y="176"><tspan class="dim">❯</tspan> fix the flaky test</text></g>
-  <g class="ask">
-    <text class="mono" x="46" y="208"><tspan class="need">●</tspan> Bash(go test ./...)</text>
-    <text class="mono dim" x="62" y="230">Do you want to proceed?</text>
-    <text class="mono dim" x="62" y="252">❯ 1. Yes   2. No</text>
-  </g>
-  <g class="done">
-    <rect x="40" y="194" width="248" height="70" fill="#171b23"/>
-    <text class="mono" x="46" y="208"><tspan class="ok">✓</tspan> Bash(go test ./...)</text>
-    <text class="mono dim" x="62" y="230">ok  api  1.82s</text>
-    <text class="mono" x="46" y="256"><tspan class="claude">✻</tspan> Writing the fix…</text>
-  </g>
-  <text class="mono dim" x="46" y="316">esc to interrupt<tspan class="cursor"> ▍</tspan></text>
-
-  <!-- daemon -->
-  <g class="core" style="transform-origin:482px 214px;transform-box:view-box">
-    <rect x="404" y="160" width="156" height="108" rx="16" fill="#1a2030" stroke="#86a3ff" stroke-width="1.5"/>
-    <text class="big" x="482" y="202" text-anchor="middle">agent-monitor</text>
-    <text class="ui dim" x="482" y="224" text-anchor="middle">daemon · :7777</text>
-    <text class="ui dim" x="482" y="246" text-anchor="middle" font-size="12">hooks · panes · MCP</text>
-  </g>
-
-  <!-- packets -->
-  <circle class="pkt p1" cx="304" cy="214" r="6"/>
-  <circle class="pkt p2" cx="562" cy="214" r="6"/>
-  <circle class="pkt p3" cx="562" cy="214" r="6"/>
-  <circle class="pkt p4" cx="676" cy="122" r="6"/>
-
-  <!-- phone -->
-  <rect class="card" x="676" y="40" width="256" height="164" rx="22"/>
-  <text class="h" x="696" y="68">IPHONE</text>
-  <g class="alert">
-    <rect x="692" y="80" width="224" height="108" rx="12" fill="#222838"/>
-    <text class="ui" x="706" y="104"><tspan class="need">●</tspan> Claude needs you</text>
-    <text class="mono" x="706" y="128" font-size="12">go test ./...</text>
-    <rect class="allow" x="706" y="144" width="92" height="30" rx="8" fill="#2c7d4f"/>
-    <text class="ui" x="752" y="164" text-anchor="middle" fill="#0f1218" style="fill:#0f1218;font-weight:700">Allow</text>
-    <rect x="808" y="144" width="92" height="30" rx="8" fill="none" stroke="#3a4252"/>
-    <text class="ui dim" x="854" y="164" text-anchor="middle">Deny</text>
-    <circle class="tap" cx="752" cy="159" r="16" fill="none" stroke="#e8edf4" stroke-width="2" style="transform-origin:752px 159px;transform-box:view-box"/>
-  </g>
-
-  <!-- web -->
-  <rect class="card" x="676" y="236" width="256" height="164" rx="12"/>
-  <text class="h" x="696" y="264">WEB · LOCALHOST:7777</text>
-  <g class="walert">
-    <rect x="692" y="278" width="224" height="34" rx="8" fill="#222838"/>
-    <text class="ui" x="706" y="300"><tspan class="need">●</tspan> Needs you · api-server</text>
-  </g>
-  <rect x="692" y="322" width="224" height="12" rx="4" fill="#222838"/>
-  <rect x="692" y="342" width="160" height="12" rx="4" fill="#222838"/>
-  <rect x="692" y="362" width="190" height="12" rx="4" fill="#222838"/>
+<!-- wires and packets -->
+<path class="wire" d="M282 320 H 334"/>
+<path class="wire" d="M920 320 H 960"/>
+<g class="a">
+  <circle class="pkt p1" cx="282" cy="320" r="5"/>
+  <circle class="pkt p2" cx="920" cy="320" r="5"/>
+  <circle class="pkt p3" cx="960" cy="320" r="5"/>
+  <circle class="pkt p4" cx="334" cy="320" r="5"/>
 </g>
 
-<text class="ui dim" x="480" y="424" text-anchor="middle" font-size="12">The agent asks · agent-monitor catches it · you answer from any device · the agent continues</text>
+<!-- terminal -->
+<g class="a">
+  <rect x="24" y="170" width="258" height="300" rx="12" fill="#161614" stroke="#33322c"/>
+  <circle cx="44" cy="190" r="5" fill="#f07068"/><circle cx="60" cy="190" r="5" fill="#f0ae4a"/><circle cx="76" cy="190" r="5" fill="#5dc48a"/>
+  <text x="94" y="194" font-size="11" class="mu" letter-spacing=".6">TMUX · api-server</text>
+  <text x="40" y="228" font-size="12.5" class="m fg"><tspan class="cl">✻</tspan> Claude Code</text>
+  <g class="typing"><text x="40" y="254" font-size="12.5" class="m fg"><tspan class="mu">❯</tspan> fix the flaky test</text></g>
+  <g class="tAsk">
+    <text x="40" y="288" font-size="12.5" class="m fg"><tspan class="nd">●</tspan> Bash(go test ./...)</text>
+    <text x="56" y="310" font-size="12" class="m mu">Do you want to proceed?</text>
+    <text x="56" y="330" font-size="12" class="m f2">❯ 1. Yes</text>
+    <text x="56" y="348" font-size="12" class="m mu">  2. No</text>
+  </g>
+  <g class="tDone">
+    <text x="40" y="288" font-size="12.5" class="m fg"><tspan class="ok">✓</tspan> Bash(go test ./...)</text>
+    <text x="56" y="310" font-size="12" class="m mu">ok  api  1.82s</text>
+    <text x="40" y="340" font-size="12.5" class="m fg"><tspan class="cl">✻</tspan> Writing the fix…</text>
+  </g>
+  <text x="40" y="448" font-size="11.5" class="m mu">esc to interrupt<tspan class="caret"> ▍</tspan></text>
+</g>
+
+<!-- app window -->
+<g class="a">
+  <rect x="334" y="36" width="586" height="568" rx="14" fill="#121210" stroke="#33322c"/>
+  <path d="M334 50 a14 14 0 0 1 14 -14 H 906 a14 14 0 0 1 14 14 V 64 H 334 Z" fill="#161614"/>
+  <circle cx="352" cy="50" r="5" fill="#3a3933"/><circle cx="368" cy="50" r="5" fill="#3a3933"/><circle cx="384" cy="50" r="5" fill="#3a3933"/>
+  <text x="627" y="54" font-size="11" class="mu" text-anchor="middle">localhost:7777/w</text>
+  <line x1="334" y1="64" x2="920" y2="64" class="ln"/>
+
+  <!-- rail -->
+  <line x1="388" y1="64" x2="388" y2="604" class="ln"/>
+  <rect x="349" y="78" width="24" height="24" rx="7" fill="#86a3ff" opacity=".85"/>
+  <text x="361" y="128" font-size="9.5" class="fg" text-anchor="middle" font-weight="600">Threads</text>
+  <text x="361" y="156" font-size="9.5" class="f2" text-anchor="middle">Search</text>
+  <text x="361" y="184" font-size="9.5" class="f2" text-anchor="middle">Alerts</text>
+  <g class="badge"><circle cx="377" cy="175" r="6" fill="#86a3ff"/><text x="377" y="178.5" font-size="8.5" fill="#121210" text-anchor="middle" font-weight="700">1</text></g>
+  <text x="361" y="212" font-size="9.5" class="f2" text-anchor="middle">Settings</text>
+  <circle cx="352" cy="588" r="3" fill="#5dc48a"/><text x="358" y="591" font-size="9" class="mu">live</text>
+
+  <!-- list -->
+  <line x1="566" y1="64" x2="566" y2="604" class="ln"/>
+  <text x="400" y="90" font-size="13" class="fg" font-weight="600">Threads</text>
+  <rect x="400" y="102" width="154" height="24" rx="6" fill="none" stroke="#33322c"/>
+  <text x="408" y="118" font-size="10.5" class="mu">Filter threads</text>
+
+  <g class="listW">
+    <text x="402" y="150" font-size="10.5" class="f2">⌄ Working</text>
+    <rect x="398" y="158" width="160" height="40" rx="7" fill="#282823"/>
+    <text x="408" y="175" font-size="11" class="fg" font-weight="600">Fix the flaky test</text>
+    <text x="408" y="191" font-size="10" class="mu"><tspan class="cl">✻</tspan> api-server</text>
+    <circle cx="546" cy="172" r="3.5" fill="#4cc3d8" class="pulse"/>
+    <text x="408" y="219" font-size="11" class="fg">Add dark mode</text>
+    <text x="408" y="235" font-size="10" class="mu"><tspan fill="#4cbf9c">◆</tspan> web-app</text>
+    <text x="402" y="266" font-size="10.5" class="f2">⌄ Ready</text>
+  </g>
+  <g class="listN">
+    <text x="402" y="150" font-size="10.5" class="nd">⌄ Needs you</text>
+    <rect x="398" y="158" width="160" height="40" rx="7" fill="#282823" stroke="#f0ae4a" stroke-opacity=".5"/>
+    <text x="408" y="175" font-size="11" class="fg" font-weight="600">Fix the flaky test</text>
+    <text x="408" y="191" font-size="10" class="mu"><tspan class="cl">✻</tspan> api-server · go test</text>
+    <circle cx="546" cy="172" r="3.5" fill="#f0ae4a"/>
+    <text x="402" y="219" font-size="10.5" class="f2">⌄ Working</text>
+    <text x="408" y="240" font-size="11" class="fg">Add dark mode</text>
+    <text x="408" y="256" font-size="10" class="mu"><tspan fill="#4cbf9c">◆</tspan> web-app</text>
+    <text x="402" y="284" font-size="10.5" class="f2">⌄ Ready</text>
+  </g>
+  <g class="listW"><text x="408" y="287" font-size="11" class="fg">Update the README</text><text x="408" y="303" font-size="10" class="mu"><tspan class="cl">✻</tspan> docs</text><text x="548" y="287" font-size="9.5" class="mu" text-anchor="end">9h</text></g>
+  <g class="listN"><text x="408" y="305" font-size="11" class="fg">Update the README</text><text x="408" y="321" font-size="10" class="mu"><tspan class="cl">✻</tspan> docs</text><text x="548" y="305" font-size="9.5" class="mu" text-anchor="end">9h</text></g>
+  <text x="402" y="352" font-size="10.5" class="f2">› Settled</text>
+
+  <!-- chat -->
+  <text x="582" y="90" font-size="13" class="fg" font-weight="600">Fix the flaky test</text>
+  <text x="582" y="106" font-size="10" class="mu"><tspan class="cl">✻</tspan> Claude Code · api-server</text>
+  <line x1="566" y1="118" x2="920" y2="118" class="ln"/>
+  <rect x="740" y="134" width="162" height="30" rx="12" fill="#282823"/>
+  <text x="752" y="153" font-size="11.5" class="fg">fix the flaky test</text>
+
+  <text x="582" y="190" font-size="11" class="f2"><tspan class="ac pulse">●</tspan> Working for 1m 12s · 9 steps ▾</text>
+  <rect x="582" y="200" width="320" height="30" rx="7" fill="#1e1e1a" stroke="#33322c"/>
+  <g>
+    <rect x="590" y="209" width="22" height="12" rx="3" fill="#86a3ff" opacity=".8"/>
+    <rect x="614" y="209" width="10" height="12" rx="3" fill="#b0ada3" opacity=".55"/>
+    <rect x="626" y="209" width="30" height="12" rx="3" fill="#5dc48a" opacity=".8"/>
+    <rect x="658" y="209" width="14" height="12" rx="3" fill="#f0ae4a" opacity=".85"/>
+    <rect x="674" y="209" width="9" height="12" rx="3" fill="#a88cf0" opacity=".85"/>
+    <rect x="685" y="209" width="18" height="12" rx="3" fill="#86a3ff" opacity=".8"/>
+    <rect x="705" y="209" width="12" height="12" rx="3" fill="#f07068"/>
+    <rect x="719" y="209" width="16" height="12" rx="3" fill="#4cc3d8" opacity=".85"/>
+    <rect class="seg a" x="737" y="209" width="26" height="12" rx="3" fill="#86a3ff"/>
+  </g>
+  <text x="896" y="219" font-size="9.5" class="mu" text-anchor="end">Bash 4 · 1 failed</text>
+  <text x="582" y="252" font-size="11.5" class="f2">The test races on the shared port. I will run it to confirm.</text>
+
+  <g class="card">
+    <rect x="582" y="270" width="320" height="118" rx="10" fill="#1a1a17" stroke="#f0ae4a" stroke-opacity=".55"/>
+    <text x="596" y="292" font-size="10" class="nd" font-weight="600" letter-spacing=".5">NEEDS YOU · BASH</text>
+    <rect x="842" y="281" width="48" height="16" rx="8" fill="rgba(93,196,138,.14)"/>
+    <text x="866" y="292.5" font-size="9.5" class="ok" text-anchor="middle">low risk</text>
+    <rect x="596" y="302" width="292" height="26" rx="6" fill="#121210"/>
+    <text x="606" y="319" font-size="11.5" class="m fg">go test ./...</text>
+    <rect x="596" y="342" width="64" height="28" rx="7" fill="#5dc48a"/>
+    <text x="628" y="360" font-size="11.5" fill="#0d2316" text-anchor="middle" font-weight="700">Allow</text>
+    <rect x="668" y="342" width="70" height="28" rx="7" fill="none" stroke="#45443d"/>
+    <text x="703" y="360" font-size="11.5" class="fg" text-anchor="middle">Always</text>
+    <rect x="746" y="342" width="60" height="28" rx="7" fill="none" stroke="#45443d"/>
+    <text x="776" y="360" font-size="11.5" class="f2" text-anchor="middle">Deny</text>
+  </g>
+
+  <g class="act2">
+    <text x="582" y="284" font-size="11" class="f2"><tspan class="ok">✓</tspan> Bash  go test ./...   <tspan class="mu">ok  api  1.82s</tspan></text>
+    <text x="582" y="312" font-size="11.5" class="f2">The test passes. Now I move it to a free port.</text>
+  </g>
+  <g class="act1"><text x="582" y="418" font-size="11" class="f2"><tspan class="ac pulse">●</tspan> <tspan class="cl">✻</tspan> Thinking… (12s · ↓ 300 tokens)</text></g>
+  <g class="act2"><text x="582" y="418" font-size="11" class="f2"><tspan class="ac pulse">●</tspan> <tspan class="cl">✻</tspan> Writing the fix… (41s · ↓ 1.2k tokens)</text></g>
+
+  <rect x="582" y="540" width="320" height="48" rx="12" fill="#1a1a17" stroke="#45443d"/>
+  <text x="596" y="568" font-size="11" class="mu">Claude Code is working. ⌘↵ adds to its queue.</text>
+</g>
+
+<!-- iPhone -->
+<g class="a">
+  <rect x="960" y="72" width="216" height="456" rx="34" fill="#0a0a09" stroke="#45443d" stroke-width="2"/>
+  <rect x="1036" y="84" width="64" height="18" rx="9" fill="#000"/>
+  <text x="1068" y="150" font-size="38" class="fg" text-anchor="middle" font-weight="300">9:41</text>
+  <text x="1068" y="172" font-size="11" class="mu" text-anchor="middle">Thursday 26 November</text>
+  <g class="phone">
+    <rect x="972" y="196" width="192" height="122" rx="16" fill="#282823" opacity=".97"/>
+    <rect x="984" y="208" width="18" height="18" rx="5" fill="#86a3ff" opacity=".85"/>
+    <text x="1008" y="221" font-size="10" class="f2" font-weight="600">AGENT MONITOR</text>
+    <text x="1152" y="221" font-size="9.5" class="mu" text-anchor="end">now</text>
+    <text x="984" y="245" font-size="11.5" class="fg" font-weight="600">Claude needs you · api-server</text>
+    <text x="984" y="263" font-size="11" class="m f2">go test ./...</text>
+    <rect class="pallow" x="984" y="276" width="80" height="28" rx="8" fill="#2c7d4f"/>
+    <text x="1024" y="294" font-size="11.5" fill="#0d2316" text-anchor="middle" font-weight="700">Allow</text>
+    <rect x="1072" y="276" width="80" height="28" rx="8" fill="#3a3933"/>
+    <text x="1112" y="294" font-size="11.5" class="fg" text-anchor="middle">Deny</text>
+    <circle class="tap" cx="1024" cy="290" r="15" fill="none" stroke="#ecebe6" stroke-width="2"/>
+  </g>
+  <rect x="1034" y="510" width="68" height="4" rx="2" fill="#45443d"/>
+</g>
+
+<text x="600" y="628" font-size="12" class="mu" text-anchor="middle">Claude asks · agent-monitor moves the thread to Needs you · you answer on any device · the card closes everywhere · Claude continues</text>
 </svg>
