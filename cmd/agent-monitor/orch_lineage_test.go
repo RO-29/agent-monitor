@@ -657,7 +657,7 @@ func TestClaudeHookScriptUsesMonitorPort(t *testing.T) {
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
 	for _, ev := range []string{"SessionStart", "SessionEnd"} {
-		cmd := exec.Command("bash", "bin/claude-hook.sh")
+		cmd := exec.Command("bash", "../../bin/claude-hook.sh")
 		cmd.Env = append(os.Environ(), "AGENT_MONITOR_URL=", "AGENT_MONITOR_PORT="+u.Port(), "TMUX_PANE=%9", "TMUX=/tmp/x")
 		cmd.Stdin = strings.NewReader(`{"hook_event_name":"` + ev + `","session_id":"s1","cwd":"/tmp"}`)
 		if out, err := cmd.CombinedOutput(); err != nil {

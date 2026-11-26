@@ -62,7 +62,7 @@ if [[ -z "$fail" ]]; then
 fi
 
 if [[ -z "$fail" ]]; then
-  if (cd "$REPO" && AM_LIVE_SCREENS="$OUT" go test -count=1 -run 'TestLiveClaudeScreens|TestClaudePromptScreens' . > "$OUT/test.log" 2>&1); then
+  if (cd "$REPO" && AM_LIVE_SCREENS="$OUT" go test -count=1 -run 'TestLiveClaudeScreens|TestClaudePromptScreens' ./cmd/agent-monitor > "$OUT/test.log" 2>&1); then
     log "claude $VER: prompts pass"
   else
     fail=$(grep -m1 -E "prompt_screens_test.go:[0-9]+:" "$OUT/test.log" | sed -E 's/^[[:space:]]*prompt_screens_test.go:[0-9]+: //')

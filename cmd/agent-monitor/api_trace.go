@@ -9,7 +9,7 @@ import (
 )
 
 // registerTraceRoutes adds the trace / thread / chapter / learning endpoints
-// (DESIGN.md §9). Existing endpoints are untouched.
+// (docs/DESIGN.md §9). Existing endpoints are untouched.
 func registerTraceRoutes(mux *http.ServeMux) {
 	// GET /api/threads?state=&tool=&project=
 	mux.HandleFunc("/api/threads", func(w http.ResponseWriter, r *http.Request) {

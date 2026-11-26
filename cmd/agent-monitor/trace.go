@@ -14,7 +14,7 @@ import (
 	"weak"
 )
 
-// Trace model (DESIGN.md §3): session, segment, chapter, span, learning.
+// Trace model (docs/DESIGN.md §3): session, segment, chapter, span, learning.
 
 type Boundary struct {
 	Kind              string            `json:"kind"` // start | compact | clear | resume

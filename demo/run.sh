@@ -11,7 +11,7 @@
 # Total ~60-75s once the prompt is fired. Stop recording on that print.
 #
 # Pre-reqs:
-#   - go build -o agent-monitor . (in repo root)
+#   - go build -o agent-monitor ./cmd/agent-monitor (in repo root)
 #   - daemon running in another terminal: ./agent-monitor
 #   - agent-monitor install (so Claude has the SessionStart hook + MCP wiring)
 #   - approve the agent-monitor MCP tools once, or launch claude with
@@ -26,7 +26,7 @@ BIN="$ROOT/agent-monitor"
 PROMPT='There is another Claude running in another pane of this same tmux session. Use list_agents to find them, then use talk_to_agent (wait_for_reply: true) to ask them to run `git log -3 --oneline` and report back. When the reply arrives, show me the three commits.'
 
 if [[ ! -x "$BIN" ]]; then
-    echo "build first: (cd \"$ROOT\" && go build -o agent-monitor .)" >&2
+    echo "build first: (cd \"$ROOT\" && go build -o agent-monitor ./cmd/agent-monitor)" >&2
     exit 1
 fi
 if ! "$BIN" list >/dev/null 2>&1; then

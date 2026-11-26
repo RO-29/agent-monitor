@@ -6,7 +6,7 @@ import (
 )
 
 // A thread is sessions joined by an explicit continuation: /clear, Codex resume, or a shared handoff file.
-// Spawned children are lanes, not members (DESIGN.md §7).
+// Spawned children are lanes, not members (docs/DESIGN.md §7).
 
 type Thread struct {
 	ID        string       `json:"id"` // root session id (oldest member)

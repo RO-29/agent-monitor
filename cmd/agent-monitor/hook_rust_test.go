@@ -74,8 +74,8 @@ func newHookEnv(t *testing.T, helper string) *hookEnv {
 			t.Fatal(err)
 		}
 	}
-	cp("bin/claude-hook.sh", filepath.Join(d, "bin", "claude-hook.sh"))
-	cp("bin/codex-hook.sh", filepath.Join(d, "bin", "codex-hook.sh"))
+	cp("../../bin/claude-hook.sh", filepath.Join(d, "bin", "claude-hook.sh"))
+	cp("../../bin/codex-hook.sh", filepath.Join(d, "bin", "codex-hook.sh"))
 	// The stub stands in for ~/bin/tmux-pane-id.sh: it is found beside the hooks, as the install dir copy would be.
 	stub := "#!/bin/sh\nout=$(tmux list-panes -a -F '#{pane_id} #{pane_pid}' | awk -v pid=\"${1-$PPID}\" '$2 == pid { print $1; exit }')\n[ -n \"$out\" ] || exit 1\necho \"$out\"\n"
 	if err := os.WriteFile(filepath.Join(d, "bin", "tmux-pane-id.sh"), []byte(stub), 0o755); err != nil {

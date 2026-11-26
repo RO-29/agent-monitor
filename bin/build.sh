@@ -3,7 +3,7 @@
 # embeds it. `go build` alone still works when web/dist is present (it is
 # committed), so this script is only needed after a frontend change.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 ( cd web && npm install --no-audit --no-fund >/dev/null && node mdcheck.mjs && npm run build )
-go build -o ./agent-monitor .
+go build -o ./agent-monitor ./cmd/agent-monitor
 echo "built ./agent-monitor ($(du -h ./agent-monitor | cut -f1))"

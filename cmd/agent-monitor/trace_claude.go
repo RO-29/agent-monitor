@@ -13,7 +13,7 @@ import (
 )
 
 // buildClaudeTrace parses a Claude transcript and its subagents into segments, spans, learnings and chapters.
-// Boundaries: compact_boundary, SessionStart clear/compact/resume hooks, and a first /clear prompt (DESIGN.md §6).
+// Boundaries: compact_boundary, SessionStart clear/compact/resume hooks, and a first /clear prompt (docs/DESIGN.md §6).
 func buildClaudeTrace(sess *Session) *SessionTrace {
 	p := newClaudeTraceParser(sess)
 	p.advance()

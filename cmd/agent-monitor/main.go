@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,12 +20,8 @@ import (
 	"unicode"
 
 	"github.com/gorilla/websocket"
+	webui "github.com/rohit/agent-monitor/web"
 )
-
-// The Vite build in web/dist is embedded, so go build makes one binary.
-//
-//go:embed web/dist
-var webFS embed.FS
 
 var store *Store
 var permStore *PermStore
@@ -869,7 +864,7 @@ func runServer() {
 
 	mux.HandleFunc("/ws", handleWS)
 
-	staticFS, err := fs.Sub(webFS, "web/dist")
+	staticFS, err := fs.Sub(webui.Dist, "dist")
 	if err != nil {
 		log.Fatalf("embed sub: %v", err)
 	}
