@@ -186,6 +186,12 @@ func withCaller(r *http.Request, c caller) *http.Request {
 }
 
 // callerLevel is the level of the request's sender; this Mac and the password are admin.
+// belowAdmin: the access layer marked this caller below admin (a direct call in a test has no mark).
+func belowAdmin(r *http.Request) bool {
+	c, ok := r.Context().Value(callerKey{}).(caller)
+	return ok && c.level < LevelAdmin
+}
+
 func callerLevel(r *http.Request) Level {
 	if c, ok := r.Context().Value(callerKey{}).(caller); ok {
 		return c.level

@@ -1248,7 +1248,7 @@ func serveCLIQueue(w http.ResponseWriter, r *http.Request, path string) bool {
 		}
 	}
 	body.Text = typedText(body.Text)
-	if callerLevel(r) < LevelAdmin && strings.HasPrefix(strings.TrimSpace(body.Text), "!") {
+	if belowAdmin(r) && strings.HasPrefix(strings.TrimSpace(body.Text), "!") {
 		writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
 		return true
 	}

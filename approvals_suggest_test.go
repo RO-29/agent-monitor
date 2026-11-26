@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -68,5 +70,18 @@ func TestAlwaysPatternStaysNarrow(t *testing.T) {
 func TestTypedTextDropsControlBytes(t *testing.T) {
 	if got := typedText("hi\r!rm x\x1b[A\x07\tok"); got != "hi\n!rm x[A\tok" {
 		t.Errorf("typedText = %q", got)
+	}
+}
+
+func TestBelowAdminNeedsTheAccessMark(t *testing.T) {
+	r := httptest.NewRequest("POST", "/api/session/send/x", nil)
+	if belowAdmin(r) {
+		t.Fatal("a direct call was limited")
+	}
+	if !belowAdmin(r.WithContext(context.WithValue(r.Context(), callerKey{}, caller{level: LevelControl}))) {
+		t.Fatal("a control caller was not limited")
+	}
+	if belowAdmin(r.WithContext(context.WithValue(r.Context(), callerKey{}, caller{level: LevelAdmin}))) {
+		t.Fatal("an admin caller was limited")
 	}
 }
