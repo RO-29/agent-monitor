@@ -561,3 +561,41 @@ func TestNotifyMarksTerminalPrompts(t *testing.T) {
 		}
 	}
 }
+
+func TestNotifyRemindsAnUnansweredRequestOnce(t *testing.T) {
+	zero := 0
+	cfg := &NotifySettings{BatchSec: &zero}
+	n := newTestNotifier(t, cfg)
+	clock := time.Date(2026, 11, 26, 12, 0, 0, 0, time.Local)
+	n.now = func() time.Time { return clock }
+	n.Emit(notifyEvent{Kind: "needs-you", ThreadID: "t1", Title: "Bash needs you", Keys: []string{"tp:s1"}})
+	n.Emit(notifyEvent{Kind: "needs-you", ThreadID: "t2", Title: "Read one", Keys: []string{"ap_2"}})
+	list, _, _ := n.List(0, 10)
+	if err := n.MarkRead([]string{list[0].ID}, false); err != nil { // the newest one: "Read one"
+		t.Fatal(err)
+	}
+	clock = clock.Add(9 * time.Minute)
+	n.remindTick()
+	if list, _, _ = n.List(0, 10); len(list) != 2 {
+		t.Fatalf("reminded too early: %d", len(list))
+	}
+	clock = clock.Add(2 * time.Minute)
+	n.remindTick()
+	n.remindTick()
+	list, _, _ = n.List(0, 10)
+	if len(list) != 3 || list[0].Title != "Still waiting (11 min): Bash needs you" || !list[0].Prompt || list[0].Read {
+		t.Fatalf("after remind = %+v", list)
+	}
+	if first, _ := n.get(list[2].ID); !first.Read {
+		t.Fatalf("the first alert stays unread: %+v", first)
+	}
+	n.Resolve("tp:s1")
+	if r, _ := n.get(list[0].ID); !r.Resolved {
+		t.Fatalf("the reminder did not resolve: %+v", r)
+	}
+	clock = clock.Add(time.Hour)
+	n.remindTick()
+	if list, _, _ = n.List(0, 10); len(list) != 3 {
+		t.Fatalf("reminded twice: %d", len(list))
+	}
+}

@@ -73,6 +73,16 @@ export interface Rule {
   createdAt: number;
   hits: number;
 }
+export interface RuleSuggestion {
+  key: string;
+  agent?: Agent;
+  tool: string;
+  pattern: string;
+  cwdPrefix?: string;
+  count: number;
+  lastAt: number;
+  example: string;
+}
 export interface ApprovalSettings {
   holdSeconds: number;
   questionHoldSeconds: number;

@@ -24,6 +24,7 @@ type notifyEvent struct {
 	Count    int      // events this one stands for (a fan-out group); 0 = 1
 	Keys     []string // approval ids; the alert resolves itself when all of them end
 	URL      string   // an https link a tapped alert opens (the iPhone install page)
+	reminder bool
 }
 
 // notify hands an event to the notifier when one is installed.
@@ -62,6 +63,15 @@ type NotifySettings struct {
 	QuietEnd            string `json:"quietEnd"`
 	QuietAllowsNeedsYou *bool  `json:"quietAllowsNeedsYou"`
 	BatchSec            *int   `json:"batchSec"`
+	// RemindMin: minutes before an unanswered "needs you" alert comes again, once; nil = 10, 0 = off.
+	RemindMin *int `json:"remindMin"`
+}
+
+func (s NotifySettings) remindAfter() time.Duration {
+	if s.RemindMin == nil {
+		return 10 * time.Minute
+	}
+	return time.Duration(max(0, *s.RemindMin)) * time.Minute
 }
 
 func onOr(b *bool) bool { return b == nil || *b }
@@ -129,9 +139,10 @@ type Notifier struct {
 	subs    map[int]chan ONotification
 	next    int
 	batches map[string]*notifyBatch
-	keyOf   map[string]int64 // approval id -> notification id
-	open    map[int64]int    // notification id -> approvals still open
-	gone    map[string]bool  // approvals that ended before their alert was stored
+	keyOf   map[string]int64    // approval id -> notification id
+	open    map[int64]int       // notification id -> approvals still open
+	gone    map[string]bool     // approvals that ended before their alert was stored
+	openAt  map[int64]time.Time // open "needs you" alerts not reminded yet
 }
 
 type notifyBatch struct {
@@ -163,7 +174,7 @@ func openNotifier(dir string, cfg func() NotifySettings) (*Notifier, error) {
 	}
 	// Older databases lack the device column; the error on a second ALTER is expected.
 	_, _ = db.Exec(`ALTER TABLE push_subs ADD COLUMN device TEXT NOT NULL DEFAULT ''`)
-	n := &Notifier{db: db, cfg: cfg, now: time.Now, unit: time.Second, subs: map[int]chan ONotification{}, batches: map[string]*notifyBatch{}, keyOf: map[string]int64{}, open: map[int64]int{}, gone: map[string]bool{}}
+	n := &Notifier{db: db, cfg: cfg, now: time.Now, unit: time.Second, subs: map[int]chan ONotification{}, batches: map[string]*notifyBatch{}, keyOf: map[string]int64{}, open: map[int64]int{}, gone: map[string]bool{}, openAt: map[int64]time.Time{}}
 	if keys, err := loadVAPID(dir); err != nil {
 		log.Printf("notify: web push off: %v", err)
 	} else {
@@ -273,6 +284,9 @@ func (n *Notifier) deliver(ev notifyEvent) {
 		}
 		if left > 0 {
 			n.open[id] = left
+			if ev.Kind == "needs-you" && !ev.reminder {
+				n.openAt[id] = now
+			}
 		}
 		n.mu.Unlock()
 		if left == 0 {
@@ -291,6 +305,74 @@ func (n *Notifier) deliver(ev notifyEvent) {
 		go n.pushAll(no)
 	}
 	if !no.Quiet && n.bark {
+		barkQueue(no, n.get)
+	}
+}
+
+// remindTick sends an alert again, once, when its request is still open and nobody read it.
+func (n *Notifier) remindTick() {
+	cfg := n.cfg()
+	after := cfg.remindAfter()
+	now := n.now()
+	if after <= 0 || !cfg.enabled("needs-you") || cfg.quiet(now) && !onOr(cfg.QuietAllowsNeedsYou) {
+		return
+	}
+	n.mu.Lock()
+	var due []int64
+	for id, at := range n.openAt {
+		if now.Sub(at) >= after {
+			due = append(due, id)
+			delete(n.openAt, id)
+		}
+	}
+	n.mu.Unlock()
+	for _, id := range due {
+		n.remind(id, now)
+	}
+}
+
+// remind stores a "Still waiting" copy, moves the open requests to it and retires the first alert.
+func (n *Notifier) remind(old int64, now time.Time) {
+	first, ok := n.get(strconv.FormatInt(old, 10))
+	if !ok || first.Read || first.Resolved {
+		return
+	}
+	no := first
+	no.ID, no.At, no.Quiet = "", now.UnixMilli(), false
+	no.Title = fmt.Sprintf("Still waiting (%d min): %s", max(1, int(now.Sub(time.UnixMilli(first.At)).Minutes())), first.Title)
+	b, _ := json.Marshal(no)
+	res, err := n.db.Exec(`INSERT INTO notifications(at, json) VALUES(?, ?)`, no.At, string(b))
+	if err != nil {
+		return
+	}
+	id, _ := res.LastInsertId()
+	n.mu.Lock()
+	moved := false
+	for k, v := range n.keyOf {
+		if v == old {
+			n.keyOf[k], moved = id, true
+		}
+	}
+	if moved {
+		n.open[id] = n.open[old]
+		delete(n.open, old)
+	}
+	n.mu.Unlock()
+	if !moved { // the request ended while the copy was written
+		_, _ = n.db.Exec(`DELETE FROM notifications WHERE id=?`, id)
+		return
+	}
+	first.Read = true
+	fb, _ := json.Marshal(first)
+	_, _ = n.db.Exec(`UPDATE notifications SET read=1, json=? WHERE id=?`, string(fb), old)
+	n.publish(first)
+	no.ID = strconv.FormatInt(id, 10)
+	n.publish(no)
+	if n.push != nil {
+		go n.pushAll(no)
+	}
+	if n.bark {
+		barkDelete(first.ID)
 		barkQueue(no, n.get)
 	}
 }
@@ -402,6 +484,7 @@ func (n *Notifier) Resolve(key string) {
 	}
 	if ok {
 		delete(n.open, id)
+		delete(n.openAt, id)
 	}
 	n.mu.Unlock()
 	if !ok {
@@ -752,6 +835,9 @@ func validNotifySettings(s NotifySettings) error {
 	}
 	if s.BatchSec != nil && (*s.BatchSec < 0 || *s.BatchSec > 600) {
 		return errors.New("batchSec must be 0 to 600")
+	}
+	if s.RemindMin != nil && (*s.RemindMin < 0 || *s.RemindMin > 240) {
+		return errors.New("remindMin must be 0 to 240")
 	}
 	return nil
 }

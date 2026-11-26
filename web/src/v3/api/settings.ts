@@ -16,6 +16,7 @@ export interface NotifySettings {
   quietEnd: string;
   quietAllowsNeedsYou: boolean;
   batchSec: number;
+  remindMin: number; // 0 = off
 }
 export interface CodexRate {
   in: number; // USD per 1M input tokens
@@ -37,6 +38,7 @@ export const DEFAULT_NOTIFY: NotifySettings = {
   quietEnd: "",
   quietAllowsNeedsYou: true,
   batchSec: 20,
+  remindMin: 10,
 };
 export const DEFAULT_SPEND: SpendSettings = { perThreadUsd: 0, perDayUsd: 0, codexRates: {} };
 
@@ -51,6 +53,7 @@ function normNotify(raw: unknown): NotifySettings {
     quietEnd: typeof r.quietEnd === "string" ? r.quietEnd : "",
     quietAllowsNeedsYou: typeof r.quietAllowsNeedsYou === "boolean" ? r.quietAllowsNeedsYou : true,
     batchSec: Number(r.batchSec) || 20,
+    remindMin: typeof r.remindMin === "number" ? r.remindMin : 10,
   };
 }
 function normSpend(raw: unknown): SpendSettings {

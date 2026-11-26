@@ -45,6 +45,7 @@ func startTurnNotifier() {
 			}
 			turnNotifyTick(store.All(), time.Now())
 			promptNotifyTick(needsYou())
+			notifier.remindTick()
 		}
 	}()
 }

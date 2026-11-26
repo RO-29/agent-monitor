@@ -166,6 +166,22 @@ export default function NotifySettings() {
             )}
           </div>
           <div className="ibox">
+            <h3>Reminder</h3>
+            <p className="sx-p">When nobody answers a request and nobody opens its notice, it comes once more as "Still waiting".</p>
+            <div className="sx-row">
+              <label>
+                Remind after{" "}
+                <select className="inp" value={cfg.remindMin} onChange={(e) => save({ remindMin: Number(e.target.value) })} aria-label="Remind after">
+                  {[0, 5, 10, 15, 30, 60].map((m) => (
+                    <option key={m} value={m}>
+                      {m ? `${m} min` : "Off"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+          <div className="ibox">
             <h3>Batching</h3>
             <p className="sx-p">
               Events that arrive within {cfg.batchSec} seconds of each other become one notification. A fan-out sends one notice when its last subagent ends, not one per subagent.

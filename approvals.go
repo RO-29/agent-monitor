@@ -906,6 +906,14 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 			default:
 				bad(http.StatusMethodNotAllowed, "method not allowed")
 			}
+		case len(parts) == 2 && parts[0] == "rules" && parts[1] == "suggest" && r.Method == http.MethodGet:
+			writeJSON(w, map[string]any{"suggestions": s.ruleSuggestions(time.Now())})
+		case len(parts) == 4 && parts[0] == "rules" && parts[1] == "suggest" && parts[3] == "dismiss" && r.Method == http.MethodPost:
+			if err := s.dismissSuggestion(parts[2]); err != nil {
+				bad(http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, map[string]any{"ok": true})
 		case len(parts) == 2 && parts[0] == "rules" && r.Method == http.MethodDelete:
 			if !s.deleteRule(parts[1]) {
 				bad(http.StatusNotFound, "rule not found")

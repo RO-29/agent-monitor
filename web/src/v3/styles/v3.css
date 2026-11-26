@@ -582,3 +582,5 @@
 .v3 .termshown.sent{color:var(--run)}
 .v3 .termshown .spin-dot{width:7px;height:7px;border-radius:50%;background:var(--run);animation:wpulse 1.2s ease-in-out infinite}
 .v3 pre.wsent{opacity:.6}
+.v3 .sugbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px;margin-bottom:12px;border:1px dashed var(--line);border-radius:10px}
+.v3 .sugbox .sugrow{gap:6px;font-size:13px}

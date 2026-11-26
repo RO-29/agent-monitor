@@ -353,6 +353,7 @@ func registerTraceRoutes(mux *http.ServeMux) {
 					QuietEnd            *string `json:"quietEnd"`
 					QuietAllowsNeedsYou *bool   `json:"quietAllowsNeedsYou"`
 					BatchSec            *int    `json:"batchSec"`
+					RemindMin           *int    `json:"remindMin"`
 				} `json:"notify"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
@@ -386,6 +387,9 @@ func registerTraceRoutes(mux *http.ServeMux) {
 				}
 				if nb.BatchSec != nil {
 					nc.BatchSec = nb.BatchSec
+				}
+				if nb.RemindMin != nil {
+					nc.RemindMin = nb.RemindMin
 				}
 				if err := validNotifySettings(nc); err != nil {
 					writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

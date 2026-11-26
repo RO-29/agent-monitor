@@ -4,7 +4,7 @@ import type { Settings } from "../../api/types";
 import { showToast } from "../../app/toast";
 import { fmtAgo, fmtUsd, projectName } from "../../lib/format";
 import { useApi, v3 } from "../api/client";
-import type { Approval, ApprovalSettings, Rule } from "../api/types";
+import type { Approval, ApprovalSettings, Rule, RuleSuggestion } from "../api/types";
 import { AgentBadge, CopyBtn, ErrorState, Load, Loading, Missing } from "../components/ui";
 
 const ACTION_PILL: Record<string, string> = { allow: "p-ok", deny: "p-err", hold: "p-need" };
@@ -29,6 +29,53 @@ export default function Rules() {
       <div style={{ marginTop: 16 }}>
         <AuditBox />
       </div>
+    </div>
+  );
+}
+
+// Calls the user allowed by hand 3 or more times in 30 days, with no deny of the same shape.
+function Suggestions({ onAdded }: { onAdded: () => void }) {
+  const res = useApi(() => v3.ruleSuggestions(), []);
+  const [busy, setBusy] = useState("");
+  const list = asList<RuleSuggestion>(res.data, "suggestions");
+  if (!list.length) return null;
+  const act = async (s: RuleSuggestion, add: boolean) => {
+    setBusy(s.key);
+    try {
+      if (add) {
+        await v3.saveRule({ action: "allow", agent: s.agent, tool: s.tool, pattern: s.pattern, cwdPrefix: s.cwdPrefix, note: `suggested: you allowed it ${s.count} times` });
+        showToast("Rule added", `${s.tool} matching ${s.pattern} is now allowed.`);
+        onAdded();
+      } else await v3.dismissSuggestion(s.key);
+      res.reload();
+    } catch (e) {
+      showToast(add ? "Rule not saved" : "Not dismissed", (e as Error).message, { kind: "alert" });
+    } finally {
+      setBusy("");
+    }
+  };
+  return (
+    <div className="sugbox" role="region" aria-label="Suggested rules">
+      <div className="xs muted">Suggested: you allowed these by hand, and never denied them</div>
+      {list.map((s) => (
+        <div key={s.key} className="row sugrow">
+          <span className="pill p-ok">allow</span>
+          <span className="grow1 trunc" title={s.example}>
+            {s.agent && <AgentBadge tool={s.agent} small />} <code>{s.tool}</code> matching <code>{s.pattern}</code>
+            {s.cwdPrefix && <span className="muted"> in {projectName(s.cwdPrefix)}</span>}
+            <span className="muted">
+              {" "}
+              · {s.count}× · last {fmtAgo(s.lastAt)}
+            </span>
+          </span>
+          <button className="btn sm" disabled={!!busy} onClick={() => act(s, true)}>
+            Add
+          </button>
+          <button className="btn sm ghost" disabled={!!busy} onClick={() => act(s, false)} aria-label={`Dismiss ${s.pattern}`}>
+            Dismiss
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -61,6 +108,7 @@ function RulesBox() {
         <Loading />
       ) : (
         <>
+          <Suggestions onAdded={res.reload} />
           <div className="sm" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {rules.length === 0 && <div className="muted">No rules. Every request waits for a person.</div>}
             {rules.map((r) => (
