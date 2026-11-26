@@ -155,6 +155,11 @@ func cursorRecordChat(s *Store, wsDir, chatID, cwd string, cutoff int64) {
 		mode = meta.Mode
 		createdAt = meta.CreatedAt
 	}
+	if title == "" || title == "New Agent" {
+		if p := cursorChatFirstPrompt(chatID, chatDir); p != "" {
+			title = p
+		}
+	}
 
 	if strings.HasPrefix(cwd, "cursor:") {
 		if c := cursorChatCwd(chatDir); c != "" {
@@ -212,4 +217,27 @@ func cursorReadMeta(chatDir, storeDB string) *cursorChatMeta {
 	}
 	cursorMetaCache.Store(chatDir, &m)
 	return &m
+}
+
+var cursorPromptCache sync.Map
+
+// cursorChatFirstPrompt names a chat that Cursor left as "New Agent": the first line of its first user message.
+func cursorChatFirstPrompt(chatID, chatDir string) string {
+	if v, ok := cursorPromptCache.Load(chatDir); ok {
+		return v.(string)
+	}
+	items, _, err := cursorItemsFor(chatID, chatDir)
+	if err != nil {
+		return ""
+	}
+	for _, it := range items {
+		if it.Kind == "user" {
+			if t := firstLine(it.Text); t != "" {
+				t = clipString(t, 80)
+				cursorPromptCache.Store(chatDir, t)
+				return t
+			}
+		}
+	}
+	return ""
 }
