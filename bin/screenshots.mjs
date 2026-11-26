@@ -40,11 +40,10 @@ const send = (method, params = {}) => new Promise((r) => { const i = ++seq; wait
 let n = 0;
 try {
   for (const theme of ["dark", "light"]) {
-    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme }] });
     for (const size of SIZES) {
       await send("Emulation.setDeviceMetricsOverride", { width: size.width, height: size.height, deviceScaleFactor: 2, mobile: size.mobile });
       for (const s of SHOTS) {
-        await send("Page.navigate", { url: `${base}${s.path}?mock=1` });
+        await send("Page.navigate", { url: `${base}${s.path}?mock=1&theme=${theme}` });
         await sleep(2500); // the sample data loads as a separate chunk
         const shot = await send("Page.captureScreenshot", { format: "png" });
         const file = `${out}/${s.name}-${size.tag}-${theme}.png`;

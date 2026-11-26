@@ -11,10 +11,11 @@ set -euo pipefail
 export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 cd ~/$DIR/web
 # Port 9 has no daemon: every /api call fails, so only the sample data can show.
-AM_TARGET=127.0.0.1:9 npx vite --port 5199 --strictPort >/tmp/am-shots-vite.log 2>&1 &
+AM_TARGET=127.0.0.1:9 npx vite --host 127.0.0.1 --port 5199 --strictPort >/tmp/am-shots-vite.log 2>&1 &
 VITE=\$!
 trap 'kill \$VITE 2>/dev/null || true' EXIT
 for _ in \$(seq 1 60); do curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:5199/ && break; sleep 1; done
+curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:5199/ || { tail -20 /tmp/am-shots-vite.log; echo "vite did not start" >&2; exit 1; }
 rm -rf /tmp/am-shots && node ../bin/screenshots.mjs http://127.0.0.1:5199 /tmp/am-shots
 EOF
 OUT="$HOME/agent-monitor-shots/$SHA"
