@@ -13,6 +13,9 @@ enum Bio {
         return SecureEnclave.isAvailable && LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
     }
     /// True after the daemon accepted this phone's key.
+    /// True while a Face ID sheet shows, so the app lock cover stays away from it.
+    @MainActor static var prompting = false
+
     static var enabled: Bool { UserDefaults.standard.bool(forKey: onKey) && UserDefaults.standard.data(forKey: blobKey) != nil }
 
     private static func key(context: LAContext? = nil) throws -> SecureEnclave.P256.Signing.PrivateKey {
@@ -46,7 +49,17 @@ enum Bio {
         let msg = "agent-monitor-bio\n\(req.httpMethod ?? "GET")\n\(path)\n\(ms)\n\(hash)"
         let ctx = LAContext()
         ctx.localizedReason = reason
-        let sig = try await Task.detached { try key(context: ctx).signature(for: Data(msg.utf8)) }.value
+        await MainActor.run { prompting = true }
+        defer { Task { @MainActor in prompting = false } }
+        let sig: P256.Signing.ECDSASignature
+        do {
+            sig = try await Task.detached { try key(context: ctx).signature(for: Data(msg.utf8)) }.value
+        } catch let e as LAError where e.code == .userCancel || e.code == .appCancel || e.code == .systemCancel {
+            throw APIError(message: "Face ID cancelled. Nothing was sent.")
+        } catch {
+            if (error as NSError).code == -128 { throw APIError(message: "Face ID cancelled. Nothing was sent.") }
+            throw error
+        }
         return "\(ms).\(sig.derRepresentation.base64EncodedString())"
     }
 

@@ -140,29 +140,30 @@ func serveOnce(dir string, val []byte, ttl time.Duration) (string, func(), error
 		return "", nil, err
 	}
 	var expired atomic.Bool
-	// end unblocks the waiting writer before the path goes, so the goroutine always exits and clears val.
 	end := func() {
-		if expired.Swap(true) {
-			return
-		}
-		if f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0); err == nil {
-			f.Close()
-		}
+		expired.Store(true)
 		os.Remove(path)
 	}
 	t := time.AfterFunc(ttl, end)
+	// The writer polls with a non-blocking open (ENXIO until a reader comes), so cancel and ttl always stop it.
 	go func() {
 		defer clear(val)
-		f, err := os.OpenFile(path, os.O_WRONLY, 0) // waits for the reader
-		if err != nil {
+		var f *os.File
+		for !expired.Load() {
+			var err error
+			if f, err = os.OpenFile(path, os.O_WRONLY|syscall.O_NONBLOCK, 0); err == nil {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if f == nil {
 			return
 		}
-		if !expired.Load() {
+		if !expired.Swap(true) {
 			_, _ = f.Write(val)
 		}
 		f.Close()
 		t.Stop()
-		expired.Store(true)
 		os.Remove(path)
 	}()
 	return path, func() { t.Stop(); end() }, nil

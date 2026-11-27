@@ -1,7 +1,7 @@
 import Foundation
 
 /// Unsent text and uploaded attachments per input box, in Application Support/drafts.json.
-/// Every change is written at once, so a killed app keeps the draft; a successful send clears it.
+/// Typing is written 0.4 s after the last change and at once on background or clear; a successful send clears it.
 @MainActor
 final class DraftStore {
     static let shared = DraftStore()
@@ -33,11 +33,12 @@ final class DraftStore {
         if empty {
             guard map[key] != nil else { return }
             map[key] = nil
+            flush()
         } else {
             if let was = map[key], was.text == text, was.attachments == attachments { return }
             map[key] = Draft(text: text, attachments: attachments)
+            save()
         }
-        save()
     }
 
     func clear(_ key: String) { set(key, text: "") }
@@ -50,7 +51,25 @@ final class DraftStore {
         save()
     }
 
+    private var pending: Task<Void, Never>?
+
     private func save() {
+        pending?.cancel()
+        pending = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self?.write()
+        }
+    }
+
+    /// Writes now; the app calls it when it goes to the background.
+    func flush() {
+        pending?.cancel()
+        pending = nil
+        write()
+    }
+
+    private func write() {
         guard let url, let d = try? JSONEncoder().encode(map) else { return }
         try? d.write(to: url, options: .atomic)
     }

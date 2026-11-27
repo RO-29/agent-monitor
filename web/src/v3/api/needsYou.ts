@@ -39,6 +39,8 @@ let timer: number | undefined;
 let inflight = false;
 let again = false;
 let every = 3000;
+// Keys answered on this page: a read that started before the answer must not bring the card back.
+const dropped = new Map<string, number>();
 
 const emit = (n: Partial<NeedsYouState>) => {
   st = { ...st, ...n, version: st.version + 1 };
@@ -52,12 +54,14 @@ export async function refreshNeedsYou(): Promise<void> {
     return;
   }
   inflight = true;
+  const t0 = Date.now();
   try {
     if (mockWanted()) return emit({ items: [], count: 0, status: "ok", error: "" });
     const r = await fetch("/api/needs-you", { cache: "no-store", credentials: "same-origin" });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = (await r.json()) as { items?: NeedsYouItem[]; count?: number };
-    const items = d.items || [];
+    for (const [k, at] of dropped) if (t0 - at > 30_000) dropped.delete(k);
+    const items = (d.items || []).filter((i) => !((dropped.get(i.key) ?? 0) > t0));
     const sig = (l: NeedsYouItem[]) => l.map((i) => `${i.key}:${i.answerable ? 1 : 0}:${i.question?.step ?? ""}:${i.question?.sentAt ?? ""}:${i.message ?? ""}`).join("|");
     if (st.status !== "ok" || st.error || sig(items) !== sig(st.items)) emit({ items, count: d.count ?? items.length, status: "ok", error: "" });
   } catch (e) {
@@ -114,6 +118,7 @@ export function useNeedsYou(opts: { fast?: boolean; paused?: boolean } = {}): Ne
 
 /** Drops one item at once, for example after an answer, until the next read confirms it. */
 export function dropNeedsYou(key: string) {
+  dropped.set(key, Date.now());
   if (!st.items.some((i) => i.key === key)) return;
   const items = st.items.filter((i) => i.key !== key);
   emit({ items, count: items.length });

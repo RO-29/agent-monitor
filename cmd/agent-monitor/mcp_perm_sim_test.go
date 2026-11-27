@@ -656,7 +656,7 @@ func handleTalkToAgent(daemonURL string, args map[string]any, id any, writeJSON 
 		var sendResp struct {
 			Pane string `json:"pane"`
 		}
-		if err := httpPostJSON(daemonURL+"/api/session/send/"+target, sendBody, &sendResp); err != nil {
+		if err := httpPostJSON(daemonURL+"/api/session/send/"+target+"?from=agent", sendBody, &sendResp); err != nil {
 			writeMCPText(writeJSON, id, fmt.Sprintf("talk_to_agent: send failed: %v", err), nil, true)
 			return
 		}
@@ -693,7 +693,7 @@ func handleTalkToAgent(daemonURL string, args map[string]any, id any, writeJSON 
 		OK   bool   `json:"ok"`
 		Pane string `json:"pane"`
 	}
-	if err := httpPostJSON(daemonURL+"/api/session/send/"+target, body, &resp); err != nil {
+	if err := httpPostJSON(daemonURL+"/api/session/send/"+target+"?from=agent", body, &resp); err != nil {
 		writeMCPText(writeJSON, id, fmt.Sprintf("talk_to_agent: %v", err), nil, true)
 		return
 	}

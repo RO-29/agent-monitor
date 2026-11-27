@@ -203,10 +203,14 @@ export async function loadThreads() {
   }
   thTimer = window.setTimeout(loadThreads, 30_000);
 }
+// A throttle, not a debounce: steady events from many agents must not push the reload out forever.
 let debounce: number | undefined;
 function soonThreads() {
-  window.clearTimeout(debounce);
-  debounce = window.setTimeout(loadThreads, 2500);
+  if (debounce !== undefined) return;
+  debounce = window.setTimeout(() => {
+    debounce = undefined;
+    void loadThreads();
+  }, 2500);
 }
 
 let started = false;

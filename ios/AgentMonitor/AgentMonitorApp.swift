@@ -39,6 +39,7 @@ struct AgentMonitorApp: App {
                         store.resume()
                         Task { await Notifier.shared.refreshAuthorization() }
                     } else if phase == .background {
+                        DraftStore.shared.flush()
                         store.backgroundAt = Date()
                         store.flushPendingDecisions()
                     }

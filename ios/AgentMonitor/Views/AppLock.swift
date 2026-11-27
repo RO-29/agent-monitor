@@ -13,7 +13,8 @@ struct AppLockGate: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                if lockOn && (locked || phase != .active) {
+                // The Face ID sheet makes the scene inactive; the cover must not flash over it.
+                if lockOn && (locked || (phase != .active && !Bio.prompting)) {
                     LockCover(locked: locked, unlock: unlock).transition(.opacity)
                 }
             }
@@ -28,10 +29,12 @@ struct AppLockGate: ViewModifier {
     private func unlock() {
         guard lockOn, !trying else { return }
         trying = true
+        Bio.prompting = true
         let ctx = LAContext()
         ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock Agent Monitor") { ok, _ in
             DispatchQueue.main.async {
                 trying = false
+                Bio.prompting = false
                 if ok { withAnimation(.snappy) { locked = false } }
             }
         }
