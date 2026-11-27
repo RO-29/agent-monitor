@@ -11,7 +11,7 @@ struct RootView: View {
                 .badge(store.needsYouThreadCount)
                 .tag(AppTab.threads)
 
-            Group { if store.needsRecent { AlertsView() } else { PermissionsView() } }
+            NeedsTabView()
                 .tabItem { Label("Needs you", systemImage: "tray") }
                 .badge(store.approvalsCount + store.remoteNeedCount)
                 .tag(AppTab.approvals)
