@@ -138,4 +138,4 @@
 .v3 .needs-tabs a{border:1px solid var(--line);background:var(--panel);color:var(--fg-2);border-radius:999px;padding:4px 12px;font:500 12.5px var(--f-ui);display:inline-flex;gap:6px;align-items:center;text-decoration:none}
 .v3 .needs-tabs a.on{background:var(--fg);color:var(--panel);border-color:var(--fg)}
 .v3 .needs-tabs a b{font-variant-numeric:tabular-nums}
-.v3 .needs-page .v3.apv.apv-emb{background:transparent;flex:1}
+.v3 .needs-page .apv-emb{background:transparent;flex:1}
