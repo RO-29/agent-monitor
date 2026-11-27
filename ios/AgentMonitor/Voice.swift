@@ -253,18 +253,19 @@ struct MicButton: View {
         } label: {
             ZStack {
                 if dictation.listening {
-                    Circle().fill(Tok.err.opacity(0.15)).frame(width: size - 6, height: size - 6)
+                    Circle().fill(Tok.accentSoft).frame(width: size - 6, height: size - 6)
                 }
-                Image(systemName: dictation.listening ? "stop.fill" : "mic")
-                    .font(.system(size: dictation.listening ? 15 : 18, weight: .semibold))
-                    .foregroundStyle(dictation.listening ? Tok.err : Tok.fg2)
+                // A check mark, not a stop square: the stop square next to it stops the agent's turn.
+                Image(systemName: dictation.listening ? "checkmark" : "mic")
+                    .font(.system(size: dictation.listening ? 16 : 18, weight: .bold))
+                    .foregroundStyle(dictation.listening ? Tok.accent : Tok.fg2)
                     .symbolEffect(.pulse, isActive: dictation.listening)
             }
             .frame(width: size, height: size)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(dictation.listening ? "Stop dictation" : "Dictate")
+        .accessibilityLabel(dictation.listening ? "Finish dictation" : "Dictate")
         .onChange(of: dictation.spoken) { _, _ in if dictation.listening || dictation.phase == .idle { text = dictation.joined } }
         .sensoryFeedback(.impact(weight: .light), trigger: dictation.listening)
     }
@@ -290,7 +291,7 @@ struct DictationBar: View {
                 case .listening:
                     HStack(spacing: 8) {
                         WorkingPulse()
-                        Text("Listening. Tap stop when you finish.").font(.footnote).foregroundStyle(Tok.fg2)
+                        Text("Listening. Tap ✓ when you finish.").font(.footnote).foregroundStyle(Tok.fg2)
                     }
                 case .cleaning:
                     HStack(spacing: 8) {
