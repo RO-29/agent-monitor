@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var pairedHaptic = 0
     @AppStorage("voice.cleanup") private var voiceCleanup = VoiceCleanup.always.rawValue
     @AppStorage(kAppLockKey) private var appLock = false
+    @AppStorage(AgentsGlance.liveKey) private var liveOn = true
     @State private var bioOn = Bio.enabled
     @State private var bioBusy = false
     @State private var bioMsg: String?
@@ -107,6 +108,21 @@ struct SettingsView: View {
                     Text(Bio.available || bioOn
                          ? "With Face ID for approvals, the Mac accepts an approval or a settings change from this phone only with a Face ID signature from this phone. A copied token cannot approve. Allow and Yes on a notification open the app first."
                          : "This phone has no Face ID set up, so Face ID for approvals is not available.")
+                }
+                .listRowBackground(Tok.panel)
+
+                Section {
+                    Toggle(isOn: $liveOn) {
+                        Label { Text("Live Activity") } icon: {
+                            Image(systemName: "rectangle.inset.topright.filled").font(.footnote.weight(.semibold)).foregroundStyle(Tok.onAccent)
+                                .frame(width: 28, height: 28).background(Tok.run, in: RoundedRectangle(cornerRadius: 7))
+                        }
+                    }
+                    .onChange(of: liveOn) { _, _ in Task { await AgentsGlance.live(store.glance()) } }
+                } header: {
+                    header("Lock screen")
+                } footer: {
+                    Text("Shows how many agents wait and work on the lock screen and in the Dynamic Island. It updates while the app runs, and it shows as old after 15 minutes without an update. Add the Agents widget from the home screen.")
                 }
                 .listRowBackground(Tok.panel)
 

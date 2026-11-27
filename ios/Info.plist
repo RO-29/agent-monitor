@@ -47,6 +47,8 @@
 	<string>Agent Monitor uses Face ID to unlock the app and to sign the approvals you give to your agents.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Agent Monitor uses the microphone when you dictate a message to an agent.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Agent Monitor turns your speech into text for messages to your agents. Recognition runs on the iPhone when it can.</string>
 	<key>CFBundleURLTypes</key>

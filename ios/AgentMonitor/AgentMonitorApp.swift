@@ -25,6 +25,10 @@ struct AgentMonitorApp: App {
                     // A cold launch can open already active, so the phase change below never fires.
                     if scenePhase == .active { store.setForeground(true) }
                     Task { await SigningWatch.tick() }
+                    while !Task.isCancelled {
+                        AgentsGlance.publish(store.glance())
+                        try? await Task.sleep(for: .seconds(5))
+                    }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     // Reconnect when returning to foreground; the socket is

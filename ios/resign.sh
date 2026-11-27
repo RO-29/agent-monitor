@@ -36,7 +36,7 @@ stale_profiles() {
   for f in "$PROFILES"/*.mobileprovision; do
     [[ -f "$f" ]] || continue
     security cms -D -i "$f" 2>/dev/null | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null |
-      grep -q "\.com\.rohit\.agentmonitor$" || continue
+      grep -qE "\.com\.rohit\.agentmonitor(\.widgets)?$" || continue
     end=$(epoch "$(profile_end "$f")")
     if (( end - $(date +%s) < RENEW_WITHIN || end * 1000 <= ${want:-0} )); then echo "$f"; fi
   done
