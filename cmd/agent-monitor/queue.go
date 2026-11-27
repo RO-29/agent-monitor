@@ -736,6 +736,9 @@ func (m *OrchManager) queueRoutes(mux *http.ServeMux) {
 			orchWriteErr(w, orchBadRequest("bad json"))
 			return
 		}
+		if denyBang(w, r, in.Text) {
+			return
+		}
 		it, err := m.queue.Add(r.PathValue("thread"), in)
 		if err != nil {
 			orchWriteErr(w, err)
@@ -766,6 +769,9 @@ func (m *OrchManager) queueRoutes(mux *http.ServeMux) {
 		var in queuePatch
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil {
 			orchWriteErr(w, orchBadRequest("bad json"))
+			return
+		}
+		if in.Text != nil && denyBang(w, r, *in.Text) {
 			return
 		}
 		id := r.PathValue("thread")

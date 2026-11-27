@@ -1,5 +1,6 @@
 // Native notifications from the daemon's /api/notify/stream.
 import Cocoa
+import LocalAuthentication
 import UserNotifications
 
 struct NotifyItem: Decodable {
@@ -154,7 +155,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         authorizing = true
         let c = UNUserNotificationCenter.current()
         c.delegate = self
-        let allow = UNNotificationAction(identifier: "ALLOW", title: "Allow", options: [])
+        let allow = UNNotificationAction(identifier: "ALLOW", title: "Allow", options: [.authenticationRequired])
         let deny = UNNotificationAction(identifier: "DENY", title: "Deny", options: [.destructive])
         c.setNotificationCategories([UNNotificationCategory(identifier: Notifier.approvalCategory, actions: [allow, deny], intentIdentifiers: [], options: [])])
         c.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -205,6 +206,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }.resume()
     }
 
+    // The banner's Allow asks for Touch ID too, like an Allow in the window.
+    private func confirmThenAllow(_ id: String) {
+        guard TouchIDGate.enabled else { return decide(id, "allow") }
+        let ctx = LAContext()
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else { return decide(id, "allow") }
+        ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "approve an agent request") { [weak self] ok, _ in
+            DispatchQueue.main.async { if ok { self?.decide(id, "allow") } }
+        }
+    }
+
     private func decide(_ id: String, _ behavior: String) {
         guard let url = URL(string: kBase + "/api/approvals/\(id)/decide") else { return }
         var r = URLRequest(url: url, timeoutInterval: 10)
@@ -229,7 +241,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let approval = info["approval"] as? String ?? ""
         DispatchQueue.main.async {
             switch response.actionIdentifier {
-            case "ALLOW" where !approval.isEmpty: self.decide(approval, "allow")
+            case "ALLOW" where !approval.isEmpty: self.confirmThenAllow(approval)
             case "DENY" where !approval.isEmpty: self.decide(approval, "deny")
             default: self.open(link)
             }

@@ -148,6 +148,9 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 				orchWriteErr(w, orchBadRequest("bad json"))
 				return
 			}
+			if denyBang(w, r, in.Text) {
+				return
+			}
 			var mode string
 			mode, err = m.SendWith(id, in.Text, in.Attachments)
 			out["mode"] = mode
@@ -309,6 +312,15 @@ func withoutDriven(in []ThreadV3) []ThreadV3 {
 		}
 	}
 	return out
+}
+
+// denyBang answers 403 when a caller below admin sends a "!" line, which runs a shell command with no approval.
+func denyBang(w http.ResponseWriter, r *http.Request, text string) bool {
+	if !belowAdmin(r) || !strings.HasPrefix(strings.TrimSpace(text), "!") {
+		return false
+	}
+	writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
+	return true
 }
 
 // denyNoApprovals answers 403 when a caller below admin asks for an agent that runs with no approvals; that agent is a shell.

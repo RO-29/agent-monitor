@@ -11,17 +11,24 @@ let kTouchIDScript = """
   const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.amTouchID;
   if (!h || window.__amTouchID) return;
   window.__amTouchID = true;
-  const gated = /(approvals\\/[^/]+\\/decide|permission\\/[^/]+\\/respond|hosts\\/[^/]+\\/answer|session\\/[^/]+\\/answer|secrets\\/[^/]+\\/answer)$/;
+  const gated = /(approvals\\/[^/]+\\/decide|permission\\/[^/]+\\/respond|hosts\\/[^/]+\\/answer|session\\/[^/]+\\/answer|session\\/prompt\\/[^/]+|secrets\\/[^/]+\\/answer)$/;
   const orig = window.fetch.bind(window);
+  let line = Promise.resolve();
   window.fetch = async (input, init) => {
     const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
     const url = new URL(typeof input === "string" ? input : (input && input.url) || String(input), location.href);
     if (method !== "POST" || !gated.test(url.pathname)) return orig(input, init);
+    let raw = init && typeof init.body === "string" ? init.body : "";
+    if (!raw && input instanceof Request) raw = await input.clone().text().catch(() => "");
     let body = {};
-    try { body = JSON.parse((init && typeof init.body === "string") ? init.body : "{}"); } catch (e) {}
-    if (body.behavior === "deny" || body.decision === "deny" || body.type === "decline") return orig(input, init);
-    const ok = await h.postMessage(url.pathname.includes("/secrets/") ? "give a secret to an agent" : "approve an agent request");
-    if (ok !== true) throw new Error("Touch ID was not confirmed");
+    try { body = JSON.parse(raw || "{}"); } catch (e) {}
+    const deny = body.behavior ? body.behavior === "deny" : body.decision === "deny";
+    if (deny || body.type === "decline" || body.answer === "no" || body.answer === "dismiss") return orig(input, init);
+    // One Touch ID sheet at a time: a second prompt would cancel the first.
+    const ask = line.then(() => h.postMessage(url.pathname.includes("/secrets/") ? "give a secret to an agent" : "approve an agent request"));
+    line = ask.catch(() => {});
+    const ok = await ask;
+    if (ok !== true) throw new Error("Touch ID was not confirmed. Nothing was sent.");
     return orig(input, init);
   };
 })();

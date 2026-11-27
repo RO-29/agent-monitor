@@ -42,3 +42,16 @@ func TestTmuxLitKeepsATrailingSemicolon(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeKeyNamesAllowMenuKeysOnly(t *testing.T) {
+	for _, k := range []string{"Enter", "Escape", "y", "1", "Up", "BSpace", "C-c", "Tab"} {
+		if !safeKeyName(k) {
+			t.Errorf("%q must be allowed", k)
+		}
+	}
+	for _, k := range []string{"!", "0x21", "U+0021", "ls -la", "y;", "Enter;", ""} {
+		if safeKeyName(k) {
+			t.Errorf("%q must need admin", k)
+		}
+	}
+}

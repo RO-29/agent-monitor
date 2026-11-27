@@ -33,8 +33,12 @@ PLIST
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "built $APP"
 
-# Launchpad shows ~/Applications: refresh that copy when it exists (AM_APP_COPY=0 skips it).
-DEST="${AM_APP_DEST:-$HOME/Applications/$APP}"
-if [[ "${AM_APP_COPY:-1}" == "1" && -d "$DEST" ]]; then
-  rm -rf "$DEST" && ditto "$APP" "$DEST" && echo "copied to $DEST (restart the app to use it)"
+# Refresh the installed copy: /Applications when one is there (Spotlight indexes it), else ~/Applications. AM_APP_COPY=0 skips it.
+if [[ -n "${AM_APP_DEST:-}" ]]; then DEST="$AM_APP_DEST"
+elif [[ -d "/Applications/$APP" ]]; then DEST="/Applications/$APP"
+else DEST="$HOME/Applications/$APP"; fi
+if [[ "${AM_APP_COPY:-1}" == "1" ]]; then
+  mkdir -p "$(dirname "$DEST")"
+  if rm -rf "$DEST" && ditto "$APP" "$DEST"; then echo "copied to $DEST (restart the app to use it)"
+  else echo "could not copy to $DEST; open $APP from the repo instead" >&2; fi
 fi

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -320,3 +321,8 @@ func CapturePane(paneID string, lines int, plain bool) (string, error) {
 	}
 	return string(out), nil
 }
+
+// safeKeyNameRE: keys a caller below admin may send. No "!", no hex or Unicode codes, no multi-character text.
+var safeKeyNameRE = regexp.MustCompile(`^([A-Za-z0-9 .,:/?=+_-]|Enter|Escape|Tab|BTab|BSpace|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|PPage|NPage|DC|C-[a-z]|M-[a-z])$`)
+
+func safeKeyName(k string) bool { return safeKeyNameRE.MatchString(k) }

@@ -446,8 +446,8 @@ func runServer() {
 			return
 		}
 		// Keys can type "!" just like send can, and "!" runs a shell command in Claude Code.
-		if belowAdmin(r) && slices.ContainsFunc(body.Keys, func(k string) bool { return strings.Contains(k, "!") }) {
-			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
+		if belowAdmin(r) && slices.ContainsFunc(body.Keys, func(k string) bool { return !safeKeyName(k) }) {
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "these keys need admin access; a phone can send letters, digits, arrows, Enter, Escape, Tab and Ctrl keys"})
 			return
 		}
 		rt, code, err := withTerminal(id, func(t string) error { return targetKeys(t, body.Keys) })

@@ -56,11 +56,14 @@ final class WebWindow: NSWindowController, WKNavigationDelegate, WKUIDelegate, W
                                                      NSImage(systemSymbolName: "chevron.forward", accessibilityDescription: "Forward") ?? NSImage()],
                                             trackingMode: .momentary, target: nil, action: nil)
     private weak var leftButton: NSButton?
+    // The offline page sits at the daemon's base URL; it must not be saved as the tab's page.
+    private var offlineShown = false
+    private var crashes: [Date] = []
     private weak var rightButton: NSButton?
 
     // Path, query and fragment of the current daemon page, or nil for anything else.
     var path: String? {
-        guard let u = web.url, isDaemon(u), u.scheme?.hasPrefix("http") == true else { return nil }
+        guard !offlineShown, let u = web.url, isDaemon(u), u.scheme?.hasPrefix("http") == true else { return nil }
         return daemonPath(u)
     }
 
@@ -277,6 +280,7 @@ final class WebWindow: NSWindowController, WKNavigationDelegate, WKUIDelegate, W
         decisionHandler(.cancel)
     }
     func webView(_ w: WKWebView, decidePolicyFor r: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if r.isForMainFrame, r.response is HTTPURLResponse { offlineShown = false }
         decisionHandler(r.canShowMIMEType ? .allow : .download)
     }
     func webView(_ w: WKWebView, navigationAction: WKNavigationAction, didBecome d: WKDownload) { d.delegate = self }
@@ -285,7 +289,20 @@ final class WebWindow: NSWindowController, WKNavigationDelegate, WKUIDelegate, W
         if (e as NSError).code == NSURLErrorCancelled { return }
         offline(e)
     }
-    func webViewWebContentProcessDidTerminate(_ w: WKWebView) { w.reload() }
+    // A page that crashes on every load would reload forever; after the third crash in 30 s show the offline page.
+    func webViewWebContentProcessDidTerminate(_ w: WKWebView) {
+        let now = Date()
+        crashes = crashes.filter { now.timeIntervalSince($0) < 30 } + [now]
+        if crashes.count >= 3 || offlineShown {
+            offline(NSError(domain: "agent-monitor", code: 1, userInfo: [NSLocalizedDescriptionKey: "the page stopped working three times"]))
+        } else {
+            w.reload()
+        }
+    }
+    func webView(_ w: WKWebView, didFail n: WKNavigation!, withError e: Error) {
+        if (e as NSError).code == NSURLErrorCancelled { return }
+        offline(e)
+    }
 
     // After each load, read the page's appearance and approval-key settings so the menus show them.
     func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
@@ -307,8 +324,10 @@ final class WebWindow: NSWindowController, WKNavigationDelegate, WKUIDelegate, W
 
     private func offline(_ e: Error) {
         // Retry the page that failed; the base URL keeps the retry on the daemon (a nil base reloads about:blank).
-        let failed = ((e as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.absoluteString ?? kBase + "/w"
-        let html = "<title>agent-monitor</title><meta name='color-scheme' content='light dark'><meta http-equiv='refresh' content='10;url=\(failed)'><body style='font:15px -apple-system;padding:48px'><h2 style='font-family:\"New York\",serif'>The daemon is not reachable</h2><p>\(kBase) did not answer: \(e.localizedDescription)</p><p>This page tries again every 10 seconds. <a href='\(failed)'>Try now</a></p></body>"
+        let failed = esc(((e as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.absoluteString ?? kBase + "/w")
+        let why = esc(e.localizedDescription)
+        offlineShown = true
+        let html = "<title>agent-monitor</title><meta name='color-scheme' content='light dark'><meta http-equiv='refresh' content='10;url=\(failed)'><body style='font:15px -apple-system;padding:48px'><h2 style='font-family:\"New York\",serif'>The daemon is not reachable</h2><p>\(kBase) did not answer: \(why)</p><p>This page tries again every 10 seconds. <a href='\(failed)'>Try now</a></p></body>"
         web.loadHTMLString(html, baseURL: URL(string: kBase))
     }
 
@@ -360,4 +379,9 @@ final class WebWindow: NSWindowController, WKNavigationDelegate, WKUIDelegate, W
         a.addButton(withTitle: "Cancel")
         a.beginSheetModal(for: window!) { completionHandler($0 == .alertFirstButtonReturn) }
     }
+}
+
+private func esc(_ s: String) -> String {
+    s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "'", with: "&#39;").replacingOccurrences(of: "\"", with: "&quot;")
 }

@@ -94,8 +94,11 @@ func TestBioGateNeedsAFreshSignature(t *testing.T) {
 	if c := run(bioReq("GET", "/api/needs-you", "", tok["phone"])); c != http.StatusOK {
 		t.Fatalf("read = %d, want 200", c)
 	}
-	if c := run(bioReq("POST", "/api/session/prompt/claude:x", `{"text":"hi"}`, tok["phone"])); c != http.StatusOK {
-		t.Fatalf("a prompt = %d, want 200 with no Face ID", c)
+	if c := run(bioReq("POST", "/api/session/prompt/claude:x", `{"answer":"no"}`, tok["phone"])); c != http.StatusOK {
+		t.Fatalf("a No to a terminal prompt = %d, want 200 with no Face ID", c)
+	}
+	if c := run(bioReq("POST", "/api/session/prompt/claude:x", `{"answer":"yes"}`, tok["phone"])); c != http.StatusPreconditionRequired {
+		t.Fatalf("a Yes to a terminal prompt = %d, want 428", c)
 	}
 	if c := run(bioReq("POST", path, body, tok["driver"])); c != http.StatusOK {
 		t.Fatalf("a device with no key = %d, want 200", c)
