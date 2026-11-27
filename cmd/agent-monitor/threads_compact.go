@@ -32,6 +32,7 @@ type threadCompact struct {
 	Kind            string   `json:"kind,omitempty"`
 	Status          string   `json:"status,omitempty"`
 	Group           string   `json:"group,omitempty"`
+	Phase           string   `json:"phase,omitempty"`
 	SpendUSD        float64  `json:"spendUsd,omitempty"`
 	Display         string   `json:"display"`
 	Repo            string   `json:"repo"`
@@ -44,7 +45,7 @@ func compactThread(t ThreadV3) threadCompact {
 		StartedAt: t.StartedAt, LastAt: t.LastAt, Turns: t.Turns, Attention: t.Attention, Model: t.Model,
 		ParentThread: t.ParentThread, ChildKind: t.ChildKind, ChildCount: t.ChildCount, ChildAttention: t.ChildAttention,
 		Approvals: t.Approvals, LiveActivity: t.LiveActivity, DrivenID: t.DrivenID, Handover: t.Handover,
-		TerminalSession: t.TerminalSession, Kind: t.Kind, Status: t.Status, Group: t.Group, SpendUSD: t.SpendUSD,
+		TerminalSession: t.TerminalSession, Kind: t.Kind, Status: t.Status, Group: t.Group, Phase: t.Phase, SpendUSD: t.SpendUSD,
 		Display: t.Display, Repo: t.Repo, OutcomeLine: t.OutcomeLine, ErrorsOpen: t.ErrorsOpen}
 }
 

@@ -25,12 +25,15 @@ export interface RecentEvent {
   text: string;
 }
 
+export type Phase = "needs-you" | "working" | "ready" | "done";
+
 export interface Session {
   id: string; // "<tool>:<sessionId>"
   tool: Tool;
   sessionId: string;
   cwd: string;
   state: SessionState;
+  phase?: Phase; // the daemon's one status for this session
   pid?: number;
   startedAt: number;
   lastActivityAt: number;
@@ -249,6 +252,7 @@ export interface Thread {
   tools: Tool[];
   sessions: string[]; // oldest → newest
   state: SessionState;
+  phase?: Phase;
   startedAt: number;
   lastAt: number;
   tokens: TokenUsage;

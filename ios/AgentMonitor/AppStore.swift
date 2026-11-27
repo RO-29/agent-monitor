@@ -291,6 +291,11 @@ final class AppStore {
             return recent && t.status != "closed" ? .ready : .settled
         }
         let st = liveState(t)
+        // The daemon's phase is the one status; the rules below cover an older daemon.
+        if let p = (t.latestSession.flatMap { sessionsByID[$0] }?.phase) ?? t.phase {
+            if p == "needs-you" || !approvals(forThread: t).isEmpty || (usesNeedsYou && needThreads.contains(t.id)) { return .need }
+            return p == "working" ? .working : p == "ready" ? .ready : .settled
+        }
         if usesNeedsYou {
             // Only a real request counts; a session that ended its turn is ready, not waiting.
             if needThreads.contains(t.id) || !approvals(forThread: t).isEmpty { return .need }

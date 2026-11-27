@@ -37,7 +37,7 @@ export const GROUPS: { key: WGroup; label: string; none: string }[] = [
   { key: "need", label: "Needs you", none: "Nothing needs you" },
   { key: "working", label: "Working", none: "Nothing running" },
   { key: "ready", label: "Ready", none: "Nothing to review" },
-  { key: "settled", label: "Settled", none: "No settled threads" },
+  { key: "settled", label: "Done", none: "Nothing done yet" },
 ];
 
 const DAY = 24 * 3600_000;
@@ -113,7 +113,7 @@ export function drivenLabel(t: OThread, openRequests = 0, kidState?: Own, now = 
   if (kidState === "working") return "Subagents running";
   if (snoozed(t, now)) return "Snoozed";
   if (t.status === "closed") return "Closed";
-  return t.settledAt ? "Settled" : "Ready";
+  return t.settledAt ? "Done" : "Ready";
 }
 
 const h0 = (t: OThread, sessions?: Map<string, Session>) => (t.nativeId ? sessions?.get(`${t.agent}:${t.nativeId}`) : undefined);
@@ -151,7 +151,7 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
       agent: t.agent,
       repo: t.repo || projectName(t.cwd),
       branch: t.worktree?.branch || t.branch,
-      status: ((l) => (l === "Ready" && t.parentId ? "Ended" : l))(drivenLabel(t, open + (needIds.has(t.id) ? 1 : 0), kidState, now)),
+      status: ((l) => (l === "Ready" && t.parentId ? "Done" : l))(drivenLabel(t, open + (needIds.has(t.id) ? 1 : 0), kidState, now)),
       at: toMs(t.updatedAt),
       pinned: !!t.pinned,
       snoozedUntil: snoozed(t, now) ? toMs(t.snoozedUntil) : undefined,
@@ -165,7 +165,7 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
   for (const r of [...watched].sort((a, b) => b.lastAt - a.lastAt)) {
     if (r.thread && (r.thread.kind === "driven" || isDrivenCopy(r.thread, natives))) continue;
     if (!r.thread && r.approvals.length && r.approvals.every((a) => a.drivenId)) continue;
-    const group: WGroup = r.bucket === "needs-you" ? "need" : r.bucket === "running" ? "working" : r.bucket === "idle-today" || r.bucket === "done-today" ? "ready" : "settled";
+    const group: WGroup = r.bucket === "needs-you" ? "need" : r.bucket === "running" ? "working" : r.bucket === "idle-today" ? "ready" : "settled";
     if (group === "settled" && ++settled > settledWatchedMax) continue;
     out.push({
       id: r.id,
@@ -175,7 +175,7 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
       agent: agentKey(r.id) || r.agent,
       repo: r.thread?.repo || projectName(r.cwd),
       branch: r.thread?.ref || "",
-      status: group === "need" ? "Needs you" : group === "working" ? "Working" : r.bucket === "idle-today" ? "Ready" : "Ended",
+      status: group === "need" ? "Needs you" : group === "working" ? "Working" : r.bucket === "idle-today" ? "Ready" : "Done",
       at: r.lastAt,
       watched: r,
     });
@@ -196,7 +196,7 @@ export function peerRows(threads: PeerThread[], now = Date.now()): WRow[] {
       agent: agentKey(t.sessions?.[t.sessions.length - 1] || t.id) || t.tools?.[0] || "",
       repo: t.repo || projectName(t.cwd),
       branch: t.ref || "",
-      status: group === "need" ? "Needs you" : group === "working" ? "Working" : today ? "Ready" : "Ended",
+      status: group === "need" ? "Needs you" : group === "working" ? "Working" : today ? "Ready" : "Done",
       at: t.lastAt,
       machine: t.machine,
       level: t.level,

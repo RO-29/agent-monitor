@@ -117,7 +117,7 @@ function Card({ r, kids }: { r: Row; kids: V3Thread[] }) {
   const nav = useNavigate();
   const t = r.thread;
   const needs = r.bucket === "needs-you";
-  const info = stateInfo(r.session?.state || t?.state || "", r.approvals.length);
+  const info = stateInfo(r.session?.phase || t?.phase || r.session?.state || t?.state || "", r.approvals.length);
   const card = (
     <div className={`tc ${needs ? "needc" : ""}`} onClick={() => nav(`/t/${encodeURIComponent(r.id)}`)}>
       <div className="row">

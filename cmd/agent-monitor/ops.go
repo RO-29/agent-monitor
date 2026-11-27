@@ -289,6 +289,7 @@ type ThreadV3 struct {
 	Kind     string  `json:"kind,omitempty"`
 	Status   string  `json:"status,omitempty"`
 	Group    string  `json:"group,omitempty"` // a driven thread's server group: need, working, ready or settled
+	Phase    string  `json:"phase,omitempty"` // needs-you, working, ready or done, from threadPhase
 	SpendUSD float64 `json:"spendUsd,omitempty"`
 	V4Fields
 }
@@ -339,6 +340,7 @@ var pendingApprovalsFn func() map[string]int
 func threadsV3All(v *threadView) []ThreadV3 {
 	par := v.parentage(childLinks())
 	pend := pendingBySession()
+	need, today := needSet(), startOfDay(time.Now())
 	out := make([]ThreadV3, 0, len(v.threads))
 	pos := map[string]int{}
 	for _, t := range v.threads {
@@ -355,6 +357,7 @@ func threadsV3All(v *threadView) []ThreadV3 {
 		if p, ok := par[t.ID]; ok {
 			tv.ParentThread, tv.ChildKind = p[0], p[1]
 		}
+		tv.Phase = threadPhase(&tv, v.byID, need, today)
 		pos[t.ID] = len(out)
 		out = append(out, tv)
 	}

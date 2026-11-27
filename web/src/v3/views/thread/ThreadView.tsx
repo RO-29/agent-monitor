@@ -83,7 +83,7 @@ export function ThreadView({ threadId, embedded }: { threadId: string; embedded?
   if (!thread || !merged) return <Loading rows={8} />;
   if (!sessionId) return <Empty title="No sessions in this thread" />;
 
-  const info = stateInfo(session?.state || thread.state, pending.length);
+  const info = stateInfo(session?.phase || thread.phase || session?.state || thread.state, pending.length);
   const setMode = (m: Mode) => {
     const n = new URLSearchParams(sp);
     if (m === "story") n.delete("mode");

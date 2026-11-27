@@ -147,6 +147,7 @@ func runServer() {
 		}
 	})
 	store.StartDecayLoop()
+	watchPhases(store)
 	// Detect AskUserQuestion / permission prompts from pane content (they don't
 	// fire the Notification hook) so they show up in the Approvals tab.
 	startPanePromptWatcher(store, paneRegistry)
@@ -188,7 +189,7 @@ func runServer() {
 		if r.URL.Query().Get("slim") == "1" {
 			all = slimSessions(all) // the iPhone list; ended sessions without their event history
 		}
-		writeJSON(w, map[string]any{"sessions": all})
+		writeJSON(w, map[string]any{"sessions": withPhase(all)})
 	})
 	// /api/chains — related-session graph (continuation chains). Precise linkage
 	// by shared handoff/resume plan reference + same-pane continuity.
@@ -1059,7 +1060,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 			fullOnce.Do(func() { close(full) })
 		}
 	}
-	unsubSess := store.Subscribe(func(e ServerEvent) { send(e) })
+	unsubSess := store.Subscribe(func(e ServerEvent) { send(eventWithPhase(e)) })
 	unsubPerm := permStore.Subscribe(func(e PermEvent) { send(e) })
 	unsubPane := paneRegistry.Subscribe(func(e PaneEvent) { send(e) })
 	unsubTalk := talkStore.Subscribe(func(e TalkEvent) { send(e) })

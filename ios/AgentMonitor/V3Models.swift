@@ -204,6 +204,7 @@ struct V3Thread: Decodable, Identifiable, Hashable {
     var tools: [String]?
     var sessions: [String]?
     var state: AgentState
+    var phase: String? = nil
     var startedAt: Int64
     var lastAt: Int64
     var turns: Int?
@@ -262,7 +263,7 @@ enum ThreadGroup: String, CaseIterable, Identifiable {
         case .need: return "Needs you"
         case .working: return "Working"
         case .ready: return "Ready"
-        case .settled: return "Settled"
+        case .settled: return "Done"
         }
     }
     var empty: String {
@@ -270,7 +271,7 @@ enum ThreadGroup: String, CaseIterable, Identifiable {
         case .need: return "Nothing waiting on you"
         case .working: return "Nothing running"
         case .ready: return "Nothing to review"
-        case .settled: return "No settled threads"
+        case .settled: return "Nothing done yet"
         }
     }
 }

@@ -374,6 +374,24 @@ func (s *Store) Upsert(in UpsertInput) *Session {
 	return next
 }
 
+// Touch re-sends a session unchanged; an id that starts with "path:" names a transcript.
+func (s *Store) Touch(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if path, ok := strings.CutPrefix(id, "path:"); ok {
+		for _, v := range s.sessions {
+			if v.TranscriptPath == path {
+				s.broadcastLocked(ServerEvent{Kind: "upsert", Session: v})
+				return
+			}
+		}
+		return
+	}
+	if v, ok := s.sessions[id]; ok {
+		s.broadcastLocked(ServerEvent{Kind: "upsert", Session: v})
+	}
+}
+
 func (s *Store) Remove(tool Tool, sessionID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -430,7 +448,7 @@ func (s *Store) tick() {
 		dt := time.Duration(now-v.LastActivityAt) * time.Millisecond
 		var next State
 		switch {
-		case v.State == StateRunning && dt > idleAfter:
+		case v.State == StateRunning && dt > idleAfter && !(toolCallOpen(v) && dt <= completedAfter):
 			next = StateIdle
 		case v.State == StateIdle && dt > completedAfter:
 			next = StateCompleted
@@ -449,6 +467,19 @@ func (s *Store) tick() {
 		s.sessions[k] = &cp
 		s.broadcastLocked(ServerEvent{Kind: "upsert", Session: &cp})
 	}
+}
+
+// toolCallOpen: the newest turn event is a PreToolUse, so a long tool (a build, a test run) still works.
+func toolCallOpen(v *Session) bool {
+	for i := len(v.RecentEvents) - 1; i >= 0; i-- {
+		switch v.RecentEvents[i].Kind {
+		case "PreToolUse":
+			return true
+		case "PostToolUse", "PostToolUseFailure", "Stop", "UserPromptSubmit", "Notification", "SessionEnd":
+			return false
+		}
+	}
+	return false
 }
 
 // ClassifyAge returns the appropriate state for a session of the given age,

@@ -138,12 +138,10 @@ enum Theme {
 
     static func label(for state: AgentState) -> String {
         switch state {
-        case .running: return "Running"
-        case .awaitingPermission: return "Needs approval"
-        case .awaitingInput: return "Ready"
-        case .idle: return "Idle"
-        case .completed: return "Done"
-        case .abandoned: return "Abandoned"
+        case .running: return "Working"
+        case .awaitingPermission: return "Needs you"
+        case .awaitingInput, .idle: return "Ready"
+        case .completed, .abandoned: return "Done"
         case .unknown: return "Unknown"
         }
     }

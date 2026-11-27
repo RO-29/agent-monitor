@@ -704,7 +704,7 @@ export function kidState(c: OThread, needIds: Set<string>): KidState {
   return c.status === "closed" ? "closed" : "done";
 }
 export const KID_DOT: Record<KidState, string> = { need: "var(--need)", run: "var(--run)", done: "var(--ok)", err: "var(--err)", closed: "var(--line-2)" };
-const KID_LABEL: Record<KidState, string> = { need: "Needs you", run: "Working", done: "Ended", err: "Error", closed: "Closed" };
+const KID_LABEL: Record<KidState, string> = { need: "Needs you", run: "Working", done: "Done", err: "Error", closed: "Closed" };
 const kidTime = (c: OThread, st: KidState, now: number) => {
   const a = toMs(c.createdAt);
   const b = st === "run" || st === "need" ? now : toMs(c.updatedAt);

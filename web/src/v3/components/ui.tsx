@@ -23,17 +23,22 @@ export interface StateInfo {
 export function stateInfo(st: SessionState | string, pending = 0): StateInfo {
   if (pending > 0) return { dot: "d-need", pill: "p-need", label: "Needs you", rank: 0 };
   switch (st) {
+    case "needs-you":
     case "awaiting-permission":
       return { dot: "d-need", pill: "p-need", label: "Needs you", rank: 0 };
     // The turn ended: ready for your next message, not waiting on you.
     case "awaiting-input":
       return { dot: "d-idle", pill: "p-mute", label: "ready", rank: 3 };
+    case "working":
     case "running":
       return { dot: "d-run", pill: "p-run", label: "working", rank: 2 };
+    case "ready":
     case "idle":
       return { dot: "d-idle", pill: "p-mute", label: "ready", rank: 3 };
+    case "done":
     case "completed":
-      return { dot: "d-ok", pill: "p-ok", label: "ended", rank: 4 };
+    case "abandoned":
+      return { dot: "d-ok", pill: "p-ok", label: "done", rank: 4 };
     default:
       return { dot: "d-mute", pill: "p-mute", label: String(st || "unknown"), rank: 5 };
   }

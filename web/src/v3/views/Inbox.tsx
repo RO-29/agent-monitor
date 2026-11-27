@@ -175,7 +175,7 @@ export default function Inbox() {
 }
 
 function Item({ r, sel, onClick }: { r: Row; sel: boolean; onClick: () => void }) {
-  const info = stateInfo(r.session?.state || r.thread?.state || "idle", r.approvals.length + r.perms.length);
+  const info = stateInfo(r.session?.phase || r.thread?.phase || r.session?.state || r.thread?.state || "idle", r.approvals.length + r.perms.length);
   const a = r.approvals[0];
   const pill = a ? (a.kind === "question" ? "question" : a.kind === "plan" ? "plan" : "approve") : r.needs ? "Needs you" : info.label;
   const act = activity(r);

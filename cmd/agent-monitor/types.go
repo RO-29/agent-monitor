@@ -42,6 +42,7 @@ type Session struct {
 	SessionID         string         `json:"sessionId"`
 	Cwd               string         `json:"cwd"`
 	State             State          `json:"state"`
+	Phase             string         `json:"phase,omitempty"` // needs-you, working, ready or done; set on output by sessionPhase
 	Pid               int            `json:"pid,omitempty"`
 	StartedAt         int64          `json:"startedAt"`
 	LastActivityAt    int64          `json:"lastActivityAt"`

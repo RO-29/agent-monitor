@@ -45,6 +45,7 @@ struct Session: Codable, Identifiable, Hashable {
     var sessionId: String
     var cwd: String
     var state: AgentState
+    var phase: String? = nil
     var pid: Int?
     var startedAt: Int64
     var lastActivityAt: Int64

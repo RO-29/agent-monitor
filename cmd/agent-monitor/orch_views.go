@@ -148,6 +148,7 @@ func drivenRowV3(a *drivenAgg, now int64) ThreadV3 {
 	}
 	row := ThreadV3{Thread: t, DrivenID: th.ID, Kind: "driven", Status: th.Status, Group: th.Group, SpendUSD: t.CostUSD, Approvals: a.open,
 		ChildCount: len(th.Children)}
+	row.Phase = threadPhase(&row, nil, nil, 0)
 	if th.ParentID != "" {
 		row.ParentThread, row.ChildKind = th.ParentID, "delegated"
 	}

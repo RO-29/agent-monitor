@@ -11,7 +11,7 @@ export const LISTS: { key: ListKey; label: string; dot: string }[] = [
   { key: "needs-you", label: "Needs you", dot: "d-need" },
   { key: "running", label: "Working", dot: "d-run" },
   { key: "idle-today", label: "Ready", dot: "d-idle" },
-  { key: "done-today", label: "Ended today", dot: "d-ok" },
+  { key: "done-today", label: "Done", dot: "d-ok" },
 ];
 
 export interface Row {
@@ -54,14 +54,15 @@ export function buildRows(st: V3State, live: LiveState, ny?: NeedsYouState): Row
     const sid = t ? t.sessions[t.sessions.length - 1] : appr[0]?.sessionId;
     const session = sid ? live.sessions.get(sid) : undefined;
     const state = session?.state || t?.state || "idle";
+    // The daemon decides the phase; the state rules below only cover an older daemon.
+    const phase = session?.phase || t?.phase;
     const perms = permsBy.get(id) || [];
-    // A session that only finished its turn is ready, not waiting on you.
-    const needs = need ? need.has(id) : appr.length > 0 || perms.length > 0 || state === "awaiting-permission";
+    const needs = (need ? need.has(id) : appr.length > 0 || perms.length > 0) || (phase ? phase === "needs-you" : state === "awaiting-permission");
     const lastAt = Math.max(t?.lastAt || 0, session?.lastActivityAt || 0, ...appr.map((a) => a.createdAt));
     let bucket: Row["bucket"] = "older";
     if (needs) bucket = "needs-you";
-    else if (state === "running") bucket = "running";
-    else if (lastAt >= today && (state === "idle" || state === "awaiting-input")) bucket = "idle-today";
+    else if (phase ? phase === "working" : state === "running") bucket = "running";
+    else if (phase ? phase === "ready" : lastAt >= today && (state === "idle" || state === "awaiting-input")) bucket = "idle-today";
     else if (lastAt >= today) bucket = "done-today";
     const sinceAt = appr.length ? appr[0].createdAt : perms.length ? perms[0].createdAt : lastAt;
     return {
