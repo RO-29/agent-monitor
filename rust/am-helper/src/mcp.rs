@@ -164,6 +164,8 @@ impl Mcp {
                 }
                 "ping" => result(&id, m(vec![])),
                 "" => {}
+                // A notification has no id and never gets a reply, not even an error.
+                _ if req.get("id").is_none() => {}
                 _ => write_json(&m(vec![
                     ("jsonrpc", s("2.0")),
                     ("id", id.clone()),
@@ -430,14 +432,15 @@ impl Mcp {
         let mut lines = 200i64;
         if let Some(v) = args.get("lines").and_then(|v| v.as_f64()) {
             if v > 0.0 {
-                lines = v as i64;
+                lines = (v as i64).min(1000);
             }
         }
         let target = match self.resolve(recipient) {
             Ok(t) => t,
             Err(e) => return text(id, &format!("read_pane: {}", e), None, true),
         };
-        let data = match http::get_json(&format!("{}/api/session/pane-view/{}?lines={}", self.daemon, target, lines)) {
+        // plain=1: the agent reads text, not terminal color codes.
+        let data = match http::get_json(&format!("{}/api/session/pane-view/{}?lines={}&plain=1", self.daemon, target, lines)) {
             Ok(d) => d,
             Err(e) => return text(id, &format!("read_pane: {}", e), None, true),
         };

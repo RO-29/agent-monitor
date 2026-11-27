@@ -205,6 +205,9 @@ func serveMCP(stdin io.Reader, stdout io.Writer, daemonURL string, orch mcpOrch,
 			// missing method — could be a response. Ignore.
 
 		default:
+			if _, has := req["id"]; !has {
+				break
+			}
 			_ = writeJSON(map[string]any{
 				"jsonrpc": "2.0", "id": id,
 				"error": map[string]any{"code": -32601, "message": "method not found"},
@@ -556,14 +559,14 @@ func handleReadPane(daemonURL string, args map[string]any, id any, writeJSON fun
 	}
 	lines := 200
 	if v, ok := args["lines"].(float64); ok && v > 0 {
-		lines = int(v)
+		lines = min(int(v), 1000)
 	}
 	target, err := mcpResolveRecipient(daemonURL, recipient)
 	if err != nil {
 		writeMCPText(writeJSON, id, fmt.Sprintf("read_pane: %v", err), nil, true)
 		return
 	}
-	url := fmt.Sprintf("%s/api/session/pane-view/%s?lines=%d", daemonURL, target, lines)
+	url := fmt.Sprintf("%s/api/session/pane-view/%s?lines=%d&plain=1", daemonURL, target, lines)
 	var data struct {
 		OK      bool   `json:"ok"`
 		Content string `json:"content"`
