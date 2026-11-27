@@ -459,7 +459,7 @@ func plainDeny(r *http.Request) bool {
 		Answers      json.RawMessage `json:"answers"`
 		OptionID     string          `json:"optionId"`
 	}
-	return json.Unmarshal(body, &in) == nil && in.Behavior == "deny" && !in.Always && len(in.UpdatedInput) == 0 && len(in.Answers) == 0 && in.OptionID == ""
+	return json.Unmarshal(body, &in) == nil && (in.Behavior == "deny" || in.Behavior == "terminal") && !in.Always && len(in.UpdatedInput) == 0 && len(in.Answers) == 0 && in.OptionID == ""
 }
 
 // bioGate answers 428 when a Face ID or passkey device sends an unsigned or bad request; false means it wrote the answer.

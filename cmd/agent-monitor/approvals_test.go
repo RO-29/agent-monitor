@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -609,5 +610,64 @@ func TestCursorDesktopUsesItsOwnRules(t *testing.T) {
 		if got := cursorDesktopPolicy("Bash", map[string]any{"command": cmd}); got != want {
 			t.Fatalf("%q: %q want %q", cmd, got, want)
 		}
+	}
+}
+
+func TestApprovalHoldIsDefault(t *testing.T) {
+	e := newApprovalEnv(t)
+	e.s.mu.Lock()
+	mode, set := e.s.settings.ApprovalsMode, e.s.settings.ModeSet
+	e.s.mu.Unlock()
+	if mode != approvalsModeHold || set {
+		t.Fatalf("default mode %q set=%v", mode, set)
+	}
+}
+
+func TestApprovalPassToTerminal(t *testing.T) {
+	e := newApprovalEnv(t)
+	e.s.reachable = func(string) bool { return true }
+	ch := e.startHook(hookClaudePermission, claudeBash("make"))
+	a := e.waitPending()
+	if !a.Passable {
+		t.Fatal("reachable session should be passable")
+	}
+	if code, body := e.decide(a.ID, map[string]any{"behavior": "terminal"}); code != 200 {
+		t.Fatalf("decide %d %s", code, body)
+	}
+	if r := waitResult(t, ch); r.code != http.StatusNoContent {
+		t.Fatalf("hook got %d %v", r.code, r.body)
+	}
+	if rec := e.s.list()["recent"].([]*Approval); rec[0].State != "passed" {
+		t.Fatalf("state %s", rec[0].State)
+	}
+}
+
+func TestApprovalPassToTerminalNeedsTerminal(t *testing.T) {
+	e := newApprovalEnv(t)
+	e.s.reachable = func(string) bool { return false }
+	ch := e.startHook(hookClaudePermission, claudeBash("make"))
+	a := e.waitPending()
+	if code, _ := e.decide(a.ID, map[string]any{"behavior": "terminal"}); code != http.StatusConflict {
+		t.Fatalf("decide without a terminal = %d", code)
+	}
+	e.decide(a.ID, map[string]any{"behavior": "deny"})
+	waitResult(t, ch)
+}
+
+func TestApprovalFocusDuringHoldReleases(t *testing.T) {
+	e := newApprovalEnv(t)
+	var mu sync.Mutex
+	look := false
+	e.s.focused = func(string) bool { mu.Lock(); defer mu.Unlock(); return look }
+	ch := e.startHook(hookClaudePermission, claudeBash("make"))
+	e.waitPending()
+	mu.Lock()
+	look = true
+	mu.Unlock()
+	if r := waitResult(t, ch); r.code != http.StatusNoContent {
+		t.Fatalf("focus should release to the terminal, got %d", r.code)
+	}
+	if rec := e.s.list()["recent"].([]*Approval); rec[0].State != "passed" {
+		t.Fatalf("state %s", rec[0].State)
 	}
 }

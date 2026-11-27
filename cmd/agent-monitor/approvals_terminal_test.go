@@ -79,6 +79,7 @@ func newApprTermEnv(t *testing.T) (*approvalEnv, *termFake) {
 	e := newApprovalEnv(t)
 	f := &termFake{sender: &fakeSender{}, pane: WatchedPane{Registered: true, Live: true, Sendable: true, PaneID: "%9"}}
 	e.s.reachable = func(string) bool { return true }
+	e.s.settings.ApprovalsMode, e.s.settings.ModeSet = approvalsModeBoth, true
 	prevPane, prevCap, prevSend, prevDelay, prevPoll := approvalPaneFn, termCaptureFn, termAnswerSender, termStepDelay, termApprovalPoll
 	approvalPaneFn = func(string) WatchedPane { return f.pane }
 	termCaptureFn = func(string) (string, error) { return f.screen, nil }
@@ -173,7 +174,7 @@ func TestApprovalsModeHoldHoldsReachable(t *testing.T) {
 		t.Fatalf("hold mode typed keys: %v", f.sender.steps)
 	}
 	s := newApprovalStore(t.TempDir())
-	if s.settings.ApprovalsMode != approvalsModeBoth {
+	if s.settings.ApprovalsMode != approvalsModeHold {
 		t.Fatalf("default mode %q", s.settings.ApprovalsMode)
 	}
 }

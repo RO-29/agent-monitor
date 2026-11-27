@@ -228,13 +228,13 @@ function SettingsBox() {
           </div>
           <label className="toggle" style={{ marginTop: 10 }}>
             Approvals for sessions with a terminal
-            <select className="inp" value={s.approvalsMode ?? "both"} onChange={(e) => setS({ ...s, approvalsMode: e.target.value as "both" | "hold" })} style={{ marginLeft: 8, width: "auto" }}>
-              <option value="both">In the terminal and here at once</option>
-              <option value="hold">Hold here first</option>
+            <select className="inp" value={s.approvalsMode ?? "hold"} onChange={(e) => setS({ ...s, approvalsMode: e.target.value as "both" | "hold" })} style={{ marginLeft: 8, width: "auto" }}>
+              <option value="hold">Answer here; the terminal when I look at it</option>
+              <option value="both">In the terminal and here at once (types keys)</option>
             </select>
           </label>
           <div className="xs muted" style={{ marginTop: 4 }}>
-            Both: the agent shows its own prompt at once, a card shows here too, and the first answer in either place counts. Hold: the card holds the request for the window above, then the terminal prompt.
+            Answer here: agent-monitor holds the request and answers the agent directly. When you switch to the agent's terminal, or press Answer in terminal, or the hold time above ends, the agent shows its own prompt instead. In the terminal and here at once: the agent shows its prompt at once and an answer from here is typed into the terminal as keys.
           </div>
           <div className="grid2" style={{ marginTop: 10 }}>
             <label>

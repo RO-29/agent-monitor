@@ -56,6 +56,8 @@ struct Approval: Codable, Identifiable, Hashable {
     var plan: String?
     var createdAt: Int64
     var holdUntil: Int64
+    /// A held request whose agent has a terminal: "Answer in terminal" releases it there.
+    var passable: Bool?
     var state: String
     var decidedAt: Int64?
     var decidedBy: String?

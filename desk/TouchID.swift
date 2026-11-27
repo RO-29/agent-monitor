@@ -22,7 +22,7 @@ let kTouchIDScript = """
     if (!raw && input instanceof Request) raw = await input.clone().text().catch(() => "");
     let body = {};
     try { body = JSON.parse(raw || "{}"); } catch (e) {}
-    const deny = body.behavior ? body.behavior === "deny" : body.decision === "deny";
+    const deny = body.behavior ? body.behavior === "deny" || body.behavior === "terminal" : body.decision === "deny";
     const promptNo = url.pathname.includes("/session/prompt/") && body.answer === "no";
     if (deny || body.type === "decline" || promptNo) return orig(input, init);
     // One Touch ID sheet at a time: a second prompt would cancel the first.

@@ -31,6 +31,7 @@ export interface Approval {
   plan?: string;
   createdAt: number;
   holdUntil: number;
+  passable?: boolean; // a held request whose agent has a terminal: "Answer in terminal" releases it there
   state: ApprovalState;
   decidedAt?: number;
   decidedBy?: string;
@@ -56,7 +57,7 @@ export interface ApprovalsResponse {
   recent: Approval[];
 }
 export interface DecideBody {
-  behavior: "allow" | "deny";
+  behavior: "allow" | "deny" | "terminal";
   message?: string;
   interrupt?: boolean;
   updatedInput?: Record<string, unknown>;

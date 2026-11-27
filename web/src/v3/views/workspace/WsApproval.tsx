@@ -686,6 +686,11 @@ function PermAsk({ ask }: { ask: AskInfo }) {
                 Deny with reason…
               </button>
             )}
+            {ask.approval?.passable && (
+              <button className="btn ghost" disabled={d.busy} title="The agent shows its own prompt in its terminal" onClick={() => void d.run(() => decideAskBody(ask, { behavior: "terminal" }, mock), "Sent to the terminal")}>
+                Answer in terminal
+              </button>
+            )}
           </>
         )}
       </div>

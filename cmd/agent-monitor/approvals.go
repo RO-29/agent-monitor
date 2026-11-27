@@ -36,15 +36,17 @@ type Approval struct {
 	Plan        string           `json:"plan,omitempty"`
 	CreatedAt   int64            `json:"createdAt"`
 	HoldUntil   int64            `json:"holdUntil"`
-	State       string           `json:"state"`
-	DecidedAt   int64            `json:"decidedAt,omitempty"`
-	DecidedBy   string           `json:"decidedBy,omitempty"`
-	Message     string           `json:"message,omitempty"`
-	RuleID      string           `json:"ruleId,omitempty"`
-	AlwaysOK    bool             `json:"alwaysOk"`
-	DrivenID    string           `json:"drivenId,omitempty"`
-	RootID      string           `json:"rootId,omitempty"`
-	Options     []acpPermOption  `json:"options,omitempty"`
+	// Passable: a held hook of a session with a terminal, so "Answer in terminal" can release it there.
+	Passable  bool            `json:"passable,omitempty"`
+	State     string          `json:"state"`
+	DecidedAt int64           `json:"decidedAt,omitempty"`
+	DecidedBy string          `json:"decidedBy,omitempty"`
+	Message   string          `json:"message,omitempty"`
+	RuleID    string          `json:"ruleId,omitempty"`
+	AlwaysOK  bool            `json:"alwaysOk"`
+	DrivenID  string          `json:"drivenId,omitempty"`
+	RootID    string          `json:"rootId,omitempty"`
+	Options   []acpPermOption `json:"options,omitempty"`
 	// Source "terminal-shown": the CLI shows its own prompt too, and a card decision is typed into it.
 	Source       string    `json:"source,omitempty"`
 	SentAt       int64     `json:"sentAt,omitempty"`
@@ -78,8 +80,11 @@ type ApprovalSettings struct {
 	SkipWhenFocused     bool `json:"skipWhenFocused"`
 	// DrivenApprovalTimeoutSec declines a driven thread's approval after this long; 0 waits for the user.
 	DrivenApprovalTimeoutSec int `json:"drivenApprovalTimeoutSec"`
-	// ApprovalsMode "both" shows a reachable session's prompt in its terminal and on cards; "hold" holds every hook.
+	// ApprovalsMode "hold" (default) holds the hook and answers it directly; "both" shows the agent's own prompt
+	// and types a remote answer into the terminal.
 	ApprovalsMode string `json:"approvalsMode"`
+	// ModeSet: the person chose ApprovalsMode; until then hold is the default, and Cursor keeps its own lists.
+	ModeSet bool `json:"modeSet,omitempty"`
 	// BioMinRisk: the lowest risk (low, medium, high) whose approval needs Face ID or a passkey; empty = medium.
 	BioMinRisk string `json:"bioMinRisk,omitempty"`
 	// BioTrustMin: minutes one signature covers the same session's low and medium approvals; nil = 10, 0 = off.
@@ -198,7 +203,9 @@ func (s *ApprovalStore) normalizeSettings() {
 	if s.settings.QuestionHoldSeconds <= 0 {
 		s.settings.QuestionHoldSeconds = 600
 	}
-	if s.settings.ApprovalsMode != approvalsModeHold {
+	if !s.settings.ModeSet {
+		s.settings.ApprovalsMode = approvalsModeHold
+	} else if s.settings.ApprovalsMode != approvalsModeHold {
 		s.settings.ApprovalsMode = approvalsModeBoth
 	}
 }
@@ -622,7 +629,7 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 	a := buildApproval(hook, p)
 
 	s.mu.Lock()
-	holdAll := s.settings.ApprovalsMode == approvalsModeHold
+	holdAll := s.settings.ApprovalsMode == approvalsModeHold && s.settings.ModeSet
 	s.mu.Unlock()
 	// Cursor runs this hook for every command: what its own lists already decide passes through unchanged.
 	// The CLI and the desktop app keep separate lists; the desktop ignores an "allow" for a call it would ask about.
@@ -673,6 +680,7 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 		hold = settings.QuestionHoldSeconds
 	}
 	a.HoldUntil = a.CreatedAt + int64(hold)*1000
+	a.Passable = hook != hookCursor && s.reachable != nil && s.reachable(a.SessionID)
 	pa := &pendingApproval{a: a, hook: hook, reply: make(chan approvalDecision, 1)}
 	s.mu.Lock()
 	s.pending[a.ID] = pa
@@ -683,33 +691,75 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 
 	timer := time.NewTimer(time.Duration(hold) * time.Second)
 	defer timer.Stop()
-	select {
-	case d := <-pa.reply:
-		writeJSON(w, hookResponse(hook, a, d))
-		return
-	case <-timer.C:
-		if _, ok := s.finish(a.ID, "expired", "", "", nil); ok {
-			passHook(w, hook)
+	// Focusing the agent's terminal hands the request back to it, so a person at the Mac answers there.
+	look := time.NewTicker(2 * time.Second)
+	defer look.Stop()
+	for {
+		select {
+		case d := <-pa.reply:
+			s.answerHook(w, hook, a, d)
 			return
+		case <-look.C:
+			if hook == hookCursor || s.focused == nil || !settings.SkipWhenFocused || !s.focused(a.SessionID) {
+				continue
+			}
+			if _, ok := s.finish(a.ID, "passed", "terminal", "", nil); ok {
+				passHook(w, hook)
+				return
+			}
+		case <-timer.C:
+			if _, ok := s.finish(a.ID, "expired", "", "", nil); ok {
+				passHook(w, hook)
+				return
+			}
+		case <-r.Context().Done():
+			if _, ok := s.finish(a.ID, "passed", "terminal", "", nil); ok {
+				return
+			}
 		}
-	case <-r.Context().Done():
-		if _, ok := s.finish(a.ID, "passed", "terminal", "", nil); ok {
-			return
-		}
+		break
 	}
 	// A decision landed at the same moment; a finish with no decision sends nothing, so wait only briefly.
 	select {
 	case d := <-pa.reply:
-		writeJSON(w, hookResponse(hook, a, d))
+		s.answerHook(w, hook, a, d)
 	case <-time.After(2 * time.Second):
 		passHook(w, hook)
 	}
+}
+
+func (s *ApprovalStore) answerHook(w http.ResponseWriter, hook string, a *Approval, d approvalDecision) {
+	if d.Behavior == "pass" {
+		passHook(w, hook)
+		return
+	}
+	writeJSON(w, hookResponse(hook, a, d))
 }
 
 func (s *ApprovalStore) settingsSkipWhenFocused() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.settings.SkipWhenFocused
+}
+
+// passToTerminal releases a held hook with no opinion, so the agent shows its own prompt in the terminal.
+func (s *ApprovalStore) passToTerminal(id string, d approvalDecision) (*Approval, int, error) {
+	s.mu.Lock()
+	p, ok := s.pending[id]
+	held := ok && p.term == nil && p.a.Passable
+	s.mu.Unlock()
+	if !ok {
+		return nil, http.StatusConflict, fmt.Errorf("approval is not pending")
+	}
+	if !held {
+		return nil, http.StatusConflict, fmt.Errorf("this request has no terminal to answer in")
+	}
+	pass := approvalDecision{Behavior: "pass", device: d.device, proof: d.proof}
+	done, ok := s.finish(id, "passed", "terminal", "", &pass)
+	if !ok {
+		return nil, http.StatusConflict, fmt.Errorf("approval is not pending")
+	}
+	return done, http.StatusOK, nil
 }
 
 // passHook answers with no opinion: an empty 204, or "ask" for Cursor, which blocks on an empty reply.
@@ -735,8 +785,11 @@ func (s *ApprovalStore) decide(id string, d approvalDecision) (*Approval, int, e
 		}
 		s.mu.Unlock()
 	}
+	if d.Behavior == "terminal" {
+		return s.passToTerminal(id, d)
+	}
 	if d.Behavior != "allow" && d.Behavior != "deny" {
-		return nil, http.StatusBadRequest, fmt.Errorf("behavior must be allow or deny")
+		return nil, http.StatusBadRequest, fmt.Errorf("behavior must be allow, deny or terminal")
 	}
 	s.mu.Lock()
 	p, ok := s.pending[id]
@@ -1061,6 +1114,7 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 					s.settings.SkipWhenFocused = *in.SkipWhenFocused
 				}
 				if in.ApprovalsMode != nil {
+					s.settings.ModeSet = true
 					s.settings.ApprovalsMode = *in.ApprovalsMode
 				}
 				if in.BioMinRisk != nil {

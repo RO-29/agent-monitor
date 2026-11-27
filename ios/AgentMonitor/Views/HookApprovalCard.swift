@@ -151,6 +151,14 @@ struct HookApprovalCard: View {
                     .buttonStyle(.am(.normal, big: true, full: true))
                     .disabled(locked)
                 }
+                if a.passable == true {
+                    Button { send(DecideBody(behavior: "terminal")) } label: {
+                        Label("Answer in terminal", systemImage: "terminal")
+                    }
+                    .buttonStyle(.am(.ghost, big: true, full: true))
+                    .disabled(locked)
+                    .accessibilityHint("The agent shows its own prompt in its terminal on the Mac")
+                }
             }
         }
     }
@@ -346,6 +354,7 @@ struct HookApprovalCard: View {
         case ("plan", _): return "Keep planning"
         case ("question", _): return "Decline"
         case (_, "allow"): return b.always == true ? "Always allow" : "Allow"
+        case (_, "terminal"): return "Answer in terminal"
         default: return "Deny"
         }
     }
