@@ -47,6 +47,8 @@
 	<string>Agent Monitor uses Face ID to unlock the app and to sign the approvals you give to your agents.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Agent Monitor uses the microphone when you dictate a message to an agent.</string>
+	<key>AMKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)com.rohit.agentmonitor.shared</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>

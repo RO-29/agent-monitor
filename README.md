@@ -315,6 +315,30 @@ The Mac app asks for Touch ID (or the Mac password) before it sends an approval.
 agent-monitor, Touch ID for Approvals. This guards against a person at an unlocked Mac only: programs on
 the Mac can still reach the daemon.
 
+**Passkeys in the browser.** A paired browser on HTTPS (for example through `tailscale serve`) can use
+Settings, Devices, *Use a passkey for approvals*. The browser makes a passkey (Touch ID, Face ID,
+Windows Hello or a security key), and its approvals then need it, the same way as the phone. The daemon
+checks the site, the user check and the signature over the exact request. A browser signed in with
+the password, or on plain HTTP, cannot hold a passkey.
+
+**When a check is needed.** Approvals, Settings: *Face ID or passkey for* every approval, medium and
+high risk (default), or high risk only. A read-only command is low risk. After one check, the same
+device can decide the same session's low and medium approvals for 10 minutes (*Trust a session*,
+0 turns it off). High risk always needs a new check, and a plain deny never does.
+
+**Signed log.** Each decision keeps the device and the signature. The audit log on the Approvals page
+shows Face ID, Passkey or Trusted next to it; a click checks the stored signature again
+(`GET /api/approvals/{id}/proof`).
+
+**Phone alerts when you leave the Mac.** While the Mac screen is unlocked and you used it in the last
+2 minutes, web push and Bark alerts wait. They go out when the screen locks or the Mac is idle, unless
+you answered them first. Settings, Notifications, *Only when I leave the Mac* turns this off.
+
+**Widget and Live Activity.** The iPhone app has an *Agents* home screen widget and a Live Activity
+(lock screen and Dynamic Island) with the count of agents that wait and work. With no Apple push
+service, both update only while the app runs, and the Live Activity shows as old after 15 minutes.
+The approval cards on the phone show the diff of an edit before you allow it.
+
 Create PR fills the description from the thread: the agent's last answer as the summary, then the
 messages that asked for the work.
 

@@ -1,4 +1,5 @@
 import ActivityKit
+import Security
 import SwiftUI
 import WidgetKit
 
@@ -31,10 +32,8 @@ struct GlanceProvider: TimelineProvider {
         completion(Timeline(entries: [read()], policy: .after(.now.addingTimeInterval(15 * 60))))
     }
     private func read() -> GlanceEntry {
-        let d = UserDefaults(suiteName: "group.com.rohit.agentmonitor")
-        let s = d?.data(forKey: "glance").flatMap { try? JSONDecoder().decode(AgentsActivity.ContentState.self, from: $0) }
-        let at = d?.double(forKey: "glanceAt") ?? 0
-        return GlanceEntry(date: .now, state: s ?? .init(working: 0, waiting: 0, oldestName: "", oldestSince: nil), updated: at > 0 ? Date(timeIntervalSince1970: at) : nil)
+        let snap = GlanceStore.read().flatMap { try? JSONDecoder().decode(GlanceSnapshot.self, from: $0) }
+        return GlanceEntry(date: .now, state: snap?.state ?? .init(working: 0, waiting: 0, oldestName: "", oldestSince: nil), updated: snap?.at)
     }
 }
 
@@ -132,4 +131,32 @@ struct AgentsWidgetBundle: WidgetBundle {
         AgentsWidget()
         AgentsLiveActivity()
     }
+}
+
+/// A small Keychain item both the app and the widget can read: free Apple accounts have no App Groups.
+enum GlanceStore {
+    private static var group: String? { Bundle.main.object(forInfoDictionaryKey: "AMKeychainGroup") as? String }
+    private static func base() -> [String: Any] {
+        var q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "agent-monitor.glance", kSecAttrAccount as String: "glance"]
+        if let g = group, !g.hasPrefix("$"), !g.hasPrefix(".") { q[kSecAttrAccessGroup as String] = g }
+        return q
+    }
+    static func read() -> Data? {
+        var q = base()
+        q[kSecReturnData as String] = true
+        var out: AnyObject?
+        return SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess ? out as? Data : nil
+    }
+    static func write(_ data: Data) {
+        let attrs: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]
+        if SecItemUpdate(base() as CFDictionary, attrs as CFDictionary) == errSecItemNotFound {
+            SecItemAdd(base().merging(attrs) { $1 } as CFDictionary, nil)
+        }
+    }
+}
+
+/// What the widget shows: the counts and when the app wrote them.
+struct GlanceSnapshot: Codable {
+    var state: AgentsActivity.ContentState
+    var at: Date
 }
