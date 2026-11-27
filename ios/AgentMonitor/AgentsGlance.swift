@@ -25,7 +25,8 @@ enum AgentsGlance {
         if s != last || Date().timeIntervalSince(lastWrite) > 60, let data = try? JSONEncoder().encode(GlanceSnapshot(state: s, at: Date())) {
             GlanceStore.write(data)
             if s != last { WidgetCenter.shared.reloadAllTimelines() }
-            last, lastWrite = s, Date()
+            last = s
+            lastWrite = Date()
         }
         Task { await live(s) }
     }
