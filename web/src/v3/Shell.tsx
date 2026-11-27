@@ -32,7 +32,6 @@ export const VIEWS: { to: string; label: string; ic: string; key?: string }[] = 
   { to: "/tracing", label: "Tracing", ic: "⌁", key: "r" },
   { to: "/monitors", label: "Monitors", ic: "◉", key: "m" },
   { to: "/intel", label: "Intelligence", ic: "✦", key: "n" },
-  { to: "/rules", label: "Rules", ic: "⚙", key: "u" },
 ];
 export const LOOKS: { to: string; label: string; note: string }[] = [
   { to: "/desk", label: "Desk", note: "overview" },
@@ -52,7 +51,10 @@ function titleOf(path: string): string {
   if (path === "/more") return "More";
   if (path.startsWith("/commands")) return "History";
   if (path.startsWith("/settings/devices")) return "Devices";
-  if (path.startsWith("/settings/notifications") || path.startsWith("/notifications")) return "Notifications";
+  if (path.startsWith("/needs") || path.startsWith("/notifications")) return "Needs you";
+  if (path.startsWith("/settings/notifications")) return "Notifications";
+  if (path === "/more" || path === "/settings") return "Settings";
+  if (path.startsWith("/rules")) return "Approval rules";
   if (path.startsWith("/settings/limits")) return "Limits";
   if (path.startsWith("/settings/templates")) return "Templates";
   if (path.startsWith("/settings/schedules")) return "Schedules";
@@ -67,6 +69,7 @@ function MenuBody({ path, onTheme, theme, notifyOn, onNotify, part = "all" }: { 
   const more = part !== "views";
   return (
     <>
+      {more && <SettingsLinks path={path} />}
       {views && <div className="mh">Other views</div>}
       {views && LOOKS.map((l) => (
         <Link key={l.to} to={l.to} className={lookOn(l.to) ? "on" : ""}>
@@ -74,7 +77,7 @@ function MenuBody({ path, onTheme, theme, notifyOn, onNotify, part = "all" }: { 
           <small>{l.note}</small>
         </Link>
       ))}
-      {more && <div className="mh">Tools</div>}
+      {more && <div className="mh">Advanced tools</div>}
       {more && VIEWS.map((v) => (
         <Link key={v.to} to={v.to} className={path.startsWith(v.to) ? "on" : ""}>
           {v.label}
@@ -87,27 +90,7 @@ function MenuBody({ path, onTheme, theme, notifyOn, onNotify, part = "all" }: { 
             History
             <small>prompts, ! commands</small>
           </Link>
-          <div className="mh">Settings</div>
-          <Link to="/settings/devices" className={path.startsWith("/settings/devices") ? "on" : ""}>
-            Devices
-            <small>tokens</small>
-          </Link>
-          <Link to="/settings/notifications" className={path.startsWith("/settings/notifications") ? "on" : ""}>
-            Notifications
-            <small>rules, push</small>
-          </Link>
-          <Link to="/settings/limits" className={path.startsWith("/settings/limits") ? "on" : ""}>
-            Limits
-            <small>spend</small>
-          </Link>
-          <Link to="/settings/templates" className={path.startsWith("/settings/templates") ? "on" : ""}>
-            Templates
-            <small>saved setups</small>
-          </Link>
-          <Link to="/settings/schedules" className={path.startsWith("/settings/schedules") ? "on" : ""}>
-            Schedules
-            <small>cron</small>
-          </Link>
+          <div className="mh">This browser</div>
           <button onClick={onTheme}>{theme === "dark" ? "Light theme" : "Dark theme"}</button>
           <button onClick={onNotify} title="Browser notifications for new approvals while this tab is hidden">
             {notifyOn ? "Alerts on" : "Alerts off"}
@@ -116,6 +99,29 @@ function MenuBody({ path, onTheme, theme, notifyOn, onNotify, part = "all" }: { 
           <ApproveKeysToggle />
         </>
       )}
+    </>
+  );
+}
+
+const SETTINGS: { to: string; label: string; note: string }[] = [
+  { to: "/rules", label: "Approval rules", note: "allow, deny, hold" },
+  { to: "/settings/devices", label: "Devices", note: "phones, tokens" },
+  { to: "/settings/notifications", label: "Notifications", note: "rules, push" },
+  { to: "/settings/limits", label: "Limits", note: "spend" },
+  { to: "/settings/templates", label: "Templates", note: "saved setups" },
+  { to: "/settings/schedules", label: "Schedules", note: "cron" },
+];
+
+function SettingsLinks({ path }: { path: string }) {
+  return (
+    <>
+      <div className="mh">Settings</div>
+      {SETTINGS.map((l) => (
+        <Link key={l.to} to={l.to} className={path.startsWith(l.to) ? "on" : ""}>
+          {l.label}
+          <small>{l.note}</small>
+        </Link>
+      ))}
     </>
   );
 }
@@ -244,7 +250,9 @@ export default function V3Shell() {
         else if (e.key === "l") nav("/threads");
         else if (e.key === "t") nav("/timeline");
         else if (e.key === "w") nav("/w");
-        else if (e.key === "a") nav("/notifications");
+        else if (e.key === "a") nav("/needs");
+        else if (e.key === "u") nav("/rules");
+        else if (e.key === "s") nav("/settings");
         else if (v) nav(v.to);
       } else if (e.key === "g") {
         g = true;
@@ -270,14 +278,12 @@ export default function V3Shell() {
   }, [menu]);
   const need = ny.status === "loading" ? c["needs-you"] : ny.count;
   useEffect(() => setNeedCount(need || 0), [need]);
-  const placeOn = (p: "work" | "alerts" | "settings" | "more") =>
-    p === "alerts"
-      ? path.startsWith("/notifications")
+  const placeOn = (p: "work" | "needs" | "settings") =>
+    p === "needs"
+      ? path.startsWith("/needs") || path.startsWith("/notifications")
       : p === "work"
-        ? path === "/" || path === "/w" || (path.startsWith("/w/") && path !== "/w/search")
-        : p === "settings"
-          ? path.startsWith("/settings")
-          : path === "/more" || [...LOOKS, ...VIEWS].some((v) => path.startsWith(v.to)) || path.startsWith("/threads") || path.startsWith("/t/");
+        ? path === "/" || path === "/w" || (path.startsWith("/w/") && path !== "/w/search") || path.startsWith("/threads") || path.startsWith("/t/")
+        : path.startsWith("/settings") || path === "/more" || path.startsWith("/commands") || [...LOOKS, ...VIEWS].some((v) => path.startsWith(v.to));
   const toggleNotify = notifyToggle(notifyOn, setNotify);
   const menuBody = <MenuBody path={path} theme={theme} onTheme={toggleTheme} notifyOn={notifyOn} onNotify={toggleNotify} />;
 
@@ -289,33 +295,25 @@ export default function V3Shell() {
             <Link to="/w" className="logo" aria-label="agent-monitor home" title="agent-monitor" />
             <Link to="/w" className={`rb ${placeOn("work") ? "on" : ""}`} title={`Threads (g h)${need ? ` · ${need} need you` : ""}`}>
               <NavIcon name="threads" />
-              Threads{need > 0 && <i className="nd" aria-label={`${need} need you`} />}
+              Threads
+            </Link>
+            <Link to="/needs" className={`rb ${placeOn("needs") ? "on" : ""}`} title={`Needs you (g a)${need ? ` · ${need} waiting` : ""}${nt.unread ? ` · ${nt.unread} unread` : ""}`}>
+              <NavIcon name="needs" />
+              Needs you{need > 0 ? <em className="un">{need > 99 ? "99+" : need}</em> : nt.unread > 0 && <i className="nd" aria-label={`${nt.unread} unread`} />}
             </Link>
             <Link to="/w/search" className={`rb ${path === "/w/search" ? "on" : ""}`} title="Search every transcript (⌘K for the quick search)">
               <NavIcon name="search" />
               Search
             </Link>
-            <Link to="/notifications" className={`rb ${placeOn("alerts") ? "on" : ""}`} title={`Notifications (g a)${nt.unread ? ` · ${nt.unread} unread` : ""}`}>
-              <NavIcon name="alerts" />
-              Alerts{nt.unread > 0 && <em className="un">{nt.unread > 99 ? "99+" : nt.unread}</em>}
-            </Link>
-            <Link to="/settings/devices" className={`rb ${placeOn("settings") ? "on" : ""}`} title="Devices, notifications, limits">
+            <Link to="/settings" className={`rb ${placeOn("settings") ? "on" : ""}`} title="Settings, rules and the other views">
               <NavIcon name="settings" />
               Settings
             </Link>
             <span className="sp" />
-            <button className={`rb sm ${menu === "more" || placeOn("more") ? "on" : ""}`} data-menu onClick={() => setMenu(menu === "more" ? null : "more")} aria-haspopup="menu" aria-expanded={menu === "more"}>
-              More
-            </button>
             <span className="lv" title={`${liveCount} live sessions · daemon ${live.connected ? "connected" : "offline"}`}>
               <span className={`dot ${live.connected ? "d-ok" : "d-err"}`} />
               {live.connected ? "live" : "offline"}
             </span>
-            {menu === "more" && (
-              <div className="dmenu" role="menu" style={{ left: 70, bottom: 40 }}>
-                {menuBody}
-              </div>
-            )}
           </nav>
           <div className="main">
             {/* An open chat has its own bar with Back and a menu; two bars cost the phone a tenth of its height. */}
@@ -343,16 +341,16 @@ export default function V3Shell() {
         </div>
         <nav className="tabbar" aria-label="Places">
           <Link to="/w" className={placeOn("work") ? "on" : ""}>
-            <span className="ti"><NavIcon name="threads" /></span>Threads{need > 0 && <i className="nd" aria-label={`${need} need you`} />}
+            <span className="ti"><NavIcon name="threads" /></span>Threads
+          </Link>
+          <Link to="/needs" className={placeOn("needs") ? "on" : ""} aria-label={`Needs you${need ? `, ${need} waiting` : ""}`}>
+            <span className="ti"><NavIcon name="needs" /></span>Needs you{need > 0 ? <span className="bd un">{need > 99 ? "99+" : need}</span> : nt.unread > 0 && <i className="nd" aria-label={`${nt.unread} unread`} />}
           </Link>
           <Link to="/w/search" className={path === "/w/search" ? "on" : ""}>
             <span className="ti"><NavIcon name="search" /></span>Search
           </Link>
-          <Link to="/notifications" className={placeOn("alerts") ? "on" : ""} aria-label={`Alerts${nt.unread ? `, ${nt.unread} unread` : ""}`}>
-            <span className="ti"><NavIcon name="alerts" /></span>Alerts{nt.unread > 0 && <span className="bd un">{nt.unread > 99 ? "99+" : nt.unread}</span>}
-          </Link>
-          <Link to="/more" className={placeOn("more") || placeOn("settings") ? "on" : ""}>
-            <span className="ti"><NavIcon name="more" /></span>More
+          <Link to="/settings" className={placeOn("settings") ? "on" : ""}>
+            <span className="ti"><NavIcon name="settings" /></span>Settings
           </Link>
         </nav>
         {pal && <Palette initial={pal} onClose={() => setPal(null)} />}

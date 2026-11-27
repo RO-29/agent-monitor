@@ -46,9 +46,15 @@ struct PermissionsView: View {
                     }
                 }
             }
-            .navigationTitle("Approvals")
+            .navigationTitle("Needs you")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { ConnectionChip(onlyWhenDown: true) }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { store.needsRecent = true } label: {
+                        Label(store.alertsUnread > 0 ? "Recent (\(store.alertsUnread))" : "Recent", systemImage: "bell")
+                    }
+                    .accessibilityLabel(store.alertsUnread > 0 ? "Recent alerts, \(store.alertsUnread) unread" : "Recent alerts")
+                }
                 ToolbarItem(placement: .topBarTrailing) { ComposeButton() }
             }
             .refreshable { await store.hydrate() }

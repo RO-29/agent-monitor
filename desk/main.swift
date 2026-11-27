@@ -217,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     @objc func goSearch() { front?.go("/w/search") }
     @objc func findInToolbar() { front?.focusSearch() }
     @objc func goNew() { front?.go("/w/new") }
-    @objc func goAlerts() { front?.go("/notifications") }
+    @objc func goAlerts() { front?.go("/needs") }
     @objc func goSettings() { front?.go("/settings") }
     @objc func attach() { if let w = front { w.attach() } else { NSSound.beep() } }
     @objc func toggleNotifications() { notifier.enabled.toggle() }
@@ -421,8 +421,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
             mine("Forward", #selector(forward), "]"),
             .separator(),
             mine("Threads", #selector(goThreads), "1"),
-            mine("Search", #selector(goSearch), "2"),
-            mine("Alerts", #selector(goAlerts), "3"),
+            mine("Needs you", #selector(goAlerts), "2"),
+            mine("Search", #selector(goSearch), "3"),
             mine("Settings", #selector(goSettings), "4"),
             .separator(),
         ] + menuItems(.more))

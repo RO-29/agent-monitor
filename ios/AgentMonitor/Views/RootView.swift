@@ -11,15 +11,14 @@ struct RootView: View {
                 .badge(store.needsYouThreadCount)
                 .tag(AppTab.threads)
 
-            PermissionsView()
-                .tabItem { Label("Approvals", systemImage: "checkmark.shield") }
+            Group { if store.needsRecent { AlertsView() } else { PermissionsView() } }
+                .tabItem { Label("Needs you", systemImage: "tray") }
                 .badge(store.approvalsCount + store.remoteNeedCount)
                 .tag(AppTab.approvals)
 
-            AlertsView()
-                .tabItem { Label("Alerts", systemImage: "bell") }
-                .badge(store.alertsUnread)
-                .tag(AppTab.alerts)
+            SearchTabView()
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(AppTab.search)
 
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
@@ -121,7 +120,7 @@ enum DebugRoute {
                     }
                 }
             }
-        case "alerts": store.tab = .alerts
+        case "alerts": store.needsRecent = true; store.tab = .approvals
         case "new":
             store.tab = .threads
             store.showNewThread = true

@@ -48,9 +48,12 @@ struct AlertsView: View {
                     }
                 }
             }
-            .navigationTitle("Alerts")
+            .navigationTitle("Recent")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { ConnectionChip(onlyWhenDown: true) }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { store.needsRecent = false } label: { Label("Waiting", systemImage: "chevron.left") }
+                        .labelStyle(.titleAndIcon)
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) { menu; ComposeButton() }
             }
             .refreshable { await store.loadAlerts() }

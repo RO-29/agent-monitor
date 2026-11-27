@@ -36,7 +36,7 @@ const WiringPage = lazy(() => import("./views/settings/Wiring"));
 const CommandsPage = lazy(() => import("./views/Commands"));
 const TemplatesPage = lazy(() => import("./views/settings/Templates"));
 const SchedulesPage = lazy(() => import("./views/settings/Schedules"));
-const NotificationsPage = lazy(() => import("./views/Notifications"));
+const NeedsPage = lazy(() => import("./views/Needs"));
 
 /** /t/{id} of a driven thread opens it in the Workspace, so every old link lands in the right place. */
 function ThreadOrWork() {
@@ -119,7 +119,9 @@ export default function V3App() {
         <Route path="/inbox" element={<Navigate to="/w" replace />} />
         <Route path="/inbox/:list" element={<Inbox />} />
         <Route path="/t/:threadId" element={<ThreadOrWork />} />
-        <Route path="/notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
+        <Route path="/needs" element={<Suspense fallback={null}><NeedsPage /></Suspense>} />
+        <Route path="/needs/recent" element={<Suspense fallback={null}><NeedsPage /></Suspense>} />
+        <Route path="/notifications" element={<Navigate to="/needs/recent" replace />} />
         <Route path="/board" element={<Board />} />
         <Route path="/timeline" element={<Timeline />} />
         <Route path="/traces/:sessionId/:turn" element={<TracePage />} />
@@ -130,7 +132,7 @@ export default function V3App() {
         <Route path="/intel" element={<Intel />} />
         <Route path="/rules" element={<Rules />} />
         <Route path="/more" element={<MorePage />} />
-        <Route path="/settings" element={<Navigate to="/settings/devices" replace />} />
+        <Route path="/settings" element={<MorePage />} />
         <Route
           path="/settings/devices"
           element={

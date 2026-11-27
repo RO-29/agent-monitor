@@ -3,7 +3,7 @@ import Observation
 import UIKit
 
 enum AppTab: Hashable {
-    case threads, approvals, alerts, settings
+    case threads, approvals, search, settings
 }
 
 /// Screens pushed inside the Settings tab.
@@ -103,6 +103,8 @@ final class AppStore {
 
     // Navigation state shared by tabs, so an alert can open a thread.
     var tab: AppTab = .threads
+    /// The Needs you tab shows the recent alerts instead of the waiting requests.
+    var needsRecent = false
     var workspacePath: [String] = []
     var settingsPath: [SettingsRoute] = []
 
@@ -368,11 +370,13 @@ final class AppStore {
             showNewThread = false
             approvalSheet = nil
             focusApproval = id
+            needsRecent = false
             tab = .approvals
         case .alerts:
             showNewThread = false
             approvalSheet = nil
-            tab = .alerts
+            needsRecent = true
+            tab = .approvals
         case .web(let u):
             UIApplication.shared.open(u)
         }

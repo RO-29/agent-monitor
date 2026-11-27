@@ -164,7 +164,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private func link(_ n: NotifyItem) -> String {
         if let t = n.threadId, !t.isEmpty { return "/w/" + (t.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? t) }
         if let u = n.url, !u.isEmpty { return u }
-        return "/notifications"
+        return "/needs/recent"
     }
 
     private func post(_ n: NotifyItem) {
@@ -237,7 +237,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler done: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
-        let link = info["link"] as? String ?? "/notifications"
+        let link = info["link"] as? String ?? "/needs/recent"
         let approval = info["approval"] as? String ?? ""
         DispatchQueue.main.async {
             switch response.actionIdentifier {

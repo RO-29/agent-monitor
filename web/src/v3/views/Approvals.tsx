@@ -92,18 +92,20 @@ function toReq(it: NeedsYouItem, live: Map<string, Approval>): Req | null {
   return null;
 }
 
-export default function ApprovalsPage() {
+/** embedded: inside the shell's Needs you page, which already runs the live feed and the secret dock. */
+export default function ApprovalsPage({ embedded = false }: { embedded?: boolean }) {
   const peerFeed = usePeerFeed();
-  useEffect(startV3Live, []);
+  useEffect(() => (embedded ? undefined : startV3Live()), [embedded]);
   const [theme, toggleTheme] = useTheme();
   useEffect(() => {
+    if (embedded) return;
     try {
       if (localStorage.getItem("agent-monitor-theme") === null && window.matchMedia?.("(prefers-color-scheme: light)").matches) setTheme("light");
     } catch {
       /* storage off */
     }
   }, []);
-  useEffect(() => { native("theme", theme); }, [theme]);
+  useEffect(() => { if (!embedded) native("theme", theme); }, [theme, embedded]);
   const v = useV3();
   const live = useLive();
   useTick(true, 30_000);
@@ -266,8 +268,8 @@ export default function ApprovalsPage() {
   const loading = ny.status === "loading";
 
   return (
-    <div className={`v3 apv ${inMac() ? "apv-mac" : ""}`}>
-      <header className="apv-top">
+    <div className={`v3 apv ${inMac() ? "apv-mac" : ""} ${embedded ? "apv-emb" : ""}`}>
+      {!embedded && <header className="apv-top">
         <span className={`dot ${live.connected ? "d-ok" : "d-err"}`} title={live.connected ? "Live" : "Reconnecting"} />
         <b>Needs you</b>
         {shown.length > 0 && <span className="apv-count">{shown.length}</span>}
@@ -279,9 +281,9 @@ export default function ApprovalsPage() {
         <button className="btn sm ghost" onClick={toggleTheme} title={theme === "dark" ? "Light theme" : "Dark theme"} aria-label="Switch theme">
           {theme === "dark" ? "☀" : "☾"}
         </button>
-      </header>
+      </header>}
       <main className="apv-body">
-        <SecretCards />
+        {!embedded && <SecretCards />}
         {ny.error && <div className="apv-warn xs">{ny.status === "ok" ? "Showing the last list; the daemon did not answer" : "Could not read the list"}: {ny.error}</div>}
         {cur ? (
           <Focus key={cur.key} req={cur} title={titleOf(cur)} pos={shown.indexOf(cur) + 1} total={shown.length} commit={commitFor(cur.key)} acts={acts} error={failed[cur.key]} />

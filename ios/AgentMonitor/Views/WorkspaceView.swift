@@ -379,7 +379,7 @@ struct ThreadRow: View {
 }
 
 /// Home search, below the thread matches: prompts that hold the words, each opening its thread.
-private struct MessageSearchRows: View {
+struct MessageSearchRows: View {
     @Environment(AppStore.self) private var store
     let query: String
     @State private var hits: [PromptRun] = []

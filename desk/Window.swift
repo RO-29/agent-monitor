@@ -35,12 +35,12 @@ extension NSToolbarItem.Identifier {
 }
 
 // Toolbar sections in order; the index is the segment.
-let kSections: [(title: String, path: String)] = [("Threads", "/w"), ("Search", "/w/search"), ("Alerts", "/notifications"), ("Settings", "/settings")]
+let kSections: [(title: String, path: String)] = [("Threads", "/w"), ("Needs you", "/needs"), ("Search", "/w/search"), ("Settings", "/settings")]
 
 func sectionIndex(_ path: String) -> Int {
-    if path == "/w/search" { return 1 }
-    if path.hasPrefix("/notifications") { return 2 }
-    if path.hasPrefix("/settings") { return 3 }
+    if path.hasPrefix("/needs") || path.hasPrefix("/notifications") { return 1 }
+    if path == "/w/search" { return 2 }
+    if path.hasPrefix("/settings") || path == "/more" || path.hasPrefix("/rules") { return 3 }
     if path == "/" || path == "/w" || path.hasPrefix("/w/") { return path == "/w/new" ? -1 : 0 }
     return -1
 }

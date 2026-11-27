@@ -15,7 +15,7 @@ export default function Rules() {
     <div className="view pad sx">
       <div className="viewhead">
         <div>
-          <h2>Rules</h2>
+          <h2>Approval rules</h2>
           <p>How the daemon answers approval requests: rules first, then the hold window. Answers land in the audit log with the surface that gave them.</p>
         </div>
       </div>
