@@ -49,7 +49,7 @@ func TestSafeKeyNamesAllowMenuKeysOnly(t *testing.T) {
 			t.Errorf("%q must be allowed", k)
 		}
 	}
-	for _, k := range []string{"!", "0x21", "U+0021", "ls -la", "y;", "Enter;", ""} {
+	for _, k := range []string{"!", "0x21", "U+0021", "ls -la", "y;", "Enter;", "", "C-z", "C-g", "M-x"} {
 		if safeKeyName(k) {
 			t.Errorf("%q must need admin", k)
 		}

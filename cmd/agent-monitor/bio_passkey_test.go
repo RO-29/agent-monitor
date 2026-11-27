@@ -141,8 +141,11 @@ func TestBioPolicyGatesTerminalPromptAnswers(t *testing.T) {
 	if needs, risk, _ := bioPolicy(post("/api/session/prompt/s1", `{"answer":"yes"}`), LevelControl); !needs || risk != "high" {
 		t.Fatalf("a yes to a terminal prompt must need a signature: %v %q", needs, risk)
 	}
-	if !plainDeny(post("/api/session/prompt/s1", `{"answer":"no"}`)) || !plainDeny(post("/api/session/prompt/s1", `{"answer":"dismiss"}`)) {
-		t.Fatal("no and dismiss run nothing, so they must pass without a signature")
+	if !plainDeny(post("/api/session/prompt/s1", `{"answer":"no"}`)) {
+		t.Fatal("no runs nothing, so it must pass without a signature")
+	}
+	if plainDeny(post("/api/session/prompt/s1", `{"answer":"dismiss"}`)) {
+		t.Fatal("dismiss lifts the gate on keys and send, so it must be signed")
 	}
 	if plainDeny(post("/api/session/prompt/s1", `{"answer":"yes"}`)) {
 		t.Fatal("yes is not a deny")

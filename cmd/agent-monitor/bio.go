@@ -429,12 +429,13 @@ func sessionWaitsForPermission(id string) bool {
 // plainDeny: a deny cannot run anything, so a lock-screen Deny works without Face ID.
 func plainDeny(r *http.Request) bool {
 	p := r.URL.Path
+	// Only "no": a dismiss marks the session running, which would lift the gate on keys and send.
 	if strings.HasPrefix(p, "/api/session/prompt/") {
 		body, err := readBody(r)
 		var in struct {
 			Answer string `json:"answer"`
 		}
-		return err == nil && json.Unmarshal(body, &in) == nil && (in.Answer == "no" || in.Answer == "dismiss")
+		return err == nil && json.Unmarshal(body, &in) == nil && in.Answer == "no"
 	}
 	if strings.HasPrefix(p, "/api/secrets/") && strings.HasSuffix(p, "/answer") {
 		body, err := readBody(r)

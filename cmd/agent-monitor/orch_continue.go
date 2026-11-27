@@ -173,7 +173,7 @@ func (m *OrchManager) continueRoute(mux *http.ServeMux) {
 			orchWriteErr(w, orchBadRequest("bad json"))
 			return
 		}
-		if denyNoApprovals(w, r, "", in.PermissionMode, "") {
+		if denyNoApprovals(w, r, "", in.PermissionMode, "") || denyBang(w, r, in.Prompt) {
 			return
 		}
 		th, created, err := m.Continue(in)

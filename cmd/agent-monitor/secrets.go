@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -159,8 +160,12 @@ func serveOnce(dir string, val []byte, ttl time.Duration) (string, func(), error
 		if f == nil {
 			return
 		}
+		// Back to blocking: on darwin Go does not poll a FIFO, so a non-blocking write could stop short.
+		_ = syscall.SetNonblock(int(f.Fd()), false)
 		if !expired.Swap(true) {
-			_, _ = f.Write(val)
+			if _, err := f.Write(val); err != nil {
+				log.Printf("secret pipe: write failed: %v", err)
+			}
 		}
 		f.Close()
 		t.Stop()

@@ -23,7 +23,8 @@ let kTouchIDScript = """
     let body = {};
     try { body = JSON.parse(raw || "{}"); } catch (e) {}
     const deny = body.behavior ? body.behavior === "deny" : body.decision === "deny";
-    if (deny || body.type === "decline" || body.answer === "no" || body.answer === "dismiss") return orig(input, init);
+    const promptNo = url.pathname.includes("/session/prompt/") && body.answer === "no";
+    if (deny || body.type === "decline" || promptNo) return orig(input, init);
     // One Touch ID sheet at a time: a second prompt would cancel the first.
     const ask = line.then(() => h.postMessage(url.pathname.includes("/secrets/") ? "give a secret to an agent" : "approve an agent request"));
     line = ask.catch(() => {});

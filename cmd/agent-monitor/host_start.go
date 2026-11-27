@@ -177,7 +177,7 @@ func serveOrchTerminal(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "args are accepted from this machine only"})
 		return
 	}
-	if denyNoApprovals(w, r, in.ApprovalPolicy, in.PermissionMode, in.Sandbox) {
+	if denyNoApprovals(w, r, in.ApprovalPolicy, in.PermissionMode, in.Sandbox) || denyBang(w, r, in.Prompt) {
 		return
 	}
 	in.Origin = requestOrigin(r)

@@ -323,8 +323,8 @@ func CapturePane(paneID string, lines int, plain bool) (string, error) {
 	return string(out), nil
 }
 
-// safeKeyNameRE: keys a caller below admin may send. No "!", no hex or Unicode codes, no multi-character text.
-var safeKeyNameRE = regexp.MustCompile(`^([A-Za-z0-9 .,:/?=+_-]|Enter|Escape|Tab|BTab|BSpace|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|PPage|NPage|DC|C-[a-z]|M-[a-z])$`)
+// safeKeyNameRE: keys a caller below admin may send. No "!", no codes, no text, no C-z or C-g that reach a shell or editor.
+var safeKeyNameRE = regexp.MustCompile(`^([A-Za-z0-9 .,:/?=+_-]|Enter|Escape|Tab|BTab|BSpace|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|PPage|NPage|DC|C-c|C-u|C-l)$`)
 
 func safeKeyName(k string) bool { return safeKeyNameRE.MatchString(k) }
 
