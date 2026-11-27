@@ -36,7 +36,7 @@ func TestTmuxBadgerChangesOnlyItsOwnWindows(t *testing.T) {
 }
 
 func TestTmuxLitKeepsATrailingSemicolon(t *testing.T) {
-	for in, want := range map[string]string{"abc;": `abc\;`, ";": `\;`, `x\;`: `x\;`, "Enter": "Enter", "a;b": "a;b"} {
+	for in, want := range map[string]string{"abc;": `abc\;`, ";": `\;`, `x\;`: `x\\;`, "Enter": "Enter", "a;b": "a;b"} {
 		if got := tmuxLit(in); got != want {
 			t.Errorf("tmuxLit(%q) = %q, want %q", in, got, want)
 		}
