@@ -187,6 +187,7 @@ impl Mcp {
             "register_self" => return self.register_self(id),
             "search_sessions" => return self.search_sessions(&args, id),
             "session_context" => return self.session_context(&args, id),
+            "request_secret" => return self.request_secret(&args, id),
             "permission_prompt" => {}
             _ => {
                 logf(format!("tools/call: unknown tool {}", go_quote(&name)));
@@ -249,6 +250,39 @@ impl Mcp {
         }
         logf(format!("decision for {}: {} ({})", reg_id, dec.behavior, dec.reason));
         perm_result(id, &dec);
+    }
+
+    // request_secret: the person answers on a private card; the value comes back as a pipe that gives it out once.
+    fn request_secret(&self, args: &Json, id: &Json) {
+        let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+        if name.is_empty() {
+            return text(id, "request_secret: 'name' is required, for example \"staging DB password\"", None, true);
+        }
+        let reason = args.get("reason").and_then(|v| v.as_str()).unwrap_or("");
+        let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        let body = m(vec![("name", s(&name)), ("reason", s(reason)), ("url", s(url)), ("agent", s(&self.self_agent_id())), ("cwd", s(&util::go_getwd()))]);
+        let reg = match http::post_json(&(self.daemon.clone() + "/api/secrets/request"), body.encode().as_bytes()) {
+            Ok(r) => r,
+            Err(e) => return text(id, &format!("request_secret: {}", e), None, true),
+        };
+        let rid = reg.fstr("id");
+        let wr = match http::request("GET", &format!("{}/api/secrets/{}/await?timeout=600", self.daemon, rid), None, Some(Duration::from_secs(11 * 60))) {
+            Ok(r) => r,
+            Err(e) => return text(id, &format!("request_secret: wait failed: {}", e), None, true),
+        };
+        let dec = crate::json::parse(&wr.body, false).unwrap_or(Json::Null);
+        let (state, file) = (dec.fstr("state"), dec.fstr("file"));
+        let msg = match state.as_str() {
+            "saved" if !file.is_empty() => format!(
+                "The user gave the secret. It is in {file}, a pipe that gives the value ONCE and is gone after 10 minutes. \
+                 Read it only inside the one command that needs it, best on stdin: `cmd --password-stdin < {file}`, or `cmd \"$(cat {file})\"`. \
+                 Never print it, echo it, write it to a file, or put it in your reply. If the command fails, call request_secret again."
+            ),
+            "declined" => "The user declined. Do not ask for it in chat or another way; say what is blocked and go on without it.".to_string(),
+            "timed_out" => "No answer in 10 minutes. Do not ask in chat; call request_secret again only if it is still needed.".to_string(),
+            other => format!("The secret card ended ({}). Do not ask in chat.", if other.is_empty() { "no answer" } else { other }),
+        };
+        text(id, &msg, Some(m(vec![("state", s(&state)), ("file", s(&file))])), state != "saved")
     }
 
     // ── agent coordination tools ──
@@ -1045,6 +1079,19 @@ fn base_tools() -> Vec<Json> {
             "permission_prompt",
             "Forward a Claude Code tool-use permission prompt to the agent-monitor browser UI for approval.",
             obj_schema(vec![("tool_name", m(vec![("type", s("string"))])), ("input", m(vec![("type", s("object"))])), ("tool_use_id", m(vec![("type", s("string"))]))], &["tool_name"]),
+        ),
+        tool(
+            "request_secret",
+            "Ask the user for a secret (a password, token, API key, PIN) on a private card in agent-monitor (phone, web, Mac app); never ask for one in chat. \
+             One value per call. The user confirms with Face ID, Touch ID or a passkey. Returns a pipe path that gives the value once: use it inside the command that needs it, never print it.",
+            obj_schema(
+                vec![
+                    ("name", prop("string", "what the secret is, for example \"staging DB password\" (at most 80 characters)")),
+                    ("reason", prop("string", "why you need it and the command that will use it")),
+                    ("url", prop("string", "an https page where the user can get or make the secret (optional)")),
+                ],
+                &["name"],
+            ),
         ),
         tool("who_am_i", "Return this agent's registered id, alias, tool, and tmux pane id. Useful when you want to identify yourself before talking to other agents.", empty_schema()),
         tool("list_agents", "List every agent registered with agent-monitor (yourself + others). Auto-registers your own pane if it's missing. When relaying to the user, ALWAYS show the raw markdown table from the response unchanged — do NOT summarize as 'N agents in panes %0 and %3'. The user needs to see each agent's id, tool, cwd, and pane to address them.", empty_schema()),

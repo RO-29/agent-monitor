@@ -63,6 +63,10 @@ var accessRules = []accessRule{
 	// Inputs that only processes on this Mac send: hooks, agent and host registration, permission servers.
 	{"", "/events/", "", levelLocal},
 	{"", "/api/approvals/hook/", "", levelLocal},
+	{"POST", "/api/secrets/request$", "", levelLocal}, // only the MCP helper on this Mac opens a card
+	{"GET HEAD", "/api/secrets/", "/await", levelLocal},
+	{"POST", "/api/secrets/", "/answer", LevelControl},
+	{"GET HEAD", "/api/secrets$", "", LevelView},
 	{"", "/api/pane/announce$", "", levelLocal},
 	{"", "/api/session/owner/", "", levelLocal},
 	{"POST", "/api/hosts$", "", levelLocal},

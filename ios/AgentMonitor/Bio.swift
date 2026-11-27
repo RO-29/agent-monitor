@@ -53,6 +53,7 @@ enum Bio {
     /// A readable reason for the Face ID prompt.
     static func reason(for req: URLRequest) -> String {
         let p = req.url?.path ?? ""
+        if p.hasPrefix("/api/secrets/") { return "Give a secret to an agent" }
         if p.hasSuffix("/decide") || p.hasSuffix("/respond") || p.hasSuffix("/answer") || p.contains("/keys/") || p.contains("/send/") { return "Approve an agent request" }
         return "Change a setting on the Mac"
     }

@@ -14,6 +14,7 @@ struct PermissionsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if let error { InlineError(message: error).padding(.horizontal, 4) }
+                    SecretCardsSection()
                     ForEach(items) { it in
                         card(it)
                             .id(focusID(it))

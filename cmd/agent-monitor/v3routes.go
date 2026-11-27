@@ -16,6 +16,7 @@ func registerV3Routes(mux *http.ServeMux) {
 	registerSearchRoutes(mux)   // search.go
 	registerOpsRoutes(mux)      // ops.go: child links, cross-agent traces, monitors, intel
 	registerDeviceRoutes(mux)   // devices.go: per-device tokens
+	registerSecretRoutes(mux)   // secrets.go: request_secret cards
 	registerTermRoutes(mux)     // term.go: browser terminals on a pty
 	registerHostRoutes(mux)     // host_registry.go: session hosts and terminal sessions
 	registerUsageRoutes(mux)    // usage_limits.go: plan usage windows and local token totals

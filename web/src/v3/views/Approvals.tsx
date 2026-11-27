@@ -1,6 +1,7 @@
 // /approvals: the request queue that agent-monitor.app shows by itself when an agent waits for you.
 // The list is GET /api/needs-you and nothing else, so it matches every other surface.
 import { PeerNeedsBox, usePeerFeed } from "./peers";
+import { SecretCards } from "./SecretCards";
 import { settleThread } from "../api/orch";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { setTheme, useTheme } from "../../app/prefs";
@@ -280,6 +281,7 @@ export default function ApprovalsPage() {
         </button>
       </header>
       <main className="apv-body">
+        <SecretCards />
         {ny.error && <div className="apv-warn xs">{ny.status === "ok" ? "Showing the last list; the daemon did not answer" : "Could not read the list"}: {ny.error}</div>}
         {cur ? (
           <Focus key={cur.key} req={cur} title={titleOf(cur)} pos={shown.indexOf(cur) + 1} total={shown.length} commit={commitFor(cur.key)} acts={acts} error={failed[cur.key]} />

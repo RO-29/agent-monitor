@@ -121,6 +121,19 @@ func serveMCP(stdin io.Reader, stdout io.Writer, daemonURL string, orch mcpOrch,
 							},
 						},
 						{
+							"name":        "request_secret",
+							"description": "Ask the user for a secret (a password, token, API key, PIN) on a private card in agent-monitor (phone, web, Mac app); never ask for one in chat. One value per call. The user confirms with Face ID, Touch ID or a passkey. Returns a pipe path that gives the value once: use it inside the command that needs it, never print it.",
+							"inputSchema": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":   map[string]any{"type": "string", "description": "what the secret is, for example \"staging DB password\" (at most 80 characters)"},
+									"reason": map[string]any{"type": "string", "description": "why you need it and the command that will use it"},
+									"url":    map[string]any{"type": "string", "description": "an https page where the user can get or make the secret (optional)"},
+								},
+								"required": []string{"name"},
+							},
+						},
+						{
 							"name":        "who_am_i",
 							"description": "Return this agent's registered id, alias, tool, and tmux pane id. Useful when you want to identify yourself before talking to other agents.",
 							"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},

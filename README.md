@@ -330,6 +330,14 @@ device can decide the same session's low and medium approvals for 10 minutes (*T
 shows Face ID, Passkey or Trusted next to it; a click checks the stored signature again
 (`GET /api/approvals/{id}/proof`).
 
+**Secrets for agents.** An agent calls the MCP tool `request_secret` (name, reason, optional https
+link) instead of asking for a password in chat. A card shows on the Approvals page, in the iPhone app and
+in the Mac app. *Give secret* needs Face ID, Touch ID or a passkey on a device that has one; *Decline*
+needs none. The daemon puts the value in a named pipe that gives it out once and is gone after one read
+or 10 minutes, so it never goes into the chat, a transcript or the disk. The agent reads it inside the
+command, best on stdin: `cmd --password-stdin < <pipe>`. An agent can still print what it reads, so
+give secrets only to agents you trust with them.
+
 **Phone alerts when you leave the Mac.** While the Mac screen is unlocked and you used it in the last
 2 minutes, web push and Bark alerts wait. They go out when the screen locks or the Mac is idle, unless
 you answered them first. Settings, Notifications, *Only when I leave the Mac* turns this off.

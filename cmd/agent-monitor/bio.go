@@ -302,7 +302,8 @@ func bioPolicy(r *http.Request, need Level) (bool, string, string) {
 		return riskNeedsBio(risk), risk, sess
 	case strings.HasPrefix(p, "/api/hosts/") && strings.HasSuffix(p, "/answer"),
 		strings.HasPrefix(p, "/api/session/") && strings.HasSuffix(p, "/answer"),
-		p == "/api/orch/terminal":
+		p == "/api/orch/terminal",
+		strings.HasPrefix(p, "/api/secrets/") && strings.HasSuffix(p, "/answer"):
 		return true, "high", ""
 	case strings.HasPrefix(p, "/api/session/keys/"):
 		return sessionWaitsForPermission(strings.TrimPrefix(p, "/api/session/keys/")), "high", ""
@@ -425,6 +426,13 @@ func sessionWaitsForPermission(id string) bool {
 // plainDeny: a deny cannot run anything, so a lock-screen Deny works without Face ID.
 func plainDeny(r *http.Request) bool {
 	p := r.URL.Path
+	if strings.HasPrefix(p, "/api/secrets/") && strings.HasSuffix(p, "/answer") {
+		body, err := readBody(r)
+		var in struct {
+			Type string `json:"type"`
+		}
+		return err == nil && json.Unmarshal(body, &in) == nil && in.Type == "decline"
+	}
 	if !(strings.HasPrefix(p, "/api/approvals/") && strings.HasSuffix(p, "/decide")) && !(strings.HasPrefix(p, "/api/permission/") && strings.HasSuffix(p, "/respond")) {
 		return false
 	}

@@ -11,7 +11,7 @@ let kTouchIDScript = """
   const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.amTouchID;
   if (!h || window.__amTouchID) return;
   window.__amTouchID = true;
-  const gated = /(approvals\\/[^/]+\\/decide|permission\\/[^/]+\\/respond|hosts\\/[^/]+\\/answer|session\\/[^/]+\\/answer)$/;
+  const gated = /(approvals\\/[^/]+\\/decide|permission\\/[^/]+\\/respond|hosts\\/[^/]+\\/answer|session\\/[^/]+\\/answer|secrets\\/[^/]+\\/answer)$/;
   const orig = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
@@ -19,8 +19,8 @@ let kTouchIDScript = """
     if (method !== "POST" || !gated.test(url.pathname)) return orig(input, init);
     let body = {};
     try { body = JSON.parse((init && typeof init.body === "string") ? init.body : "{}"); } catch (e) {}
-    if (body.behavior === "deny" || body.decision === "deny") return orig(input, init);
-    const ok = await h.postMessage("approve an agent request");
+    if (body.behavior === "deny" || body.decision === "deny" || body.type === "decline") return orig(input, init);
+    const ok = await h.postMessage(url.pathname.includes("/secrets/") ? "give a secret to an agent" : "approve an agent request");
     if (ok !== true) throw new Error("Touch ID was not confirmed");
     return orig(input, init);
   };
