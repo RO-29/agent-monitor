@@ -88,6 +88,7 @@ export function Palette({ initial, onClose }: { initial: { q?: string; scope?: s
     if (!q) {
       setRes(null);
       setErr("");
+      setLoading(false);
       return;
     }
     let alive = true;

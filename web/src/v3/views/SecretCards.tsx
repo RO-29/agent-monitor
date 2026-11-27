@@ -1,6 +1,7 @@
 // Secret cards: an agent's request_secret. The value goes to the daemon only, which hands it to the agent once.
 import { useEffect, useRef, useState } from "react";
 import { fmtAgo, projectName } from "../../lib/format";
+import { onLiveEvent } from "../../lib/ws";
 
 interface SecretReq {
   id: string;
@@ -17,39 +18,71 @@ async function post(id: string, body: object) {
   if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`);
 }
 
-export function SecretCards() {
+// The live socket sends kind "secret" on each change; the slow poll covers a dropped socket.
+export function SecretCards({ dock = false }: { dock?: boolean }) {
   const [list, setList] = useState<SecretReq[]>([]);
+  const done = useRef(new Set<string>());
   useEffect(() => {
     let stop = false;
+    let busy = false;
     const load = async () => {
+      if (busy || stop) return;
+      busy = true;
       try {
         const r = await fetch("/api/secrets", { credentials: "same-origin", cache: "no-store" });
-        if (r.ok && !stop) setList(((await r.json()).secrets || []) as SecretReq[]);
+        if (r.ok && !stop) setList((((await r.json()).secrets || []) as SecretReq[]).filter((x) => !done.current.has(x.id)));
       } catch {
-        /* the next poll tries again */
+        /* the next event or poll tries again */
       }
+      busy = false;
     };
     void load();
-    const t = setInterval(load, 3000);
+    const off = onLiveEvent((e) => {
+      if ((e as unknown as { kind?: string }).kind === "secret") void load();
+    });
+    const t = setInterval(() => document.hidden || void load(), 15_000);
+    const vis = () => document.hidden || void load();
+    document.addEventListener("visibilitychange", vis);
     return () => {
       stop = true;
+      off();
       clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
     };
   }, []);
   if (!list.length) return null;
+  const finish = (id: string) => {
+    done.current.add(id);
+    setList((l) => l.filter((x) => x.id !== id));
+  };
   return (
-    <div style={{ display: "grid", gap: 10, marginBottom: 12 }} onKeyDown={(e) => e.stopPropagation()}>
+    <div className={dock ? "secret-dock" : undefined} style={{ display: "grid", gap: 10, marginBottom: dock ? 0 : 12 }} onKeyDown={(e) => e.stopPropagation()} aria-live="polite">
       {list.map((s) => (
-        <SecretCard key={s.id} s={s} onDone={() => setList((l) => l.filter((x) => x.id !== s.id))} />
+        <SecretCard key={s.id} s={s} onDone={() => finish(s.id)} />
       ))}
     </div>
   );
+}
+
+function hostOf(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.host : null;
+  } catch {
+    return null;
+  }
 }
 
 function SecretCard({ s, onDone }: { s: SecretReq; onDone: () => void }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // Take focus only when the user is not typing elsewhere, so keystrokes never land in the secret field.
+  useEffect(() => {
+    const a = document.activeElement;
+    if (!a || !a.matches("input, textarea, [contenteditable=true]")) ref.current?.focus();
+  }, []);
+  const host = s.url ? hostOf(s.url) : null;
   const answer = async (save: boolean) => {
     setBusy(true);
     setErr("");
@@ -71,12 +104,12 @@ function SecretCard({ s, onDone }: { s: SecretReq; onDone: () => void }) {
         <span className="xs muted">{fmtAgo(s.createdAt)}</span>
       </div>
       {s.reason && <div className="sm muted">{s.reason}</div>}
-      {s.url && (
+      {s.url && host && (
         <a className="sm" href={s.url} target="_blank" rel="noreferrer noopener">
-          Get it here: {new URL(s.url).host}
+          Get it here: {host}
         </a>
       )}
-      <input ref={ref} className="inp mono" type="password" name={`am-secret-${s.id}`} autoComplete="off" spellCheck={false} placeholder="Secret" aria-label={`Secret: ${s.name}`} autoFocus />
+      <input ref={ref} className="inp mono" type="password" name={`am-secret-${s.id}`} autoComplete="off" spellCheck={false} placeholder="Secret" aria-label={`Secret: ${s.name}`} />
       <div className="row" style={{ gap: 8 }}>
         <button className="btn pri" type="submit" disabled={busy}>
           {busy ? "Sending…" : "Give secret"}

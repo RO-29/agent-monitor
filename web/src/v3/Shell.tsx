@@ -23,6 +23,7 @@ import { buildRows, counts } from "./model";
 import "./styles/v3.css";
 import "./styles/p6.css";
 import { sessionKey, useNeedsYou } from "./api/needsYou";
+import { SecretCards } from "./views/SecretCards";
 
 export const VIEWS: { to: string; label: string; ic: string; key?: string }[] = [
   { to: "/board", label: "Board", ic: "▦", key: "b" },
@@ -334,6 +335,9 @@ export default function V3Shell() {
             </header>
             <Boundary resetKey={path} what="This page">
               <Outlet />
+            </Boundary>
+            <Boundary what="Secret requests">
+              <SecretCards dock />
             </Boundary>
           </div>
         </div>

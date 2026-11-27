@@ -35,7 +35,7 @@ async function header(method: string, url: string, body: string): Promise<string
       timeout: 60_000,
     },
   })) as PublicKeyCredential | null;
-  if (!cred) throw new Error("passkey cancelled");
+  if (!cred) throw new Error("Passkey cancelled. Nothing was sent.");
   const r = cred.response as AuthenticatorAssertionResponse;
   const j = { ts, id, authData: b64u(r.authenticatorData), clientData: b64u(r.clientDataJSON), sig: b64u(r.signature) };
   return b64u(new TextEncoder().encode(JSON.stringify(j)));
@@ -55,9 +55,20 @@ export function installPasskeyFetch() {
     if (!j?.bio) return res;
     const method = (init?.method || "GET").toUpperCase();
     const h = new Headers(init?.headers);
-    h.set("X-AM-Passkey", await header(method, String(input), body));
+    h.set("X-AM-Passkey", await signed(method, String(input), body));
     return orig(input, { ...init, headers: h });
   };
+}
+
+// The browser allows one passkey sheet at a time, so requests that need one wait in line.
+let queue: Promise<unknown> = Promise.resolve();
+function signed(method: string, url: string, body: string): Promise<string> {
+  const run = queue.then(() => header(method, url, body));
+  queue = run.catch(() => undefined);
+  return run.catch((e: Error) => {
+    if (e?.name === "NotAllowedError" || e?.name === "AbortError") throw new Error("Passkey cancelled. Nothing was sent.");
+    throw e;
+  });
 }
 
 /** Makes a passkey on this browser and gives its public key to the Mac. */
@@ -72,7 +83,7 @@ export async function enrollPasskey(name: string) {
       timeout: 60_000,
     },
   })) as PublicKeyCredential | null;
-  if (!cred) throw new Error("passkey cancelled");
+  if (!cred) throw new Error("Passkey cancelled. Nothing was sent.");
   const r = cred.response as AuthenticatorAttestationResponse;
   if (r.getPublicKeyAlgorithm?.() !== -7) throw new Error("this browser made a key type the Mac does not check (it needs ES256)");
   const spki = r.getPublicKey?.();

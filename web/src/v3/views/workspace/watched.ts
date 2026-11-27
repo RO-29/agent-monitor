@@ -270,6 +270,8 @@ export function useWatchedFeed(sessionId: string, threadId: string, running: boo
 
   const apply = (r: WatchedItems, first: boolean) => {
     const s = st.current;
+    // An empty incremental poll changes nothing, so it must not re-render the transcript.
+    if (!first && !r.reset && !r.items?.length && !r.runs?.length && r.cursor === s.cursor && s.loaded) return;
     if (first || r.reset) {
       s.items = new Map();
       s.runs = new Map();

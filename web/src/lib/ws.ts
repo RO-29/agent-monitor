@@ -22,6 +22,7 @@ const eventListeners = new Set<EventListener>();
 let snapshot: LiveState = { ...state };
 let ws: WebSocket | null = null;
 let retryTimer: number | undefined;
+let retryMs = 1500;
 
 function emit() {
   state.version++;
@@ -29,16 +30,28 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+// Only a change to sessions, prompts or talks re-renders live views; other kinds go to event listeners alone.
 function handle(e: WsEvent) {
+  let changed = true;
   switch (e.kind) {
     case "snapshot":
       state.sessions = new Map(e.sessions.map((s) => [s.id, s]));
       break;
-    case "upsert":
+    case "upsert": {
+      const old = state.sessions.get(e.session.id);
+      if (old && JSON.stringify(old) === JSON.stringify(e.session)) {
+        changed = false;
+        break;
+      }
       state.sessions = new Map(state.sessions);
       state.sessions.set(e.session.id, e.session);
       break;
+    }
     case "remove":
+      if (!state.sessions.has(e.id)) {
+        changed = false;
+        break;
+      }
       state.sessions = new Map(state.sessions);
       state.sessions.delete(e.id);
       break;
@@ -59,9 +72,9 @@ function handle(e: WsEvent) {
       state.talks.delete(e.talk.id);
       break;
     default:
-      break;
+      changed = false;
   }
-  emit();
+  if (changed) emit();
   eventListeners.forEach((l) => {
     try {
       l(e);
@@ -80,6 +93,7 @@ export function connectLive() {
     state.perms = new Map();
     state.talks = new Map();
     state.connected = true;
+    retryMs = 1500;
     emit();
   };
   ws.onmessage = (m) => {
@@ -93,7 +107,8 @@ export function connectLive() {
     state.connected = false;
     emit();
     window.clearTimeout(retryTimer);
-    retryTimer = window.setTimeout(connectLive, 1500);
+    retryTimer = window.setTimeout(connectLive, retryMs);
+    retryMs = Math.min(retryMs * 2, 10_000);
   };
   ws.onerror = () => ws?.close();
 }

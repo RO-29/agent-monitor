@@ -72,12 +72,21 @@ export function needsSecond(a: Approval, key: string): boolean {
   return true;
 }
 
+// A key press within this window of the last one is ignored, so a double tap never answers the next request.
+const QUICK_SETTLE_MS = 600;
+let lastQuick = 0;
+const quickBusy = new Set<string>();
+
 /** Keyboard path: allow or always-allow without the card. Questions need the card. */
 export async function quickDecide(a: Approval, how: "allow" | "always") {
+  const now = Date.now();
+  if (now - lastQuick < QUICK_SETTLE_MS || quickBusy.has(a.id)) return;
+  lastQuick = now;
   if (sentToTerminal(a)) return showToast("Sent to the terminal", "Waiting for the terminal to confirm.");
   if (a.kind === "question") return showToast("Pick an answer", "Questions need an option or a typed answer.");
   if (how === "always" && !canAlways(a)) return showToast("No always here", "High-risk, chained or piped commands, questions and plans are answered once.");
   const b: DecideBody = a.kind === "plan" ? { behavior: "allow", updatedInput: a.input } : { behavior: "allow", always: how === "always" || undefined };
+  quickBusy.add(a.id);
   try {
     const r = await v3.decide(a.id, b);
     applyDecision(r && r.id ? r : { ...a, state: "allowed" });
@@ -85,6 +94,8 @@ export async function quickDecide(a: Approval, how: "allow" | "always") {
     if (e instanceof ApiError && e.status === 409) showToast("Already answered", "Another surface or the terminal answered first.");
     else showToast("Decision failed", (e as Error).message, { kind: "alert" });
     void loadApprovals();
+  } finally {
+    quickBusy.delete(a.id);
   }
 }
 

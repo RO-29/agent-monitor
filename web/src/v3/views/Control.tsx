@@ -183,7 +183,7 @@ export default function Control() {
           setSel(n.key);
           requestAnimationFrame(() => document.querySelector(`.ctl [data-key="${CSS.escape(n.key)}"]`)?.scrollIntoView({ block: "nearest" }));
         }
-      } else if (e.key === "Enter" && k.cur) {
+      } else if (e.key === "Enter" && k.cur && !(e.target as Element | null)?.closest?.("button, a, summary, [role=button]")) {
         const id = k.cur.stack ? k.cur.stack.parent : k.cur.key;
         nav(threadHref(id, k.cur.stack ? undefined : k.cur.thread));
       } else if (e.key === "o") k.openPane(k.cur);

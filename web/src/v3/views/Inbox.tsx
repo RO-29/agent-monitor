@@ -75,7 +75,7 @@ export default function Inbox() {
         e.preventDefault();
         const n = flat[Math.max(i - 1, 0)];
         if (n) setSelId(n.id);
-      } else if (e.key === "Enter" && sel) {
+      } else if (e.key === "Enter" && sel && !(e.target as Element | null)?.closest?.("button, a, summary, [role=button]")) {
         nav(threadHref(sel.id, sel.thread));
       } else if ((e.key === "a" || e.key === "A") && sel?.approvals[0]) {
         if (!approvalKeyOk(e)) return;

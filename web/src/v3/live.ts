@@ -109,7 +109,14 @@ export function addMockApprovals(list: Approval[]) {
 }
 
 let apprTimer: number | undefined;
+let apprInflight = false;
+let apprAgain = false;
 export async function loadApprovals() {
+  if (apprInflight) {
+    apprAgain = true;
+    return;
+  }
+  apprInflight = true;
   window.clearTimeout(apprTimer);
   try {
     const r = await v3.approvals();
@@ -120,8 +127,14 @@ export async function loadApprovals() {
   } catch (e) {
     s.apprStatus = isMissing(e) ? "missing" : "error";
     s.apprError = (e as Error).message;
+  } finally {
+    apprInflight = false;
   }
   emit();
+  if (apprAgain) {
+    apprAgain = false;
+    return void loadApprovals();
+  }
   apprTimer = window.setTimeout(loadApprovals, s.apprStatus === "ok" ? 20_000 : 30_000);
 }
 
@@ -152,8 +165,12 @@ export function addMockThreads(t: V3Thread[]) {
 
 let thTimer: number | undefined;
 let thInflight = false;
+let thAgain = false;
 export async function loadThreads() {
-  if (thInflight) return;
+  if (thInflight) {
+    thAgain = true;
+    return;
+  }
   thInflight = true;
   window.clearTimeout(thTimer);
   try {
@@ -180,6 +197,10 @@ export async function loadThreads() {
     thInflight = false;
   }
   emit();
+  if (thAgain) {
+    thAgain = false;
+    return void loadThreads();
+  }
   thTimer = window.setTimeout(loadThreads, 30_000);
 }
 let debounce: number | undefined;
