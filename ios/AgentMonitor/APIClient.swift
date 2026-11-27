@@ -17,12 +17,14 @@ struct APIClient {
 
     static func peer(_ name: String?) -> APIClient { name.map { APIClient(via: $0) } ?? .shared }
 
-    var session: URLSession {
+    /// One shared session, so requests reuse connections instead of a new handshake each time.
+    static let sharedSession: URLSession = {
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = 15
         cfg.waitsForConnectivity = false
         return URLSession(configuration: cfg)
-    }
+    }()
+    var session: URLSession { Self.sharedSession }
 
     func url(_ path: String) throws -> URL {
         let prefix = via.map { "/api/m/" + ($0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))) ?? $0) } ?? ""

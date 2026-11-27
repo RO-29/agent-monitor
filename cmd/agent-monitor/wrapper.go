@@ -71,7 +71,7 @@ func runSendCmd(args []string) {
 			os.Exit(1)
 		}
 		body, _ := json.Marshal(map[string]any{"text": msg, "enter": true})
-		resp, err := http.Post(daemonURL()+"/api/session/send/"+id, "application/json", bytes.NewReader(body))
+		resp, err := http.Post(daemonURL()+"/api/session/send/"+id+"?from=agent", "application/json", bytes.NewReader(body))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agent-monitor send: %v\n", err)
 			os.Exit(1)

@@ -12,7 +12,7 @@ import (
 
 func TestServeOnceGivesTheValueOneTime(t *testing.T) {
 	dir := t.TempDir()
-	path, err := serveOnce(dir, []byte("hunter2"), time.Minute)
+	path, _, err := serveOnce(dir, []byte("hunter2"), time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,10 +24,29 @@ func TestServeOnceGivesTheValueOneTime(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("the pipe is still there after one read: %v", err)
 	}
-	p2, _ := serveOnce(dir, []byte("x"), 50*time.Millisecond)
+	p2, _, _ := serveOnce(dir, []byte("x"), 50*time.Millisecond)
 	time.Sleep(200 * time.Millisecond)
 	if _, err := os.Stat(p2); !os.IsNotExist(err) {
 		t.Fatal("an unread pipe outlived its time")
+	}
+}
+
+func TestServeOnceCancelFreesTheWriter(t *testing.T) {
+	val := []byte("hunter2")
+	path, cancel, err := serveOnce(t.TempDir(), val, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	for string(val) == "hunter2" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if string(val) == "hunter2" {
+		t.Fatal("the writer still holds the secret after cancel")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("the pipe is still there after cancel")
 	}
 }
 

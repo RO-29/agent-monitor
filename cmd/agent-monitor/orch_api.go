@@ -116,8 +116,7 @@ func (m *OrchManager) routes(mux *http.ServeMux) {
 			return
 		}
 		// A thread that runs with no approvals is a shell: admin only.
-		if belowAdmin(r) && (in.ApprovalPolicy == "never" || in.PermissionMode == "auto" || in.PermissionMode == "bypassPermissions" || in.Sandbox == "danger-full-access") {
-			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a thread with no approvals needs admin access"})
+		if denyNoApprovals(w, r, in.ApprovalPolicy, in.PermissionMode, in.Sandbox) {
 			return
 		}
 		th, err := m.CreateThread(in)
@@ -310,4 +309,13 @@ func withoutDriven(in []ThreadV3) []ThreadV3 {
 		}
 	}
 	return out
+}
+
+// denyNoApprovals answers 403 when a caller below admin asks for an agent that runs with no approvals; that agent is a shell.
+func denyNoApprovals(w http.ResponseWriter, r *http.Request, policy, mode, sandbox string) bool {
+	if !belowAdmin(r) || (policy != "never" && mode != "auto" && mode != "bypassPermissions" && sandbox != "danger-full-access") {
+		return false
+	}
+	writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a thread with no approvals needs admin access"})
+	return true
 }

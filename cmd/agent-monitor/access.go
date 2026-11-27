@@ -116,7 +116,7 @@ var accessRules = []accessRule{
 	{"POST", "/api/session/", "/cli-queue/", LevelControl},
 	{"POST", "/api/session/", "/answer", LevelControl},
 	{"POST", "/api/permission/", "/respond", LevelControl},
-	{"", "/api/queue/", "", LevelControl},
+	{"POST PUT PATCH DELETE", "/api/queue/", "", LevelControl},
 	{"POST", "/api/hosts/", "/answer", LevelControl},
 	{"POST", "/api/orch/continue$", "", LevelControl},
 	{"POST", "/api/orch/terminal$", "", LevelControl},

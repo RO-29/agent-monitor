@@ -172,7 +172,9 @@ func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 	paste := asPaste(text)
 	if paste && paneIsClaude(paneID) {
 		paste = false
-		err := typeAsKeys(text, func(t string) error { return exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", t).Run() },
+		err := typeAsKeys(text, func(t string) error {
+			return exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", tmuxLit(t)).Run()
+		},
 			func(k []string) error { return SendKeysToTmuxPane(paneID, k) })
 		if err != nil {
 			return err
@@ -191,7 +193,7 @@ func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 			return err
 		}
 	} else if text != "" {
-		if err := exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", text).Run(); err != nil {
+		if err := exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", tmuxLit(text)).Run(); err != nil {
 			return err
 		}
 	}
@@ -225,8 +227,19 @@ func SendKeysToTmuxPane(paneID string, keys []string) error {
 	if len(keys) == 0 {
 		return errors.New("keys required")
 	}
-	args := append([]string{"send-keys", "-t", paneID, "--"}, keys...) // a key such as "-t" must not become an option
+	args := []string{"send-keys", "-t", paneID, "--"} // a key such as "-t" must not become an option
+	for _, k := range keys {
+		args = append(args, tmuxLit(k))
+	}
 	return exec.Command("tmux", args...).Run()
+}
+
+// tmuxLit keeps an argument literal: tmux reads a trailing ";" as a command separator, even after "--".
+func tmuxLit(s string) string {
+	if strings.HasSuffix(s, ";") {
+		return s[:len(s)-1] + `\;`
+	}
+	return s
 }
 
 // sweepStaleAgentTmux kills our claude-/codex- tmux sessions idle longer than maxIdle.

@@ -499,7 +499,7 @@ impl Mcp {
                 message
             );
             let send = m(vec![("text", s(&prefixed)), ("enter", Json::Bool(true))]);
-            let sent = match http::post_json(&format!("{}/api/session/send/{}", self.daemon, target), send.encode().as_bytes()) {
+            let sent = match http::post_json(&format!("{}/api/session/send/{}?from=agent", self.daemon, target), send.encode().as_bytes()) {
                 Ok(r) => r,
                 Err(e) => return text(id, &format!("talk_to_agent: send failed: {}", e), None, true),
             };
@@ -528,7 +528,7 @@ impl Mcp {
             );
         }
         let body = m(vec![("text", s(message)), ("enter", Json::Bool(true))]);
-        match http::post_json(&format!("{}/api/session/send/{}", self.daemon, target), body.encode().as_bytes()) {
+        match http::post_json(&format!("{}/api/session/send/{}?from=agent", self.daemon, target), body.encode().as_bytes()) {
             Ok(r) => {
                 let pane = r.fstr("pane");
                 text(id, &format!("delivered to {}", pane), Some(m(vec![("delivered", Json::Bool(true)), ("pane", s(&pane))])), false)

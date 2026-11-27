@@ -697,9 +697,13 @@ func (s *ApprovalStore) handleHook(hook string, w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-	// A decision landed at the same moment; it is already in the channel.
-	d := <-pa.reply
-	writeJSON(w, hookResponse(hook, a, d))
+	// A decision landed at the same moment; a finish with no decision sends nothing, so wait only briefly.
+	select {
+	case d := <-pa.reply:
+		writeJSON(w, hookResponse(hook, a, d))
+	case <-time.After(2 * time.Second):
+		passHook(w, hook)
+	}
 }
 
 func (s *ApprovalStore) settingsSkipWhenFocused() bool {

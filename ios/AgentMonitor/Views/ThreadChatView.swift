@@ -612,7 +612,10 @@ struct ThreadChatView: View {
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .onChange(of: items.count) { _, _ in settlePending() }
-            .onChange(of: asks.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+            // A new request scrolls into view only for a reader at the bottom; others get the jump button.
+            .onChange(of: asks.count) { old, new in
+                if new > old, atBottom || Date().timeIntervalSince(bottomLeftAt) < 0.5 { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+            }
             .environment(\.canFillComposer, true)
             .overlay(alignment: .topTrailing) {
                 if !atTop && loaded {

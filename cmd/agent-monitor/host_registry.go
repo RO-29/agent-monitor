@@ -605,7 +605,7 @@ func registerHostRoutes(mux *http.ServeMux) {
 
 // tmuxNewSessionFn starts a detached tmux session; tests swap it.
 var tmuxNewSessionFn = func(name, cwd, command string) error {
-	out, err := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", cwd, command).CombinedOutput()
+	out, err := exec.Command("tmux", "new-session", "-d", "-s", tmuxLit(name), "-c", tmuxLit(cwd), tmuxLit(command)).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("tmux new-session: %v: %s", err, strings.TrimSpace(string(out)))
 	}

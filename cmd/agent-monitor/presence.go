@@ -80,12 +80,11 @@ func startMacPresence() {
 		for {
 			locked, idle, ok := readMacPresence()
 			macPresence.Lock()
-			was := macPresence.inUse
 			macPresence.inUse = ok && macInUse(locked, idle)
 			macPresence.locked, macPresence.idle, macPresence.checked = locked, idle, time.Now()
-			left := was && !macPresence.inUse
 			macPresence.Unlock()
-			if left && notifier != nil {
+			// Each tick, not only on the leave edge: a push held just after the edge, or a setting turned off, must still go out.
+			if notifier != nil && !atMac() {
 				notifier.releaseHeld()
 			}
 			time.Sleep(5 * time.Second)

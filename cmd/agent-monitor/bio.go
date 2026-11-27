@@ -158,7 +158,8 @@ func verifyProof(r *http.Request, key string, now time.Time) (*bioProof, error) 
 	if err := checkProof(p); err != nil {
 		return nil, err
 	}
-	if !bioFresh(p.Sig, now) {
+	// The signed message, not the signature bytes, is the replay key: an ECDSA signature has a second valid form.
+	if !bioFresh(key+"\n"+hex.EncodeToString(bioMessageHash(p.Method, p.Path, p.At, bh[:])), now) {
 		return nil, errors.New("this signature was already used")
 	}
 	return p, nil
@@ -302,7 +303,9 @@ func bioPolicy(r *http.Request, need Level) (bool, string, string) {
 		return riskNeedsBio(risk), risk, sess
 	case strings.HasPrefix(p, "/api/hosts/") && strings.HasSuffix(p, "/answer"),
 		strings.HasPrefix(p, "/api/session/") && strings.HasSuffix(p, "/answer"),
+		strings.HasPrefix(p, "/api/session/prompt/"),
 		p == "/api/orch/terminal",
+		strings.HasPrefix(p, "/api/orch/threads/") && strings.HasSuffix(p, "/allow-once"),
 		strings.HasPrefix(p, "/api/secrets/") && strings.HasSuffix(p, "/answer"):
 		return true, "high", ""
 	case strings.HasPrefix(p, "/api/session/keys/"):
@@ -426,6 +429,13 @@ func sessionWaitsForPermission(id string) bool {
 // plainDeny: a deny cannot run anything, so a lock-screen Deny works without Face ID.
 func plainDeny(r *http.Request) bool {
 	p := r.URL.Path
+	if strings.HasPrefix(p, "/api/session/prompt/") {
+		body, err := readBody(r)
+		var in struct {
+			Answer string `json:"answer"`
+		}
+		return err == nil && json.Unmarshal(body, &in) == nil && (in.Answer == "no" || in.Answer == "dismiss")
+	}
 	if strings.HasPrefix(p, "/api/secrets/") && strings.HasSuffix(p, "/answer") {
 		body, err := readBody(r)
 		var in struct {

@@ -62,7 +62,16 @@ func (s *secretStore) add(name, reason, url, agent, cwd string) *SecretRequest {
 	}
 	s.reqs[r.ID] = r
 	s.mu.Unlock()
+	// A helper that dies before it waits must not leave the card open forever.
+	time.AfterFunc(secretWait+time.Minute, func() { _, _ = s.finish(r.ID, "timed_out", "", nil, nil) })
 	return r
+}
+
+func (s *secretStore) isPending(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r := s.reqs[id]
+	return r != nil && r.State == "pending"
 }
 
 func (s *secretStore) snapshot(r *SecretRequest) SecretRequest {
@@ -118,26 +127,30 @@ func (s *secretStore) finish(id, state, file string, d *Device, p *bioProof) (*S
 	return r, nil
 }
 
-// serveOnce gives val to the first reader of a new named pipe, then removes it; it also goes away after ttl.
-func serveOnce(dir string, val []byte, ttl time.Duration) (string, error) {
+// serveOnce gives val to the first reader of a new named pipe, then removes it; it also goes away after ttl or cancel.
+func serveOnce(dir string, val []byte, ttl time.Duration) (string, func(), error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	_ = os.Chmod(dir, 0o700)
 	b := make([]byte, 12)
 	_, _ = rand.Read(b)
 	path := filepath.Join(dir, hex.EncodeToString(b))
 	if err := syscall.Mkfifo(path, 0o600); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	var expired atomic.Bool
-	t := time.AfterFunc(ttl, func() {
-		expired.Store(true)
+	// end unblocks the waiting writer before the path goes, so the goroutine always exits and clears val.
+	end := func() {
+		if expired.Swap(true) {
+			return
+		}
 		if f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0); err == nil {
-			f.Close() // lets the waiting writer return
+			f.Close()
 		}
 		os.Remove(path)
-	})
+	}
+	t := time.AfterFunc(ttl, end)
 	go func() {
 		defer clear(val)
 		f, err := os.OpenFile(path, os.O_WRONLY, 0) // waits for the reader
@@ -149,9 +162,10 @@ func serveOnce(dir string, val []byte, ttl time.Duration) (string, error) {
 		}
 		f.Close()
 		t.Stop()
+		expired.Store(true)
 		os.Remove(path)
 	}()
-	return path, nil
+	return path, func() { t.Stop(); end() }, nil
 }
 
 // clearSecretDir removes pipes a previous daemon left behind; nobody can read them now.
@@ -239,18 +253,19 @@ func registerSecretRoutes(mux *http.ServeMux) {
 				bad(w, http.StatusBadRequest, "the secret is empty")
 				return
 			}
-			if req := secrets.get(id); req == nil || req.State != "pending" {
+			if !secrets.isPending(id) {
+				clear(val)
 				bad(w, http.StatusConflict, "this secret request is not waiting")
 				return
 			}
-			path, err := serveOnce(secrets.dir(), val, secretTTL)
+			path, cancel, err := serveOnce(secrets.dir(), val, secretTTL)
 			if err != nil {
 				clear(val)
 				bad(w, http.StatusInternalServerError, "could not make the one-read pipe: "+err.Error())
 				return
 			}
 			if _, err := secrets.finish(id, "saved", path, callerDevice(r), requestProof(r)); err != nil {
-				os.Remove(path)
+				cancel()
 				bad(w, http.StatusConflict, err.Error())
 				return
 			}

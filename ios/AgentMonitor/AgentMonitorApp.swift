@@ -26,7 +26,8 @@ struct AgentMonitorApp: App {
                     if scenePhase == .active { store.setForeground(true) }
                     Task { await SigningWatch.tick() }
                     while !Task.isCancelled {
-                        AgentsGlance.publish(store.glance())
+                        // Before the first load the counts are zero, which would end the Live Activity.
+                        if store.threadsLoaded { AgentsGlance.publish(store.glance()) }
                         try? await Task.sleep(for: .seconds(5))
                     }
                 }

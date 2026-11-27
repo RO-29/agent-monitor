@@ -133,3 +133,21 @@ func TestStoredProofChecksAgain(t *testing.T) {
 		t.Fatal("a changed body hash still checks")
 	}
 }
+
+func TestBioPolicyGatesTerminalPromptAnswers(t *testing.T) {
+	post := func(path, body string) *http.Request {
+		return httptest.NewRequest("POST", path, strings.NewReader(body))
+	}
+	if needs, risk, _ := bioPolicy(post("/api/session/prompt/s1", `{"answer":"yes"}`), LevelControl); !needs || risk != "high" {
+		t.Fatalf("a yes to a terminal prompt must need a signature: %v %q", needs, risk)
+	}
+	if !plainDeny(post("/api/session/prompt/s1", `{"answer":"no"}`)) || !plainDeny(post("/api/session/prompt/s1", `{"answer":"dismiss"}`)) {
+		t.Fatal("no and dismiss run nothing, so they must pass without a signature")
+	}
+	if plainDeny(post("/api/session/prompt/s1", `{"answer":"yes"}`)) {
+		t.Fatal("yes is not a deny")
+	}
+	if needs, _, _ := bioPolicy(post("/api/orch/threads/t1/allow-once", ""), LevelControl); !needs {
+		t.Fatal("allow-once lifts a spend limit, so it must need a signature")
+	}
+}

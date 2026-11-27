@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -355,6 +356,13 @@ func runServer() {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "behavior must be allow|deny"})
 			return
 		}
+		// Changed input for a tool other than a question would run something new: admin only, as in decide.
+		if body.UpdatedInput != nil && belowAdmin(r) {
+			if q := permStore.Get(id); q == nil || q.ToolName != "AskUserQuestion" {
+				writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "an edited command needs admin access"})
+				return
+			}
+		}
 		if !permStore.Respond(id, body) {
 			writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "not found or already answered"})
 			return
@@ -407,6 +415,11 @@ func runServer() {
 			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
 			return
 		}
+		// An agent's message must not land in another agent's permission menu, where "1" or "y" would approve it.
+		if r.URL.Query().Get("from") == "agent" && sessionWaitsForPermission(id) {
+			writeJSONStatus(w, http.StatusConflict, map[string]any{"error": "the recipient waits for a permission answer; try again after the person answers it"})
+			return
+		}
 		if drivenSessionAction(w, id, "send", body.Text) {
 			return
 		}
@@ -430,6 +443,11 @@ func runServer() {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		// Keys can type "!" just like send can, and "!" runs a shell command in Claude Code.
+		if belowAdmin(r) && slices.ContainsFunc(body.Keys, func(k string) bool { return strings.Contains(k, "!") }) {
+			writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a ! shell command needs admin access"})
 			return
 		}
 		rt, code, err := withTerminal(id, func(t string) error { return targetKeys(t, body.Keys) })
@@ -952,7 +970,11 @@ func runServer() {
 	for _, b := range binds {
 		addr := fmt.Sprintf("%s:%d", b, port)
 		log.Printf("agent-monitor listening on http://%s", addr)
-		go func(a string) { errCh <- http.ListenAndServe(a, handler) }(addr)
+		// No write timeout: SSE and WebSocket replies stay open.
+		go func(a string) {
+			srv := &http.Server{Addr: a, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second, MaxHeaderBytes: 64 << 10}
+			errCh <- srv.ListenAndServe()
+		}(addr)
 	}
 	log.Fatal(<-errCh)
 }
