@@ -391,13 +391,17 @@ final class AppStore {
 
     // MARK: Needs you
 
-    /// Polls /api/needs-you every 3 s while the app is active and connected; stops on a 404.
+    /// Polls /api/needs-you every 3 s while active and connected, and every 12 s while the live socket is down
+    /// (REST can work when the socket does not); stops on a 404.
     private func startNeedsYouPoll() {
         needsYouPoll?.cancel()
         needsYouPoll = Task { [weak self] in
+            var tick = 0
             while !Task.isCancelled {
                 guard let self else { return }
-                if self.appActive, self.connection == .connected, self.needsYouSupported != false { await self.loadNeedsYou() }
+                tick += 1
+                let live = self.connection == .connected
+                if self.appActive, self.needsYouSupported != false, live || tick % 4 == 0 { await self.loadNeedsYou() }
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }

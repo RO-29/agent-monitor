@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os/exec"
@@ -24,7 +25,7 @@ type TmuxPane struct {
 
 // listTmuxPanes runs tmux list-panes -a; the error keeps tmux's stderr.
 func listTmuxPanes() ([]TmuxPane, error) {
-	cmd := exec.Command("tmux", "list-panes", "-a", "-F",
+	cmd := tmuxCmd("list-panes", "-a", "-F",
 		"#{pane_id}\t#{session_name}\t#{window_id}\t#{pane_pid}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_start_command}")
 	out, err := cmd.Output()
 	if err != nil {
@@ -174,7 +175,7 @@ func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 	if paste && paneIsClaude(paneID) {
 		paste = false
 		err := typeAsKeys(text, func(t string) error {
-			return exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", tmuxLit(t)).Run()
+			return tmuxCmd("send-keys", "-t", paneID, "-l", "--", tmuxLit(t)).Run()
 		},
 			func(k []string) error { return SendKeysToTmuxPane(paneID, k) })
 		if err != nil {
@@ -185,16 +186,16 @@ func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 	if paste {
 		// One bracketed paste: typed fast as keys, a long or multi-line text loses its start in Claude Code.
 		buf := "am-paste-" + strings.TrimPrefix(paneID, "%")
-		load := exec.Command("tmux", "load-buffer", "-b", buf, "-")
+		load := tmuxCmd("load-buffer", "-b", buf, "-")
 		load.Stdin = strings.NewReader(text)
 		if err := load.Run(); err != nil {
 			return err
 		}
-		if err := exec.Command("tmux", "paste-buffer", "-p", "-d", "-b", buf, "-t", paneID).Run(); err != nil {
+		if err := tmuxCmd("paste-buffer", "-p", "-d", "-b", buf, "-t", paneID).Run(); err != nil {
 			return err
 		}
 	} else if text != "" {
-		if err := exec.Command("tmux", "send-keys", "-t", paneID, "-l", "--", tmuxLit(text)).Run(); err != nil {
+		if err := tmuxCmd("send-keys", "-t", paneID, "-l", "--", tmuxLit(text)).Run(); err != nil {
 			return err
 		}
 	}
@@ -204,7 +205,7 @@ func SendToTmuxPane(paneID, text string, sendEnter bool) error {
 		if paste {
 			time.Sleep(pasteSettle)
 		}
-		if err := exec.Command("tmux", "send-keys", "-t", paneID, "Enter").Run(); err != nil {
+		if err := tmuxCmd("send-keys", "-t", paneID, "Enter").Run(); err != nil {
 			return err
 		}
 	}
@@ -217,7 +218,7 @@ func SendCtrlCToTmuxPane(paneID string) error {
 	if paneID == "" {
 		return errors.New("paneID required")
 	}
-	return exec.Command("tmux", "send-keys", "-t", paneID, "C-c").Run()
+	return tmuxCmd("send-keys", "-t", paneID, "C-c").Run()
 }
 
 // SendKeysToTmuxPane sends tmux key names in one call, so "y Enter" is atomic.
@@ -232,7 +233,7 @@ func SendKeysToTmuxPane(paneID string, keys []string) error {
 	for _, k := range keys {
 		args = append(args, tmuxLit(k))
 	}
-	return exec.Command("tmux", args...).Run()
+	return tmuxCmd(args...).Run()
 }
 
 // tmuxLit keeps an argument literal: tmux reads a trailing ";" as a command separator, even after "--".
@@ -245,7 +246,7 @@ func tmuxLit(s string) string {
 
 // sweepStaleAgentTmux kills our claude-/codex- tmux sessions idle longer than maxIdle.
 func sweepStaleAgentTmux(maxIdle time.Duration) {
-	out, err := exec.Command("tmux", "list-sessions", "-F", "#{session_name}\t#{session_activity}").Output()
+	out, err := tmuxCmd("list-sessions", "-F", "#{session_name}\t#{session_activity}").Output()
 	if err != nil {
 		return // no server / no tmux — nothing to sweep
 	}
@@ -260,7 +261,7 @@ func sweepStaleAgentTmux(maxIdle time.Duration) {
 		if err != nil || act == 0 || now-act <= cutoff {
 			continue
 		}
-		if err := exec.Command("tmux", "kill-session", "-t", name).Run(); err == nil {
+		if err := tmuxCmd("kill-session", "-t", name).Run(); err == nil {
 			log.Printf("tmux GC: killed stale agent session %q (idle %dd)", name, (now-act)/86400)
 		}
 	}
@@ -283,7 +284,7 @@ func CapturePanes(paneIDs []string, lines int) (map[string]string, error) {
 		}
 		args = append(args, "capture-pane", "-p", "-t", id, "-S", "-"+strconv.Itoa(lines), ";", "display-message", "-p", capturePanesSep)
 	}
-	out, err := exec.Command("tmux", args...).Output()
+	out, err := tmuxCmd(args...).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +316,7 @@ func CapturePane(paneID string, lines int, plain bool) (string, error) {
 	if lines > 0 {
 		args = append(args, "-S", "-"+strconv.Itoa(lines))
 	}
-	out, err := exec.Command("tmux", args...).Output()
+	out, err := tmuxCmd(args...).Output()
 	if err != nil {
 		return "", err
 	}
@@ -326,3 +327,10 @@ func CapturePane(paneID string, lines int, plain bool) (string, error) {
 var safeKeyNameRE = regexp.MustCompile(`^([A-Za-z0-9 .,:/?=+_-]|Enter|Escape|Tab|BTab|BSpace|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|PPage|NPage|DC|C-[a-z]|M-[a-z])$`)
 
 func safeKeyName(k string) bool { return safeKeyNameRE.MatchString(k) }
+
+// tmuxCmd runs tmux with a 5 s limit, so a hung tmux server cannot hang a request or the pane watcher.
+func tmuxCmd(args ...string) *exec.Cmd {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = cancel // the deadline frees the context
+	return exec.CommandContext(ctx, "tmux", args...)
+}

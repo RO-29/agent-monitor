@@ -255,15 +255,18 @@ fn dechunk(b: &[u8]) -> Vec<u8> {
     out
 }
 
+/// A hung daemon must not freeze an MCP tool forever; the long waits pass their own limit to request.
+const JSON_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// httpJSON: GET and decode; status >= 400 becomes "HTTP <code>: <body>".
 pub fn get_json(url: &str) -> Result<crate::json::Json, String> {
-    let r = request("GET", url, None, None)?;
+    let r = request("GET", url, None, Some(JSON_TIMEOUT))?;
     decode(r)
 }
 
 /// httpPostJSON.
 pub fn post_json(url: &str, body: &[u8]) -> Result<crate::json::Json, String> {
-    let r = request("POST", url, Some(body), None)?;
+    let r = request("POST", url, Some(body), Some(JSON_TIMEOUT))?;
     decode(r)
 }
 

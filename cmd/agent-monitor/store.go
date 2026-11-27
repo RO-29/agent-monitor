@@ -89,7 +89,8 @@ func (s *Store) All() []*Session {
 	defer s.mu.Unlock()
 	out := make([]*Session, 0, len(s.sessions))
 	for _, v := range s.sessions {
-		out = append(out, v)
+		cp := *v // a copy: published sessions are never changed in place
+		out = append(out, &cp)
 	}
 	return out
 }
@@ -387,11 +388,12 @@ func (s *Store) Remove(tool Tool, sessionID string) {
 func (s *Store) SetState(tool Tool, sessionID string, state State, msg string) {
 	s.mu.Lock()
 	prev, ok := s.sessions[sid(tool, sessionID)]
+	same := ok && prev.State == state
 	s.mu.Unlock()
 	if !ok {
 		return
 	}
-	if prev.State == state && msg == "" {
+	if same && msg == "" {
 		return
 	}
 	in := UpsertInput{
@@ -424,7 +426,7 @@ func (s *Store) tick() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UnixMilli()
-	for _, v := range s.sessions {
+	for k, v := range s.sessions {
 		dt := time.Duration(now-v.LastActivityAt) * time.Millisecond
 		var next State
 		switch {
@@ -441,8 +443,11 @@ func (s *Store) tick() {
 		default:
 			continue
 		}
-		v.State = next
-		s.broadcastLocked(ServerEvent{Kind: "upsert", Session: v})
+		// Copy on write: v may already be in a listener's queue or under the WebSocket writer.
+		cp := *v
+		cp.State = next
+		s.sessions[k] = &cp
+		s.broadcastLocked(ServerEvent{Kind: "upsert", Session: &cp})
 	}
 }
 

@@ -5,6 +5,7 @@ struct TerminalScreen: View {
     let sessionID: String
     @Environment(\.dismiss) private var dismiss
     @State private var screen = ""
+    @State private var atEnd = true
     @State private var error: String?
     @State private var input = ""
     @State private var busy = false
@@ -21,9 +22,13 @@ struct TerminalScreen: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .padding(10)
                         Color.clear.frame(height: 1).id("end")
+                            .onAppear { atEnd = true }
+                            .onDisappear { atEnd = false }
                     }
                     .background(Tok.panel2)
-                    .onChange(of: screen) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+                    .defaultScrollAnchor(.bottom)
+                    // Follow new output only while the reader is at the end, so scrolling up to read works.
+                    .onChange(of: screen) { _, _ in if atEnd { proxy.scrollTo("end", anchor: .bottom) } }
                 }
                 if let error { Text(error).font(.footnote).foregroundStyle(Tok.err).padding(.horizontal, 12).padding(.top, 6) }
                 keyRow
