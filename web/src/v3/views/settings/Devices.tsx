@@ -1,4 +1,5 @@
 // Settings → Devices: paired devices, add (token shown once), revoke, and the device-token-only switch.
+import { enrollPasskey, passkeyId, passkeySupported, removePasskey } from "../../api/passkey";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtAgo } from "../../../lib/format";
 import { isMissing } from "../../api/client";
@@ -117,6 +118,17 @@ function DeviceRow({ d, onRevoked }: { d: Device; onRevoked: () => void }) {
     }
     setBusy(false);
   };
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    setErr("");
+    try {
+      await f();
+      onRevoked();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+    setBusy(false);
+  };
   const resetBio = async () => {
     setBusy(true);
     setErr("");
@@ -136,8 +148,8 @@ function DeviceRow({ d, onRevoked }: { d: Device; onRevoked: () => void }) {
           <b className="trunc">{d.name || "Unnamed device"}</b>
           {d.current && <span className="pill p-ok">this device</span>}
           {d.bio && !d.revokedAt && (
-            <span className="pill p-ok" title="Approvals and admin changes from this device need Face ID">
-              Face ID
+            <span className="pill p-ok" title={`Approvals and admin changes from this device need ${d.passkey ? "its passkey" : "Face ID"}`}>
+              {d.passkey ? "Passkey" : "Face ID"}
             </span>
           )}
           {d.revokedAt && <span className="pill p-mute">revoked {fmtAgo(d.revokedAt)}</span>}
@@ -147,8 +159,18 @@ function DeviceRow({ d, onRevoked }: { d: Device; onRevoked: () => void }) {
           <span>{d.lastUsedAt ? `Last used ${fmtAgo(d.lastUsedAt)}` : "Never used"}</span>
           {d.lastIp && <span className="mono">{d.lastIp}</span>}
           {d.bio && !d.revokedAt && (
-            <button className="btn sm ghost" disabled={busy} onClick={resetBio} title="Use this when the phone lost its Face ID key, for example after a new install. The phone can then set a new key.">
-              Reset Face ID
+            <button className="btn sm ghost" disabled={busy} onClick={resetBio} title="Use this when the device lost its key, for example after a new install. The device can then set a new key.">
+              {d.passkey ? "Reset passkey" : "Reset Face ID"}
+            </button>
+          )}
+          {d.current && !d.revokedAt && !d.bio && passkeySupported() && (
+            <button className="btn sm" disabled={busy} onClick={() => run(() => enrollPasskey(d.name))} title="Approvals from this browser then need Touch ID, Face ID or the device password">
+              Use a passkey for approvals
+            </button>
+          )}
+          {d.current && d.passkey && passkeyId() && (
+            <button className="btn sm ghost" disabled={busy} onClick={() => run(removePasskey)}>
+              Remove passkey
             </button>
           )}
         </div>

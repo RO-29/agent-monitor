@@ -91,6 +91,7 @@ export const v3 = {
   deleteRule: (id: string) => req<unknown>("DELETE", `/api/approvals/rules/${enc(id)}`),
   ruleSuggestions: () => get<{ suggestions: RuleSuggestion[] }>("/api/approvals/rules/suggest"),
   dismissSuggestion: (key: string) => req<unknown>("POST", `/api/approvals/rules/suggest/${enc(key)}/dismiss`),
+  proof: (id: string) => get<{ ok: boolean; kind?: string; detail?: string }>(`/api/approvals/${encodeURIComponent(id)}/proof`),
   audit: (q: { since?: number; limit?: number } = {}) => get<{ approvals?: Approval[]; audit?: Approval[] } | Approval[]>(`/api/approvals/audit${qs(q)}`),
   approvalSettings: () => get<ApprovalSettings>("/api/approvals/settings"),
   saveApprovalSettings: (s: ApprovalSettings) => req<ApprovalSettings>("POST", "/api/approvals/settings", s),

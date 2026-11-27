@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import V3App from "./v3/V3App";
 import "./styles/tokens.css";
 import { connectLive } from "./lib/ws";
+import { installPasskeyFetch } from "./v3/api/passkey";
 
 // Theme before first paint: stored choice (light, dark or system), else dark.
 try {
@@ -75,6 +76,8 @@ function watchForNewBuild() {
   document.addEventListener("visibilitychange", () => void check());
 }
 if (location.pathname !== "/pair") watchForNewBuild();
+
+installPasskeyFetch();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

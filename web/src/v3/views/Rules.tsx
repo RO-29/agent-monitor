@@ -236,6 +236,23 @@ function SettingsBox() {
           <div className="xs muted" style={{ marginTop: 4 }}>
             Both: the agent shows its own prompt at once, a card shows here too, and the first answer in either place counts. Hold: the card holds the request for the window above, then the terminal prompt.
           </div>
+          <div className="grid2" style={{ marginTop: 10 }}>
+            <label>
+              Face ID or passkey for
+              <select className="inp" value={s.bioMinRisk ?? "medium"} onChange={(e) => setS({ ...s, bioMinRisk: e.target.value as "low" | "medium" | "high" })}>
+                <option value="low">Every approval</option>
+                <option value="medium">Medium and high risk</option>
+                <option value="high">High risk only</option>
+              </select>
+            </label>
+            <label>
+              Trust a session after one check (minutes, 0 = off)
+              <input className="inp" type="number" min={0} max={120} value={s.bioTrustMin ?? 10} onChange={(e) => setS({ ...s, bioTrustMin: Number(e.target.value) })} />
+            </label>
+          </div>
+          <div className="xs muted" style={{ marginTop: 4 }}>
+            Applies to devices with Face ID or a passkey. A high-risk approval always needs a new check, and a plain deny never does.
+          </div>
           <label className="toggle" style={{ marginTop: 10 }}>
             <input type="checkbox" checked={s.skipWhenFocused} onChange={(e) => setS({ ...s, skipWhenFocused: e.target.checked })} />
             Skip the hold when the agent's tmux pane has focus (you are at the terminal)
@@ -341,6 +358,27 @@ function HooksBox() {
   );
 }
 
+const proofLabel: Record<string, string> = { faceid: "Face ID", passkey: "Passkey", trusted: "Trusted" };
+
+// ProofPill shows how a decision was signed; a click checks the stored signature again on the daemon.
+function ProofPill({ id, kind }: { id: string; kind: string }) {
+  const [res, setRes] = useState<{ ok: boolean; detail?: string } | null>(null);
+  const check = async () => {
+    try {
+      setRes(await v3.proof(id));
+    } catch (e) {
+      setRes({ ok: false, detail: (e as Error).message });
+    }
+  };
+  const cls = res ? (res.ok ? "p-ok" : "p-err") : "p-mute";
+  return (
+    <button className={`pill ${cls}`} style={{ marginLeft: 6, cursor: "pointer", border: 0 }} onClick={check} title={res?.detail || "Check the signature again"}>
+      {proofLabel[kind] || kind}
+      {res ? (res.ok ? " ✓" : " ✗") : ""}
+    </button>
+  );
+}
+
 function AuditBox() {
   const res = useApi(() => v3.audit({ limit: 50 }), [], { poll: 60_000 });
   const rows = Array.isArray(res.data) ? res.data : asList<Approval>(res.data, "approvals").length ? asList<Approval>(res.data, "approvals") : asList<Approval>(res.data, "audit");
@@ -379,7 +417,10 @@ function AuditBox() {
                   <td>
                     <span className={`pill ${a.state.includes("allow") ? "p-ok" : a.state.includes("den") ? "p-err" : "p-mute"}`}>{a.state}</span>
                   </td>
-                  <td className="muted">{a.decidedBy || "·"}</td>
+                  <td className="muted">
+                    {a.deviceName ? `${a.decidedBy || "web"} · ${a.deviceName}` : a.decidedBy || "·"}
+                    {a.proof && <ProofPill id={a.id} kind={a.proof.kind} />}
+                  </td>
                 </tr>
               ))}
             </tbody>

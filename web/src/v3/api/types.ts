@@ -34,6 +34,8 @@ export interface Approval {
   state: ApprovalState;
   decidedAt?: number;
   decidedBy?: string;
+  deviceName?: string;
+  proof?: { kind: string; device?: string; at?: number };
   message?: string;
   ruleId?: string;
   drivenId?: string; // orchestrator thread that raised it
@@ -90,6 +92,8 @@ export interface ApprovalSettings {
   questionHoldSeconds: number;
   skipWhenFocused: boolean;
   approvalsMode?: "both" | "hold";
+  bioMinRisk?: "low" | "medium" | "high";
+  bioTrustMin?: number;
 }
 export interface HooksSnippet {
   claude: unknown;

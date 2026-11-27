@@ -354,6 +354,7 @@ func registerTraceRoutes(mux *http.ServeMux) {
 					QuietAllowsNeedsYou *bool   `json:"quietAllowsNeedsYou"`
 					BatchSec            *int    `json:"batchSec"`
 					RemindMin           *int    `json:"remindMin"`
+					PhoneWhenAway       *bool   `json:"phoneWhenAway"`
 				} `json:"notify"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
@@ -374,7 +375,7 @@ func registerTraceRoutes(mux *http.ServeMux) {
 					dst **bool
 					v   *bool
 				}{{&nc.NeedsYou, nb.NeedsYou}, {&nc.Finished, nb.Finished}, {&nc.Error, nb.Error},
-					{&nc.Spend, nb.Spend}, {&nc.QuietAllowsNeedsYou, nb.QuietAllowsNeedsYou}} {
+					{&nc.Spend, nb.Spend}, {&nc.QuietAllowsNeedsYou, nb.QuietAllowsNeedsYou}, {&nc.PhoneWhenAway, nb.PhoneWhenAway}} {
 					if f.v != nil {
 						*f.dst = f.v
 					}

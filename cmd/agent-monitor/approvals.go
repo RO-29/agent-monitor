@@ -46,12 +46,15 @@ type Approval struct {
 	RootID      string           `json:"rootId,omitempty"`
 	Options     []acpPermOption  `json:"options,omitempty"`
 	// Source "terminal-shown": the CLI shows its own prompt too, and a card decision is typed into it.
-	Source       string `json:"source,omitempty"`
-	SentAt       int64  `json:"sentAt,omitempty"`
-	Choice       string `json:"choice,omitempty"`
-	ToolUseID    string `json:"toolUseId,omitempty"`
-	Group        string `json:"group,omitempty"`
-	GroupPattern string `json:"groupPattern,omitempty"`
+	Source       string    `json:"source,omitempty"`
+	SentAt       int64     `json:"sentAt,omitempty"`
+	Choice       string    `json:"choice,omitempty"`
+	ToolUseID    string    `json:"toolUseId,omitempty"`
+	Group        string    `json:"group,omitempty"`
+	DeviceID     string    `json:"deviceId,omitempty"`
+	DeviceName   string    `json:"deviceName,omitempty"`
+	Proof        *bioProof `json:"proof,omitempty"`
+	GroupPattern string    `json:"groupPattern,omitempty"`
 	fullText     string
 	// noAutoAllow keeps allow rules from answering (read-only workspaces); deny rules still apply.
 	noAutoAllow bool
@@ -77,6 +80,10 @@ type ApprovalSettings struct {
 	DrivenApprovalTimeoutSec int `json:"drivenApprovalTimeoutSec"`
 	// ApprovalsMode "both" shows a reachable session's prompt in its terminal and on cards; "hold" holds every hook.
 	ApprovalsMode string `json:"approvalsMode"`
+	// BioMinRisk: the lowest risk (low, medium, high) whose approval needs Face ID or a passkey; empty = medium.
+	BioMinRisk string `json:"bioMinRisk,omitempty"`
+	// BioTrustMin: minutes one signature covers the same session's low and medium approvals; nil = 10, 0 = off.
+	BioTrustMin *int `json:"bioTrustMin,omitempty"`
 }
 
 type approvalDecision struct {
@@ -89,6 +96,8 @@ type approvalDecision struct {
 	Surface      string            `json:"surface,omitempty"`
 	// OptionID picks one of Approval.Options (ACP agents).
 	OptionID string `json:"optionId,omitempty"`
+	device   *Device
+	proof    *bioProof
 	// limited: the sender is below admin, so it may not add a lasting rule ("always").
 	limited bool
 	// AlwaysScope "claude" returns the CLI's permission_suggestions instead of adding an agent-monitor rule.
@@ -237,6 +246,41 @@ func (s *ApprovalStore) audit(since int64, limit int) ([]*Approval, error) {
 		}
 	}
 	return out, rows.Err()
+}
+
+func (s *ApprovalStore) auditOne(id string) *Approval {
+	if s.db == nil {
+		return nil
+	}
+	var raw string
+	if s.db.QueryRow(`SELECT json FROM approvals WHERE id = ?`, id).Scan(&raw) != nil {
+		return nil
+	}
+	var a Approval
+	if json.Unmarshal([]byte(raw), &a) != nil {
+		return nil
+	}
+	return &a
+}
+
+// proofCheck checks a stored decision's signature again, against the key it was made with.
+func proofCheck(a *Approval) map[string]any {
+	out := map[string]any{"id": a.ID, "device": a.DeviceName, "decidedAt": a.DecidedAt, "state": a.State}
+	switch {
+	case a.Proof == nil:
+		out["ok"], out["detail"] = false, "no signature: decided on the Mac, by a rule, or by a device with no Face ID or passkey"
+	case a.Proof.Kind == "trusted":
+		out["ok"], out["kind"], out["detail"] = true, "trusted", "inside the trust window of an earlier signature from this device"
+	default:
+		err := checkProof(a.Proof)
+		out["ok"], out["kind"] = err == nil, a.Proof.Kind
+		if err != nil {
+			out["detail"] = err.Error()
+		} else {
+			out["detail"] = "the signature matches the request and the device key"
+		}
+	}
+	return out
 }
 
 func (s *ApprovalStore) writeAudit(a *Approval) {
@@ -479,6 +523,9 @@ func (s *ApprovalStore) finishChoice(id, state, by, msg, choice string, d *appro
 	p.a.State, p.a.DecidedAt, p.a.DecidedBy, p.a.Message = state, time.Now().UnixMilli(), by, msg
 	if choice != "" {
 		p.a.Choice = choice
+	}
+	if d != nil && d.device != nil {
+		p.a.DeviceID, p.a.DeviceName, p.a.Proof = d.device.ID, d.device.Name, d.proof
 	}
 	if d != nil {
 		p.reply <- *d
@@ -967,6 +1014,8 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 					SkipWhenFocused          *bool   `json:"skipWhenFocused"`
 					DrivenApprovalTimeoutSec *int    `json:"drivenApprovalTimeoutSec"`
 					ApprovalsMode            *string `json:"approvalsMode"`
+					BioMinRisk               *string `json:"bioMinRisk"`
+					BioTrustMin              *int    `json:"bioTrustMin"`
 				}
 				if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 					bad(http.StatusBadRequest, "bad json")
@@ -980,6 +1029,14 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 				}
 				if v := in.ApprovalsMode; v != nil && *v != approvalsModeBoth && *v != approvalsModeHold {
 					bad(http.StatusBadRequest, "approvalsMode must be both or hold")
+					return
+				}
+				if v := in.BioMinRisk; v != nil && *v != "low" && *v != "medium" && *v != "high" {
+					bad(http.StatusBadRequest, "bioMinRisk must be low, medium or high")
+					return
+				}
+				if v := in.BioTrustMin; v != nil && (*v < 0 || *v > 120) {
+					bad(http.StatusBadRequest, "bioTrustMin must be 0..120")
 					return
 				}
 				if v := in.DrivenApprovalTimeoutSec; v != nil && (*v < 0 || *v > 86400) {
@@ -1002,6 +1059,12 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 				if in.ApprovalsMode != nil {
 					s.settings.ApprovalsMode = *in.ApprovalsMode
 				}
+				if in.BioMinRisk != nil {
+					s.settings.BioMinRisk = *in.BioMinRisk
+				}
+				if in.BioTrustMin != nil {
+					s.settings.BioTrustMin = in.BioTrustMin
+				}
 				st := s.settings
 				err := writeFileAtomic(filepath.Join(s.dir, "approval-settings.json"), st)
 				s.mu.Unlock()
@@ -1015,6 +1078,13 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 			}
 		case len(parts) == 1 && parts[0] == "hooks-snippet" && r.Method == http.MethodGet:
 			writeJSON(w, s.hooksSnippet())
+		case len(parts) == 2 && parts[1] == "proof" && r.Method == http.MethodGet:
+			a := s.auditOne(parts[0])
+			if a == nil {
+				bad(http.StatusNotFound, "no decided approval with this id")
+				return
+			}
+			writeJSON(w, proofCheck(a))
 		case len(parts) == 2 && parts[1] == "decide" && r.Method == http.MethodPost:
 			var d approvalDecision
 			if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
@@ -1022,6 +1092,7 @@ func (s *ApprovalStore) routes(mux *http.ServeMux) {
 				return
 			}
 			d.limited = callerLevel(r) < LevelAdmin
+			d.device, d.proof = callerDevice(r), requestProof(r)
 			a, code, err := s.decide(parts[0], d)
 			if err != nil {
 				bad(code, err.Error())

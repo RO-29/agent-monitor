@@ -12,6 +12,8 @@ export interface Device {
   current?: boolean;
   /** Approvals and admin writes from this device need a Face ID signature. */
   bio?: boolean;
+  /** The key is this browser's passkey, not a phone's Face ID key. */
+  passkey?: boolean;
 }
 export interface NewDevice {
   device: Device;

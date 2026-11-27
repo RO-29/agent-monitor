@@ -66,6 +66,9 @@ struct QuickApprovalCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(Tok.panel2, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            if let diff = EditDiff.lines(tool: a.toolName, input: a.input) {
+                EditDiffView(lines: diff, limit: 16)
+            }
             if a.highRisk, !a.riskReason.isEmpty {
                 Label(a.riskReason, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote).foregroundStyle(Tok.err)

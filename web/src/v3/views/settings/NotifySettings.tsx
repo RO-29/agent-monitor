@@ -166,6 +166,15 @@ export default function NotifySettings() {
             )}
           </div>
           <div className="ibox">
+            <h3>Phone alerts</h3>
+            <Switch
+              on={cfg.phoneWhenAway}
+              label="Only when I leave the Mac"
+              hint="While the Mac is unlocked and you used it in the last 2 minutes, phone alerts wait. They go out when the screen locks or the Mac goes idle, unless you answered them first."
+              onChange={(v) => save({ phoneWhenAway: v })}
+            />
+          </div>
+          <div className="ibox">
             <h3>Reminder</h3>
             <p className="sx-p">When nobody answers a request and nobody opens its notice, it comes once more as "Still waiting".</p>
             <div className="sx-row">

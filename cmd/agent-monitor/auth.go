@@ -91,10 +91,12 @@ func authMiddleware(next http.Handler) http.Handler {
 				writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "this device has " + d.Level + " access; this needs " + need.String()})
 				return
 			}
-			if !bioGate(w, r, d, need) {
+			r2, ok := bioGate(w, r, d, need)
+			if !ok {
 				logAccess(r, d, need, http.StatusPreconditionRequired)
 				return
 			}
+			r = r2
 			deviceStore.Touch(d.ID, remoteIP(r))
 			noteDeviceAgent(d.ID, d.Name, r.UserAgent())
 			rec := &statusRecorder{ResponseWriter: w, code: http.StatusOK}

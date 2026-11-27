@@ -51,6 +51,8 @@ type ONotification struct {
 	Resolved bool `json:"resolved,omitempty"`
 	// Prompt: it is about a terminal prompt, so the phone offers Yes and No on it.
 	Prompt bool `json:"prompt,omitempty"`
+	// AtMac: the person used the Mac when it came, so the phone holds it until they leave.
+	AtMac bool `json:"atMac,omitempty"`
 }
 
 // NotifySettings: nil booleans mean the default (on).
@@ -65,6 +67,8 @@ type NotifySettings struct {
 	BatchSec            *int   `json:"batchSec"`
 	// RemindMin: minutes before an unanswered "needs you" alert comes again, once; nil = 10, 0 = off.
 	RemindMin *int `json:"remindMin"`
+	// PhoneWhenAway holds phone pushes while the Mac is unlocked and in use; nil = on.
+	PhoneWhenAway *bool `json:"phoneWhenAway"`
 }
 
 func (s NotifySettings) remindAfter() time.Duration {
@@ -145,6 +149,7 @@ type Notifier struct {
 	openAt  map[int64]time.Time // open "needs you" alerts not reminded yet
 	// restored: keys reloaded at start, checked once against the live requests.
 	restored map[string]bool
+	held     map[int64]ONotification // pushes that wait until the person leaves the Mac
 }
 
 type notifyBatch struct {
@@ -324,6 +329,7 @@ func (n *Notifier) deliver(ev notifyEvent) {
 		no.Prompt = no.Prompt || strings.HasPrefix(k, "tp:")
 	}
 	no.Quiet = cfg.quiet(now) && !(ev.Kind == "needs-you" && onOr(cfg.QuietAllowsNeedsYou))
+	no.AtMac = !no.Quiet && atMac()
 	b, _ := json.Marshal(no)
 	res, err := n.db.Exec(`INSERT INTO notifications(at, json, keys) VALUES(?, ?, ?)`, no.At, string(b), strings.Join(ev.Keys, "\n"))
 	if err != nil {
@@ -362,11 +368,40 @@ func (n *Notifier) deliver(ev notifyEvent) {
 		n.prune(now)
 	}
 	n.publish(no)
-	if !no.Quiet && n.push != nil {
+	if no.AtMac {
+		n.mu.Lock()
+		if n.held == nil {
+			n.held = map[int64]ONotification{}
+		}
+		n.held[id] = no
+		n.mu.Unlock()
+		return
+	}
+	n.sendPush(no)
+}
+
+func (n *Notifier) sendPush(no ONotification) {
+	if n.push != nil {
 		go n.pushAll(no)
 	}
-	if !no.Quiet && n.bark {
+	if n.bark {
 		barkQueue(no, n.get)
+	}
+}
+
+// releaseHeld pushes what came while the person used the Mac and is still open and unread.
+func (n *Notifier) releaseHeld() {
+	n.mu.Lock()
+	held := n.held
+	n.held = nil
+	n.mu.Unlock()
+	for id, no := range held {
+		cur, ok := n.get(strconv.FormatInt(id, 10))
+		if !ok || cur.Read || cur.Resolved {
+			continue
+		}
+		no.AtMac = false
+		n.sendPush(no)
 	}
 }
 

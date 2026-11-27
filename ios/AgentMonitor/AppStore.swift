@@ -737,7 +737,7 @@ final class AppStore {
         // Alert only for fresh needs-you items; a reconnect replays older ones.
         let fresh = Int64(Date().timeIntervalSince1970 * 1000) - a.at < 120_000
         let looking = showsChat(a.threadId)
-        let canShow = !(a.quiet ?? false) && !(a.resolved ?? false) && fresh && !looking
+        let canShow = !(a.quiet ?? false) && !(a.atMac ?? false) && !(a.resolved ?? false) && fresh && !looking
         // The bell is spent only when its banner shows or the user already looks at the chat.
         let watched = (canShow || (fresh && looking)) && a.kind == "finished" && takeDoneWatch(a.threadId)
         if canShow, !(a.kind == "needs-you" && bannerShown(a.threadId)) {

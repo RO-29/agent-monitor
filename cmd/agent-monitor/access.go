@@ -121,7 +121,8 @@ var accessRules = []accessRule{
 	{"POST", "/api/orch/threads", "", LevelControl},
 	{"POST", "/api/session-title$", "", LevelControl},
 	{"POST DELETE", "/api/devices/me/bio-key$", "", LevelView}, // a device sets its own Face ID key; a replacement needs the old one
-	{"POST", "/api/ios/renew$", "", LevelView},                 // starts ios/resign.sh at most once per 30 min; view lets a peer pass the phone's ask on
+	{"POST DELETE", "/api/devices/me/passkey$", "", LevelView},
+	{"POST", "/api/ios/renew$", "", LevelView}, // starts ios/resign.sh at most once per 30 min; view lets a peer pass the phone's ask on
 
 	// Reading what agents do and ask.
 	{"GET HEAD", "/ws$", "", LevelView},
@@ -260,4 +261,9 @@ func logAccess(r *http.Request, d *Device, need Level, code int) {
 	}
 	b, _ := json.Marshal(e)
 	_, _ = accessLog.f.Write(append(b, '\n'))
+}
+
+func callerDevice(r *http.Request) *Device {
+	c, _ := r.Context().Value(callerKey{}).(caller)
+	return c.device
 }

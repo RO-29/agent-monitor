@@ -95,7 +95,10 @@ struct HookApprovalCard: View {
                 RiskBadge(risk: a.risk)
                 Text(a.displayTool).font(Typo.mono(12, .medium)).foregroundStyle(Tok.fg2).lineLimit(1)
             }
-            AskPre(text: a.command ?? a.summary, lines: 12)
+            if let diff = EditDiff.lines(tool: a.toolName, input: a.input) {
+                EditDiffView(lines: diff)
+            }
+            AskPre(text: a.command ?? a.summary, lines: EditDiff.lines(tool: a.toolName, input: a.input) == nil ? 12 : 2)
                 .contextMenu {
                     Button { UIPasteboard.general.string = a.command ?? a.summary } label: { Label("Copy", systemImage: "doc.on.doc") }
                 }

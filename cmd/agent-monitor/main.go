@@ -124,6 +124,7 @@ func runServer() {
 		log.Printf("pane dedupe: dropped %d duplicate-on-pane registration(s)", len(dropped))
 	}
 	startTmuxBadges()
+	startMacPresence()
 	go func() {
 		// 15s: notices hookless CLIs exiting without forking ps and tmux too often.
 		t := time.NewTicker(15 * time.Second)

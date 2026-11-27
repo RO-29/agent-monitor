@@ -41,7 +41,8 @@ type Device struct {
 	Kind       string `json:"kind"`              // device (a person's app) or machine (another daemon)
 	Level      string `json:"level"`             // view, control or admin; a machine is never admin
 	BoundIP    string `json:"boundIp,omitempty"` // a machine grant works only from the address that paired
-	Bio        bool   `json:"bio"`               // approvals and admin writes need a Face ID signature
+	Bio        bool   `json:"bio"`               // approvals and admin writes need a Face ID or passkey signature
+	Passkey    bool   `json:"passkey"`           // the key is a browser passkey, not the phone's Face ID key
 	bioKey     string // base64 of the uncompressed P-256 public key from the phone's Secure Enclave
 	hash       []byte
 }
@@ -130,7 +131,7 @@ func openDeviceStore(dir string) (*DeviceStore, error) {
 			return nil, err
 		}
 		d.hash, _ = hex.DecodeString(h)
-		d.Bio = d.bioKey != ""
+		d.Bio, d.Passkey = d.bioKey != "", strings.HasPrefix(d.bioKey, passkeyPrefix)
 		s.devs = append(s.devs, d)
 	}
 	return s, rows.Err()
@@ -281,7 +282,7 @@ func (s *DeviceStore) SetBioKey(id, key string) (bool, error) {
 			if _, err := s.db.Exec(`UPDATE devices SET bio_key=? WHERE id=?`, key, id); err != nil {
 				return true, err
 			}
-			d.bioKey, d.Bio = key, key != ""
+			d.bioKey, d.Bio, d.Passkey = key, key != "", strings.HasPrefix(key, passkeyPrefix)
 			return true, nil
 		}
 	}

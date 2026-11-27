@@ -17,6 +17,7 @@ export interface NotifySettings {
   quietAllowsNeedsYou: boolean;
   batchSec: number;
   remindMin: number; // 0 = off
+  phoneWhenAway: boolean; // hold phone pushes while the Mac is unlocked and in use
 }
 export interface CodexRate {
   in: number; // USD per 1M input tokens
@@ -39,6 +40,7 @@ export const DEFAULT_NOTIFY: NotifySettings = {
   quietAllowsNeedsYou: true,
   batchSec: 20,
   remindMin: 10,
+  phoneWhenAway: true,
 };
 export const DEFAULT_SPEND: SpendSettings = { perThreadUsd: 0, perDayUsd: 0, codexRates: {} };
 
@@ -54,6 +56,7 @@ function normNotify(raw: unknown): NotifySettings {
     quietAllowsNeedsYou: typeof r.quietAllowsNeedsYou === "boolean" ? r.quietAllowsNeedsYou : true,
     batchSec: Number(r.batchSec) || 20,
     remindMin: typeof r.remindMin === "number" ? r.remindMin : 10,
+    phoneWhenAway: typeof r.phoneWhenAway === "boolean" ? r.phoneWhenAway : true,
   };
 }
 function normSpend(raw: unknown): SpendSettings {

@@ -172,6 +172,7 @@ struct AlertItem: Codable, Identifiable, Hashable {
     var read: Bool?
     var count: Int?
     var quiet: Bool?
+    var atMac: Bool?
     var resolved: Bool?         // every approval it was about has ended
     var prompt: Bool?           // about a terminal prompt: the banner offers Yes and No
 
