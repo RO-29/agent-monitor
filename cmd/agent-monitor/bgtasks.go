@@ -52,22 +52,6 @@ func (st *bgState) drop(toolUseID string) {
 	}
 }
 
-// resultText reads a tool_result content that is a string or a list of text blocks.
-func resultText(raw json.RawMessage) string {
-	var s string
-	if json.Unmarshal(raw, &s) == nil {
-		return s
-	}
-	var parts []struct {
-		Text string `json:"text"`
-	}
-	_ = json.Unmarshal(raw, &parts)
-	for _, p := range parts {
-		s += p.Text
-	}
-	return s
-}
-
 // runningBg reads only the bytes added since the last call, so a poll costs one stat.
 func runningBg(path string) []BgRun {
 	if path == "" {
