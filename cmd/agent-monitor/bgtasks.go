@@ -24,7 +24,8 @@ type BgRun struct {
 type bgState struct {
 	off       int64
 	open      map[string]BgRun
-	skipFirst bool // a tail scan starts mid-line
+	byTask    map[string]string // task id (b…/agent id) to tool-use id; TaskStop writes no finish notice
+	skipFirst bool              // a tail scan starts mid-line
 }
 
 var bgScan = struct {
@@ -37,7 +38,35 @@ const (
 	bgMaxAge    = 6 * time.Hour
 )
 
-var reToolUseID = regexp.MustCompile(`<tool-use-id>([^<]+)</tool-use-id>`)
+var (
+	reToolUseID = regexp.MustCompile(`<tool-use-id>([^<]+)</tool-use-id>`)
+	reTaskID    = regexp.MustCompile(`^(?:Command running in background with ID: |Async agent launched[^\n]*\nagentId: )([A-Za-z0-9_-]+)`)
+)
+
+func (st *bgState) drop(toolUseID string) {
+	delete(st.open, toolUseID)
+	for t, u := range st.byTask {
+		if u == toolUseID {
+			delete(st.byTask, t)
+		}
+	}
+}
+
+// resultText reads a tool_result content that is a string or a list of text blocks.
+func resultText(raw json.RawMessage) string {
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var parts []struct {
+		Text string `json:"text"`
+	}
+	_ = json.Unmarshal(raw, &parts)
+	for _, p := range parts {
+		s += p.Text
+	}
+	return s
+}
 
 // runningBg reads only the bytes added since the last call, so a poll costs one stat.
 func runningBg(path string) []BgRun {
@@ -54,7 +83,7 @@ func runningBg(path string) []BgRun {
 	}
 	if st == nil || fi.Size() < st.off {
 		off := max(0, fi.Size()-bgTailBytes)
-		st = &bgState{off: off, open: map[string]BgRun{}, skipFirst: off > 0}
+		st = &bgState{off: off, open: map[string]BgRun{}, byTask: map[string]string{}, skipFirst: off > 0}
 		bgScan.m[path] = st
 	}
 	if fi.Size() > st.off {
@@ -64,7 +93,7 @@ func runningBg(path string) []BgRun {
 	out := make([]BgRun, 0, len(st.open))
 	for id, b := range st.open {
 		if b.StartedAt < cut {
-			delete(st.open, id)
+			st.drop(id)
 			continue
 		}
 		out = append(out, b)
@@ -101,7 +130,9 @@ func bgLine(line []byte, st *bgState) {
 	start := bytes.Contains(line, []byte(`"run_in_background":true`))
 	done := bytes.Contains(line, []byte(`<task-notification>`))
 	failed := bytes.Contains(line, []byte(`"is_error":true`))
-	if !start && !done && !failed {
+	launched := bytes.Contains(line, []byte(`running in background with ID: `)) || bytes.Contains(line, []byte(`agentId: `))
+	stopped := bytes.Contains(line, []byte(`Successfully stopped task`))
+	if !start && !done && !failed && !launched && !stopped {
 		return
 	}
 	var j struct {
@@ -123,26 +154,47 @@ func bgLine(line []byte, st *bgState) {
 		}
 		if strings.HasPrefix(strings.TrimSpace(txt), "<task-notification>") {
 			for _, m := range reToolUseID.FindAllStringSubmatch(txt, -1) {
-				delete(st.open, m[1])
+				st.drop(m[1])
 			}
 			return
 		}
 	}
 	var blocks []struct {
-		Type      string         `json:"type"`
-		ID        string         `json:"id"`
-		Name      string         `json:"name"`
-		Input     map[string]any `json:"input"`
-		ToolUseID string         `json:"tool_use_id"`
-		IsError   bool           `json:"is_error"`
+		Type      string          `json:"type"`
+		ID        string          `json:"id"`
+		Name      string          `json:"name"`
+		Input     map[string]any  `json:"input"`
+		ToolUseID string          `json:"tool_use_id"`
+		IsError   bool            `json:"is_error"`
+		Content   json.RawMessage `json:"content"`
 	}
 	if json.Unmarshal(j.Message.Content, &blocks) != nil {
 		return
 	}
-	if j.Message.Role == "user" { // a refused or failed start never sends a finish notice
+	if j.Message.Role == "user" {
 		for _, b := range blocks {
-			if b.Type == "tool_result" && b.IsError {
-				delete(st.open, b.ToolUseID)
+			if b.Type != "tool_result" {
+				continue
+			}
+			if b.IsError { // a refused or failed start never sends a finish notice
+				st.drop(b.ToolUseID)
+				continue
+			}
+			txt := strings.TrimSpace(resultText(b.Content))
+			if _, ok := st.open[b.ToolUseID]; ok {
+				if m := reTaskID.FindStringSubmatch(txt); m != nil {
+					st.byTask[m[1]] = b.ToolUseID
+				}
+				continue
+			}
+			var stop struct {
+				Message string `json:"message"`
+				TaskID  string `json:"task_id"`
+			}
+			if strings.HasPrefix(txt, `{"message":"Successfully stopped task`) && json.Unmarshal([]byte(txt), &stop) == nil {
+				if u, ok := st.byTask[stop.TaskID]; ok {
+					st.drop(u)
+				}
 			}
 		}
 		return
