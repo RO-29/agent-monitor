@@ -56,6 +56,7 @@ export interface Session {
   subagentCount?: number;
   filesTouched?: number;
   bgTasksCount?: number;
+  bgRunning?: { id: string; label: string; tool: string; startedAt: number }[]; // background tasks that have not finished
   transcriptPath?: string;
   /** User messages waiting in the CLI's own queue (Claude Code). */
   cliQueued?: number;

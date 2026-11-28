@@ -10,7 +10,8 @@ import { typing } from "../../ctx";
 import { overlayOpen } from "../../keys";
 import { GROUPS, type WRow, type WTree } from "./rows";
 import { agentKey } from "../../components/AgentIcon";
-import { useV3 } from "../../live";
+import { loadThreads, useV3 } from "../../live";
+import { v3 } from "../../api/client";
 import { ChipRow, groupHits, hitHref, markedTerms, SessionHitRow, typedChips, useTitleOf, useTranscriptSearch, withoutChips } from "./search";
 import { UsageMini } from "../../components/Usage";
 import { useFleet } from "../../api/fleet";
@@ -30,9 +31,39 @@ const fmtUntil = (ms: number) => {
 };
 
 export type RowAction = "pin" | "settle" | "snooze1h" | "snoozeTomorrow" | "unsnooze";
+// Terminal threads keep pin, done and snooze in the daemon (POST /api/v3/mark) for the thread and its sessions.
+async function watchedAction(r: WRow, a: RowAction) {
+  const ids = [r.id, ...(r.watched?.thread?.sessions || [])];
+  const settle = settleLabel(r) === "Settle";
+  const was = r.snoozedUntil || 0;
+  const send = (b: { pinned?: boolean; settled?: boolean; snoozedUntil?: number }) => v3.mark({ ids, ...b }).then(() => loadThreads());
+  try {
+    let done: string, undo: () => Promise<unknown>;
+    if (a === "pin") {
+      await send({ pinned: !r.pinned });
+      done = r.pinned ? "Unpinned" : "Pinned";
+      undo = () => send({ pinned: !!r.pinned });
+    } else if (a === "settle") {
+      await send({ settled: settle });
+      done = settle ? "Marked done" : "Back in Ready";
+      undo = () => send({ settled: !settle });
+    } else {
+      const until = a === "snooze1h" ? Date.now() + HOUR : a === "snoozeTomorrow" ? tomorrowAt9() : 0;
+      await send({ snoozedUntil: until });
+      done = until ? `Snoozed until ${fmtUntil(until)}` : "Unsnoozed";
+      undo = () => send({ snoozedUntil: was });
+    }
+    const run = () => void undo().catch((e: Error) => showToast("Could not undo", e.message, { kind: "alert" }));
+    lastUndo = { run, until: Date.now() + 8000 };
+    showToast(`${done}: ${r.title}`, undefined, { action: "Undo (u)", onClick: () => ((lastUndo = null), run()) });
+  } catch (e) {
+    showToast("Could not update the thread", (e as Error).message, { kind: "alert" });
+  }
+}
+
 export async function rowAction(r: WRow, a: RowAction) {
   const t = r.driven;
-  if (!t) return;
+  if (!t) return r.peer ? showToast("This thread runs on another machine", "Pin, done and snooze work only for threads on this machine.") : watchedAction(r, a);
   const settle = settleLabel(r) === "Settle";
   const was = r.snoozedUntil || 0;
   try {
@@ -61,7 +92,7 @@ export async function rowAction(r: WRow, a: RowAction) {
 // The last row action, for the u key while its toast shows.
 let lastUndo: { run: () => void; until: number } | null = null;
 // Settle on a settled (not snoozed) row means unsettle.
-const settleLabel = (r: WRow) => (r.group === "settled" && !r.snoozedUntil ? "Unsettle" : "Settle");
+const settleLabel = (r: WRow) => (r.group === "settled" && !r.snoozedUntil && !(r.mode === "watched" && !r.watched?.thread?.mark?.settledAt) ? "Unsettle" : "Settle");
 
 function PinIcon() {
   return (
@@ -80,6 +111,8 @@ function noteOf(r: WRow): { text: string; cls: string } | null {
   const s = r.watched?.session;
   const n = s && s.state !== "completed" && s.state !== "abandoned" ? s.cliQueued || 0 : 0;
   if (n > 0) return { text: `${n} queued`, cls: "" };
+  const bg = s && s.state !== "completed" && s.state !== "abandoned" ? s.bgRunning?.length || 0 : 0;
+  if (bg > 0) return { text: `${bg} in background`, cls: "" };
   return null;
 }
 const dotCls = (r: WRow) => (r.group === "need" ? "need" : r.group === "working" ? "run" : r.status === "Error" ? "err" : "");
@@ -126,7 +159,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
   const cost = useContext(CostCtx).get(r.id);
   const note = noteOf(r);
   const dc = dotCls(r);
-  const menuBtn = r.driven ? (
+  const menuBtn = !r.peer ? (
     <button
       className="wdots"
       aria-label={`Actions for ${r.title}`}
@@ -142,7 +175,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
     </button>
   ) : null;
   const ctx = (e: React.MouseEvent) => {
-    if (!r.driven) return;
+    if (r.peer) return;
     e.preventDefault();
     onMenu(r, e.clientX, e.clientY);
   };
@@ -153,7 +186,7 @@ function RowBtn({ r, sel, child, onMenu }: { r: WRow; sel: boolean; child?: bool
   const keep = sp.get("beside");
   const to = keep && keep !== rid ? `/w/${enc(rid)}?beside=${enc(keep)}` : `/w/${enc(rid)}`;
   return (
-    <div className={`wth-w ${child ? "wsubrow" : ""} ${r.driven ? "has-menu" : ""}`}>
+    <div className={`wth-w ${child ? "wsubrow" : ""} ${!r.peer ? "has-menu" : ""}`}>
       <Link to={to} className={`wth ${child ? "wsubrow" : ""}`} role="option" aria-selected={sel} data-id={r.id} onContextMenu={ctx} onClick={(e) => e.altKey && openBeside(rid) && e.preventDefault()} title={`${r.title} · ${status}${sel ? "" : " (⌥-click opens it beside)"}`}>
         <span className={`wsd ${dc} ${dc === "run" ? "wpulse" : ""}`} aria-hidden />
         <span className="ti">{r.title}</span>
@@ -398,7 +431,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
     setMenu(null);
   };
 
-  // e settles, p pins, z snoozes the selected driven row for 1 hour (z again clears it).
+  // e settles, p pins, z snoozes the selected row for 1 hour (z again clears it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "u" && lastUndo && Date.now() < lastUndo.until && !typing(e) && !overlayOpen() && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -410,7 +443,7 @@ export function ThreadList({ rows, tree, sel, notice, liveLabel }: { rows: WRow[
       }
       if (typing(e) || overlayOpen() || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !["e", "p", "z"].includes(e.key)) return;
       const r = rows.find((x) => x.id === sel);
-      if (!r?.driven) return;
+      if (!r) return;
       e.preventDefault();
       void rowAction(r, e.key === "p" ? "pin" : e.key === "e" ? "settle" : r.snoozedUntil ? "unsnooze" : "snooze1h");
     };

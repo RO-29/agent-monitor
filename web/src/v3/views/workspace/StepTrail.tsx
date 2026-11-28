@@ -7,7 +7,9 @@ import { HitCtx } from "./hit";
 const TRAIL_KINDS = new Set(["command", "fileChange", "mcp", "web", "other", "review"]);
 export const TRAIL_MIN = 4;
 
-export const inTrail = (it: OItem) => TRAIL_KINDS.has(it.kind) && it.by !== "user";
+// A question to the user is conversation, so it stays out of the folded steps.
+export const isAsk = (it: OItem) => it.kind === "other" && it.command === "AskUserQuestion";
+export const inTrail = (it: OItem) => TRAIL_KINDS.has(it.kind) && it.by !== "user" && !isAsk(it);
 
 const failedOf = (it: OItem) => it.status === "failed" || (it.exitCode !== undefined && it.exitCode !== 0);
 

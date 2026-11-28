@@ -62,6 +62,7 @@ type Session struct {
 	SubagentCount     int            `json:"subagentCount,omitempty"`
 	FilesTouched      int            `json:"filesTouched,omitempty"`
 	BgTasksCount      int            `json:"bgTasksCount,omitempty"`
+	BgRunning         []BgRun        `json:"bgRunning,omitempty"`      // set per response by withPhase
 	TranscriptPath    string         `json:"transcriptPath,omitempty"` // for /api/session/:id/full
 	CLIQueued         int            `json:"cliQueued,omitempty"`      // user messages in the CLI's own queue
 	RecentEvents      []RecentEvent  `json:"recentEvents"`

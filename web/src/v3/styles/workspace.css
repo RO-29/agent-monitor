@@ -74,6 +74,7 @@
 .v3 .ws .f .n{margin-left:auto;white-space:nowrap}
 .v3 .ws .add{color:var(--ok)} .v3 .ws .del{color:var(--err)}
 .v3 .ws .wagent{font-size:14px;line-height:1.65}
+.v3 .ws .wqa-a{margin-top:6px;padding:6px 10px;border-radius:8px;background:var(--panel-2);display:inline-block;font-size:13px}
 .v3 .ws .wmeta{display:flex;align-items:center;gap:5px;font-size:11.5px;line-height:1.4;color:var(--muted);margin:0 0 3px}
 .v3 .ws .wmeta-u{justify-content:flex-end;margin:3px 2px 0}
 .v3 .ws .wmeta-i{display:inline-flex;color:var(--fg-2)}
@@ -898,6 +899,7 @@
 @media (max-width:640px){.v3 .ws .dnote-c{padding-left:10px}}
 .v3 .ws .wcost{font-size:11.5px;color:var(--fg-2);padding:2px 7px;border:1px solid var(--line);border-radius:10px;white-space:nowrap}
 .v3 .ws .wactivity{display:flex;align-items:center;gap:6px;margin-block:2px 8px;font-size:12.5px;color:var(--fg-2)}
+.v3 .ws .wactivity.wbg{display:block;line-height:1.5}.v3 .ws .wbg .mute{color:var(--muted)}
 .v3 .ws .wtrail{display:flex;flex-direction:column;gap:4px}
 .v3 .ws .wtrail-h{display:flex;align-items:center;gap:10px;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
 .v3 .ws .wtrail-bar{display:flex;gap:2px;flex:1 1 40%;min-width:60px;height:14px;align-items:stretch}

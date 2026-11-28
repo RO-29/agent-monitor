@@ -56,6 +56,8 @@ func sessionPhase(s *Session, need map[string]bool, today int64) string {
 		return phaseNeedsYou
 	case s.State == StateRunning:
 		return phaseWorking
+	case markOf(s.ID).hides(s.LastActivityAt, time.Now().UnixMilli()):
+		return phaseDone
 	case (s.State == StateIdle || s.State == StateAwaitingInput) && s.LastActivityAt >= today:
 		return phaseReady
 	}
@@ -69,6 +71,9 @@ func withPhase(in []*Session) []*Session {
 	for i, s := range in {
 		cp := *s
 		cp.Phase = sessionPhase(s, need, today)
+		if s.Tool == ToolClaude && s.State != StateCompleted && s.State != StateAbandoned {
+			cp.BgRunning = runningBg(s.TranscriptPath)
+		}
 		out[i] = &cp
 	}
 	return out
@@ -129,7 +134,23 @@ func phaseRank(p string) int {
 func watchPhases(st *Store) {
 	go func() {
 		prev := map[string]bool{}
+		day := startOfDay(time.Now())
+		last := time.Now().UnixMilli()
 		for range time.Tick(2 * time.Second) {
+			now := time.Now()
+			// At midnight Ready becomes Done; a snooze that ends brings a thread back. Neither has an event of its own.
+			if d := startOfDay(now); d != day {
+				for _, s := range st.All() {
+					if s.LastActivityAt >= day && s.LastActivityAt < d {
+						st.Touch(s.ID)
+					}
+				}
+				day = d
+			}
+			for _, id := range snoozesEnded(last, now.UnixMilli()) {
+				st.Touch(id)
+			}
+			last = now.UnixMilli()
 			cur := needSet()
 			for id := range cur {
 				if !prev[id] {

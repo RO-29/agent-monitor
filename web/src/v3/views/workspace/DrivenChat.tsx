@@ -24,7 +24,7 @@ import { agentName, useV3 } from "../../live";
 import { childMap, cmdLabel, descendants, drivenLabel, drivenThreads, permModeLabel, WORKSPACE_LABEL, workspaceOf } from "./rows";
 import { askFromApproval, askFromRequest, AskAnnouncer, WsApproval, type AskInfo } from "./WsApproval";
 import { DiffView } from "./Diff";
-import { StepTrail, TrailBar, trailSegments } from "./StepTrail";
+import { isAsk, StepTrail, TrailBar, trailSegments } from "./StepTrail";
 import { gitKey, isLoopback, runDiff, useDiffNav, useGit, type DiffNav } from "./git";
 import { openIn } from "./GitBox";
 import { drivenTerm, TermDock, toggleTerm, useTermOpen } from "./TermDock";
@@ -248,6 +248,24 @@ function ItemBody({ it, hl }: { it: OItem; hl: boolean }) {
             </li>
           ))}
         </ul>
+      </div>
+    );
+  }
+  if (isAsk(it)) {
+    const answers = [...(it.output || "").matchAll(/"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g)].map((m) => m[2]);
+    return (
+      <div className="wagent wqa">
+        <MsgMeta it={it} />
+        <Markdown text={it.text || "Question"} collapseAt={0} />
+        {answers.length > 0 ? (
+          <div className="wqa-a">
+            <span className="muted">You answered</span> {answers.join(" · ")}
+          </div>
+        ) : it.status === "started" ? (
+          <div className="wqa-a muted">Waiting for your answer</div>
+        ) : it.status === "failed" ? (
+          <div className="wqa-a muted">Not answered</div>
+        ) : null}
       </div>
     );
   }

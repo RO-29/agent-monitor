@@ -286,11 +286,12 @@ type ThreadV3 struct {
 	Handover        string `json:"handover,omitempty"`
 	TerminalSession string `json:"terminalSession,omitempty"`
 	// Kind "driven" marks an orchestrator thread row (id = drivenId); watched rows leave it empty.
-	Kind     string  `json:"kind,omitempty"`
-	Status   string  `json:"status,omitempty"`
-	Group    string  `json:"group,omitempty"` // a driven thread's server group: need, working, ready or settled
-	Phase    string  `json:"phase,omitempty"` // needs-you, working, ready or done, from threadPhase
-	SpendUSD float64 `json:"spendUsd,omitempty"`
+	Kind     string      `json:"kind,omitempty"`
+	Status   string      `json:"status,omitempty"`
+	Group    string      `json:"group,omitempty"` // a driven thread's server group: need, working, ready or settled
+	Phase    string      `json:"phase,omitempty"` // needs-you, working, ready or done, from threadPhase
+	Mark     *threadMark `json:"mark,omitempty"`  // pin, done and snooze of a watched thread
+	SpendUSD float64     `json:"spendUsd,omitempty"`
 	V4Fields
 }
 
@@ -358,6 +359,9 @@ func threadsV3All(v *threadView) []ThreadV3 {
 			tv.ParentThread, tv.ChildKind = p[0], p[1]
 		}
 		tv.Phase = threadPhase(&tv, v.byID, need, today)
+		if m := markOf(t.ID); m != (threadMark{}) {
+			tv.Mark = &m
+		}
 		pos[t.ID] = len(out)
 		out = append(out, tv)
 	}
@@ -1112,6 +1116,7 @@ func registerOpsRoutes(mux *http.ServeMux) {
 		q := r.URL.Query()
 		writeJSON(w, shapeThreads(threadsResponse(q.Get("all") == "1", q.Get("driven") == "1"), q))
 	})
+	mux.HandleFunc("/api/v3/mark", handleMark)
 	mux.HandleFunc("/api/v3/now", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, buildNow(time.Now().UnixMilli()))
 	})

@@ -166,6 +166,10 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
     if (r.thread && (r.thread.kind === "driven" || isDrivenCopy(r.thread, natives))) continue;
     if (!r.thread && r.approvals.length && r.approvals.every((a) => a.drivenId)) continue;
     const group: WGroup = r.bucket === "needs-you" ? "need" : r.bucket === "running" ? "working" : r.bucket === "idle-today" ? "ready" : "settled";
+    const mk = r.thread?.mark;
+    const snoozeAt = mk?.snoozedUntil && mk.snoozedUntil > now ? mk.snoozedUntil : undefined;
+    // A finished thread with no prompt and no outcome is noise (a CLI opened and closed); Cursor does not count turns.
+    if (group === "settled" && r.thread && !r.thread.turns && !r.thread.outcomeLine && agentKey(r.id) !== "cursor") continue;
     if (group === "settled" && ++settled > settledWatchedMax) continue;
     out.push({
       id: r.id,
@@ -177,6 +181,8 @@ export function buildWRows(orch: OrchState, watched: Row[], needIds: Set<string>
       branch: r.thread?.ref || "",
       status: group === "need" ? "Needs you" : group === "working" ? "Working" : r.bucket === "idle-today" ? "Ready" : "Done",
       at: r.lastAt,
+      pinned: !!mk?.pinned,
+      snoozedUntil: group === "settled" ? snoozeAt : undefined,
       watched: r,
     });
   }

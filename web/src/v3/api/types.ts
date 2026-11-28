@@ -205,6 +205,7 @@ export interface Shipped {
   ts: number;
 }
 export interface V3Thread extends Thread {
+  mark?: { pinned?: boolean; settledAt?: number; snoozedUntil?: number };
   parentThread?: string;
   childKind?: string;
   childCount?: number;

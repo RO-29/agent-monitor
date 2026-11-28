@@ -86,6 +86,7 @@ export const v3 = {
   decide: (id: string, b: DecideBody) => (decideHook ? decideHook(id, b) : req<Approval>("POST", `/api/approvals/${enc(id)}/decide`, { surface: "web", ...b })),
   rules: () => get<{ rules: Rule[] } | Rule[]>("/api/approvals/rules"),
   /** Saves the user's title for a watched session; "" returns to the agent's own title. */
+  mark: (b: { ids: string[]; pinned?: boolean; settled?: boolean; snoozedUntil?: number }) => req<void>("POST", "/api/v3/mark", b),
   renameSession: (id: string, title: string) => req<{ ok: boolean; title: string }>("POST", "/api/session-title", { id, title }),
   saveRule: (r: Partial<Rule>) => req<Rule>("POST", "/api/approvals/rules", r),
   deleteRule: (id: string) => req<unknown>("DELETE", `/api/approvals/rules/${enc(id)}`),

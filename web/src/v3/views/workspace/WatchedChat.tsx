@@ -12,7 +12,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../../api/client";
 import type { Session } from "../../../api/types";
 import { showToast } from "../../../app/toast";
-import { modelShort } from "../../../lib/format";
+import { fmtAgo, modelShort } from "../../../lib/format";
 import { useLive } from "../../../lib/ws";
 import { continueSession, sendMessage, useOrch } from "../../api/orch";
 import { useShell } from "../../ctx";
@@ -463,6 +463,17 @@ export function WatchedChat({ row, feed, onBack, onSide, tab, onTab, hit, kids, 
         {!oldTab && (q.activity || running) && (
           <div className="wactivity" role="status" aria-live="polite">
             <span className="wic run wpulse">●</span> {q.activity || `${cliName} is working…`}
+          </div>
+        )}
+        {!oldTab && !!session?.bgRunning?.length && (
+          <div className="wactivity wbg" role="status" title="Commands and agents that run in the background; the agent continues when each one finishes">
+            <span className="wic run wpulse">●</span> {session.bgRunning.length === 1 ? "1 task runs" : `${session.bgRunning.length} tasks run`} in the background:{" "}
+            {session.bgRunning.map((b, i) => (
+              <span key={b.id}>
+                {i > 0 && " · "}
+                {b.label || b.tool} <span className="mute">{fmtAgo(b.startedAt, "")}</span>
+              </span>
+            ))}
           </div>
         )}
         {!oldTab && <AskAnnouncer asks={asks} />}

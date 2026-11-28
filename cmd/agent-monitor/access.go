@@ -108,6 +108,7 @@ var accessRules = []accessRule{
 	// Driving the agents.
 	{"POST", "/api/approvals/", "/decide", LevelControl},
 	{"POST", "/api/session/prompt/", "", LevelControl},
+	{"POST", "/api/v3/mark$", "", LevelControl},
 	{"POST", "/api/session/end/", "", LevelControl},
 	{"POST", "/api/session/resume/", "", LevelControl},
 	{"POST", "/api/session/send/", "", LevelControl},
